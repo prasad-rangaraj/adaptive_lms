@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from core.security import get_password_hash, verify_password, create_access_token, get_current_user
 from models.user import User
+from models.tenant import Tenant
 from models.cognitive_profile import CognitiveProfile
-from schemas.schemas import UserRegisterRequest, TokenResponse, UserResponse
+from schemas.schemas import UserRegisterRequest, OrgRegisterRequest, TokenResponse, UserResponse
 import secrets
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -42,6 +43,57 @@ async def register(payload: UserRegisterRequest, db: Session = Depends(get_db)):
     return user
 
 
+@router.post("/register-org", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register_org(payload: OrgRegisterRequest, db: Session = Depends(get_db)):
+    """
+    Public self-signup for organizations.
+    Creates a Tenant + tenant_admin account atomically, then returns a JWT
+    so the new admin lands directly in their dashboard.
+    """
+    # Guard: email must be unique
+    if db.query(User).filter(User.email == payload.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Guard: subdomain must be unique
+    subdomain = payload.subdomain.lower().strip().replace(" ", "-")
+    if db.query(Tenant).filter(Tenant.subdomain == subdomain).first():
+        raise HTTPException(status_code=400, detail="Organisation subdomain already taken")
+
+    # 1. Create Tenant
+    tenant = Tenant(
+        name=payload.org_name,
+        subdomain=subdomain,
+        plan="basic",
+        is_active=True,
+    )
+    db.add(tenant)
+    db.flush()  # get tenant.id
+
+    # 2. Create tenant_admin user
+    user = User(
+        email=payload.email,
+        full_name=payload.full_name,
+        password_hash=get_password_hash(payload.password),
+        role="tenant_admin",
+        tenant_id=tenant.id,
+        is_active=True,
+        is_email_verified=False,
+        email_verify_token=secrets.token_urlsafe(32),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token(data={"sub": str(user.id), "role": user.role})
+    return TokenResponse(
+        access_token=token,
+        user_id=user.id,
+        role=user.role,
+        full_name=user.full_name,
+        tenant_id=user.tenant_id,
+    )
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -64,6 +116,33 @@ async def login(
         role=user.role,
         full_name=user.full_name,
         tenant_id=user.tenant_id,
+    )
+
+
+from core.security import require_role
+
+@router.post("/impersonate/{target_user_id}", response_model=TokenResponse)
+async def impersonate_user(
+    target_user_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_role("super_admin")),
+):
+    """Super Admin only: Generate a JWT for any user to log in as them."""
+    target_user = db.query(User).filter(User.id == target_user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found")
+    
+    if not target_user.is_active:
+        raise HTTPException(status_code=403, detail="Target user is inactive")
+
+    # Generate a normal token for the target user
+    token = create_access_token(data={"sub": str(target_user.id), "role": target_user.role})
+    return TokenResponse(
+        access_token=token,
+        user_id=target_user.id,
+        role=target_user.role,
+        full_name=target_user.full_name,
+        tenant_id=target_user.tenant_id,
     )
 
 

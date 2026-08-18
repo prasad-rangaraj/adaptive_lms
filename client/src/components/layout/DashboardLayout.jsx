@@ -3,7 +3,7 @@ import { useAuthStore } from '../../store/authStore';
 import {
   LayoutDashboard, BookOpen, Bot, Shield, Building2,
   LogOut, GraduationCap, Brain,
-  Bell, Search, Settings, ChevronRight,
+  Bell, Search, Settings, ChevronRight, Users, CreditCard,
 } from 'lucide-react';
 
 const navConfig = {
@@ -24,15 +24,27 @@ const navConfig = {
   admin: [
     { section: null, items: [
       { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/admin/tenants', icon: Building2, label: 'Tenants' },
+      { to: '/admin/users', icon: Building2, label: 'Manage Users' },
+    ]},
+  ],
+  super_admin: [
+    { section: null, items: [
+      { to: '/super-admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { to: '/super-admin/tenants', icon: Building2, label: 'Tenants' },
+      { to: '/super-admin/users', icon: Users, label: 'Global Users' },
+      { to: '/super-admin/courses', icon: BookOpen, label: 'Platform Content' },
+      { to: '/super-admin/audit-logs', icon: Settings, label: 'Audit Logs' },
+      { to: '/super-admin/billing', icon: CreditCard, label: 'Billing & Subscriptions' },
+      { to: '/super-admin/settings', icon: Settings, label: 'Platform Settings' },
     ]},
   ],
 };
 
 const roleConfig = {
-  student: { label: 'Student', gradient: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#4f46e5', light: '#eef2ff', glow: '0 4px 14px rgba(99,102,241,0.3)' },
-  teacher: { label: 'Teacher', gradient: 'linear-gradient(135deg, #059669, #0d9488)', color: '#059669', light: '#ecfdf5', glow: '0 4px 14px rgba(16,185,129,0.3)' },
-  admin:   { label: 'Admin',   gradient: 'linear-gradient(135deg, #d97706, #dc2626)', color: '#d97706', light: '#fffbeb', glow: '0 4px 14px rgba(245,158,11,0.3)' },
+  student:     { label: 'Student', gradient: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#4f46e5', light: '#eef2ff', glow: '0 4px 14px rgba(99,102,241,0.3)' },
+  teacher:     { label: 'Teacher', gradient: 'linear-gradient(135deg, #059669, #0d9488)', color: '#059669', light: '#ecfdf5', glow: '0 4px 14px rgba(16,185,129,0.3)' },
+  admin:       { label: 'Admin',   gradient: 'linear-gradient(135deg, #d97706, #dc2626)', color: '#d97706', light: '#fffbeb', glow: '0 4px 14px rgba(245,158,11,0.3)' },
+  super_admin: { label: 'Super Admin', gradient: 'linear-gradient(135deg, #db2777, #9333ea)', color: '#db2777', light: '#fdf2f8', glow: '0 4px 14px rgba(219,39,119,0.3)' },
 };
 
 export default function DashboardLayout({ role }) {
@@ -126,7 +138,26 @@ export default function DashboardLayout({ role }) {
       </aside>
 
       {/* ── Main Content ── */}
-      <div className="main-content" style={{ flex: 1 }}>
+      <div className="main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        
+        {/* Impersonation Banner */}
+        {useAuthStore.getState().isImpersonating() && (
+          <div style={{ background: '#fef2f2', borderBottom: '1px solid #fecdd3', padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <span style={{ fontSize: '0.875rem', color: '#9f1239', fontWeight: 600 }}>
+              ⚠️ You are currently impersonating {user?.full_name} ({user?.role})
+            </span>
+            <button 
+              onClick={() => {
+                useAuthStore.getState().stopImpersonating();
+                window.location.href = '/super-admin/dashboard';
+              }}
+              style={{ background: '#e11d48', color: 'white', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Stop Impersonating
+            </button>
+          </div>
+        )}
+
         {/* Top Header */}
         <header style={{
           height: 60,

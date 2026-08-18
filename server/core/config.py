@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     # Database
-    DATABASE_URL: str = "postgresql://postgres:2006@127.0.0.1:5433/adaptive_lms"
+    DATABASE_URL: str = "postgresql://postgres:2006@127.0.0.1:5432/adaptive_lms"
 
     # Redis & Celery
     REDIS_URL: str = "redis://localhost:6379/0"

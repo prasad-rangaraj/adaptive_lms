@@ -1,4 +1,5 @@
-import { Building2, Users, DollarSign, Activity, MoreHorizontal, Plus, TrendingUp, TrendingDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Building2, Users, DollarSign, Activity, MoreHorizontal, Plus, TrendingUp, TrendingDown, UserPlus, GraduationCap, BookOpen, ArrowRight } from 'lucide-react';
 
 const stats = [
   { label: 'Total Tenants', value: '14', icon: Building2, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', trend: '+2 this month', up: true },
@@ -30,6 +31,7 @@ const tenantAvatarColors = [
 ];
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div className="page-header">
@@ -40,6 +42,32 @@ export default function AdminDashboard() {
         <button className="btn btn-primary" style={{ gap: 8 }}>
           <Plus size={16} /> Add Tenant
         </button>
+      </div>
+
+      {/* Quick Actions */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+        {[
+          { label: 'Manage Members', desc: 'Add students & teachers to your org', icon: UserPlus, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', path: '/admin/users' },
+          { label: 'View Students', desc: 'Browse all enrolled students', icon: GraduationCap, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', path: '/admin/users' },
+          { label: 'View Teachers', desc: 'Manage course instructors', icon: BookOpen, color: '#059669', bg: '#ecfdf5', border: '#bbf7d0', path: '/admin/users' },
+        ].map(({ label, desc, icon: Icon, color, bg, border, path }) => (
+          <div key={label} onClick={() => navigate(path)} style={{
+            background: 'white', border: `1px solid ${border}`, borderRadius: 16, padding: '1.25rem',
+            cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 14,
+          }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 20px ${color}18`; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none'; }}
+          >
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon size={22} color={color} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontWeight: 700, color: '#111827', fontSize: '0.9375rem' }}>{label}</p>
+              <p style={{ color: '#9ca3af', fontSize: '0.8125rem', marginTop: 2 }}>{desc}</p>
+            </div>
+            <ArrowRight size={16} color="#9ca3af" />
+          </div>
+        ))}
       </div>
 
       {/* Stats */}

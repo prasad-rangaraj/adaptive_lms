@@ -34,7 +34,19 @@ export const authAPI = {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     }),
   register: (data) => api.post('/api/auth/register', data),
+  registerOrg: (data) => api.post('/api/auth/register-org', data),
   me: () => api.get('/api/auth/me'),
+  impersonate: (userId) => api.post(`/api/auth/impersonate/${userId}`),
+};
+
+// --- Admin (user management) ---
+export const adminAPI = {
+  listUsers: (tenantId) => api.get(`/api/tenants/${tenantId}/users`),
+  createUser: (tenantId, data) => api.post(`/api/tenants/${tenantId}/users`, data),
+  listGlobalUsers: () => api.get('/api/admin/users/global'),
+  listGlobalCourses: () => api.get('/api/admin/courses/global'),
+  listAuditLogs: () => api.get('/api/admin/audit-logs'),
+  getBillingStats: () => api.get('/api/admin/billing'),
 };
 
 // --- Tenants ---
@@ -42,6 +54,7 @@ export const tenantsAPI = {
   list: () => api.get('/api/tenants'),
   create: (data) => api.post('/api/tenants', data),
   get: (id) => api.get(`/api/tenants/${id}`),
+  update: (id, data) => api.put(`/api/tenants/${id}`, data),
   deactivate: (id) => api.delete(`/api/tenants/${id}`),
 };
 

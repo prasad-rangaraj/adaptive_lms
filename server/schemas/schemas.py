@@ -13,6 +13,35 @@ class UserRegisterRequest(BaseModel):
     tenant_id: Optional[int] = None
 
 
+class OrgRegisterRequest(BaseModel):
+    """Public self-signup: creates a Tenant + tenant_admin in one call."""
+    org_name: str
+    subdomain: str
+    full_name: str
+    email: EmailStr
+    password: str
+
+
+class AdminCreateUserRequest(BaseModel):
+    """Tenant admin creates a student or teacher account."""
+    full_name: str
+    email: EmailStr
+    role: str  # "student" or "teacher"
+    password: Optional[str] = None  # auto-generated if omitted
+
+
+class AdminCreateUserResponse(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    role: str
+    tenant_id: Optional[int]
+    temp_password: Optional[str]  # shown once, then discarded
+
+    class Config:
+        from_attributes = True
+
+
 class UserLoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -51,6 +80,15 @@ class TenantCreateRequest(BaseModel):
     plan: str = "basic"
     primary_color: str = "#6366F1"
     secondary_color: str = "#8B5CF6"
+
+
+class TenantUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    subdomain: Optional[str] = None
+    plan: Optional[str] = None
+    primary_color: Optional[str] = None
+    secondary_color: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 class TenantResponse(BaseModel):
@@ -146,3 +184,18 @@ class ProctoringViolationEvent(BaseModel):
     severity: str = "medium"
     description: Optional[str] = None
     screenshot_base64: Optional[str] = None
+
+# --- Audit Logs Schemas ---
+
+class AuditLogResponse(BaseModel):
+    id: int
+    tenant_id: Optional[int]
+    user_id: Optional[int]
+    action: str
+    resource: str
+    details: Optional[dict]
+    ip_address: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
