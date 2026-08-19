@@ -47,6 +47,10 @@ export const adminAPI = {
   listGlobalCourses: () => api.get('/api/admin/courses/global'),
   listAuditLogs: () => api.get('/api/admin/audit-logs'),
   getBillingStats: () => api.get('/api/admin/billing'),
+  getDashboardStats: () => api.get('/api/admin/stats'),
+  getSystemHealth: () => api.get('/api/admin/health'),
+  getSupportTickets: () => api.get('/api/admin/tickets'),
+  suspendUser: (userId) => api.post(`/api/admin/users/${userId}/suspend`),
 };
 
 // --- Tenants ---

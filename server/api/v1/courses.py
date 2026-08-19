@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
-from core.database import get_db
+from db.database import get_db
 from core.security import get_current_user, require_role
 from models.course import Course, CourseMaterial
 from models.user import User

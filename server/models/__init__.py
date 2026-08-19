@@ -1,4 +1,4 @@
-from core.database import Base  # noqa: F401
+from db.database import Base  # noqa: F401
 
 # Import all models so SQLAlchemy can discover them for alembic and Base.metadata.create_all()
 from models.tenant import Tenant  # noqa: F401

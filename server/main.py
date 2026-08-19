@@ -3,13 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from core.config import settings
-from core.database import Base, engine, create_extensions
+from db.database import Base, engine, create_extensions
 
 # Import all models to register them with SQLAlchemy
 import models  # noqa: F401
 
 # Import all routers
-from routers import auth, tenants, courses, ai_tutor, proctoring, assignments, admin
+from api.v1 import auth, tenants, courses, ai_tutor, proctoring, assignments, admin
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

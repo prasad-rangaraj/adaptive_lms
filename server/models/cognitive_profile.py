@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, Float, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from core.database import Base
+from db.database import Base
 
 
 class CognitiveProfile(Base):

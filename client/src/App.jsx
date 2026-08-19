@@ -35,6 +35,10 @@ import GlobalCoursesPage from './pages/admin/GlobalCoursesPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
 import BillingPage from './pages/admin/BillingPage';
 import GlobalSettingsPage from './pages/admin/GlobalSettingsPage';
+import AnalyticsPage from './pages/admin/AnalyticsPage';
+import AnnouncementsPage from './pages/admin/AnnouncementsPage';
+import HealthPage from './pages/admin/HealthPage';
+import SupportTicketsPage from './pages/admin/SupportTicketsPage';
 import ManageUsersPage from './pages/admin/ManageUsersPage';
 
 const queryClient = new QueryClient({
@@ -124,6 +128,10 @@ export default function App() {
             <Route path="audit-logs" element={<AuditLogsPage />} />
             <Route path="billing" element={<BillingPage />} />
             <Route path="settings" element={<GlobalSettingsPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="announcements" element={<AnnouncementsPage />} />
+            <Route path="health" element={<HealthPage />} />
+            <Route path="support" element={<SupportTicketsPage />} />
           </Route>
 
           {/* Fallback */}

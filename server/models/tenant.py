@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from core.database import Base
+from db.database import Base
 
 
 class Tenant(Base):

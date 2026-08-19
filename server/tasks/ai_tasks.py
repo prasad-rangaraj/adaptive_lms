@@ -4,7 +4,7 @@ These run asynchronously, without blocking the main FastAPI server.
 """
 from celery_worker import celery_app
 from sqlalchemy.orm import Session
-from core.database import SessionLocal
+from db.database import SessionLocal
 from core.config import settings
 from openai import OpenAI
 

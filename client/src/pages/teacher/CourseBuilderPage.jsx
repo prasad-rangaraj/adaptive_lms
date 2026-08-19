@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { coursesAPI } from '../../lib/api';
+import { coursesAPI } from '../../services/api.service';
 import { Upload, BookOpen, Plus, CheckCircle, Loader2, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 

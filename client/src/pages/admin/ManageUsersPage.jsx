@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminAPI } from '../../lib/api';
+import { adminAPI } from '../../services/api.service';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import {

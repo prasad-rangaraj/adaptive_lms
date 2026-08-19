@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
-from core.database import get_db
+from db.database import get_db
 from core.security import get_current_user
 from models.assignment import Assignment, AssignmentSubmission
 from models.user import User

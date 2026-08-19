@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from core.database import get_db
+from db.database import get_db
 from core.security import get_current_user, require_role, get_password_hash
 from models.tenant import Tenant
 from models.user import User

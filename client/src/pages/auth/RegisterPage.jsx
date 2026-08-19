@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authAPI } from '../../lib/api';
+import { authAPI } from '../../services/api.service';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { GraduationCap, Building2, User, Mail, Lock, Eye, EyeOff, ArrowRight, Globe } from 'lucide-react';

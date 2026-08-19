@@ -4,6 +4,7 @@ import {
   LayoutDashboard, BookOpen, Bot, Shield, Building2,
   LogOut, GraduationCap, Brain,
   Bell, Search, Settings, ChevronRight, Users, CreditCard,
+  BarChart3, Megaphone, ClipboardList, HeartPulse, LifeBuoy,
 } from 'lucide-react';
 
 const navConfig = {
@@ -28,72 +29,89 @@ const navConfig = {
     ]},
   ],
   super_admin: [
-    { section: null, items: [
-      { to: '/super-admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/super-admin/tenants', icon: Building2, label: 'Tenants' },
-      { to: '/super-admin/users', icon: Users, label: 'Global Users' },
-      { to: '/super-admin/courses', icon: BookOpen, label: 'Platform Content' },
-      { to: '/super-admin/audit-logs', icon: Settings, label: 'Audit Logs' },
-      { to: '/super-admin/billing', icon: CreditCard, label: 'Billing & Subscriptions' },
-      { to: '/super-admin/settings', icon: Settings, label: 'Platform Settings' },
+    { section: 'Overview', items: [
+      { to: '/super-admin/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
+      { to: '/super-admin/analytics',     icon: BarChart3,       label: 'Analytics' },
+      { to: '/super-admin/health',        icon: HeartPulse,      label: 'System Health' },
+    ]},
+    { section: 'Platform', items: [
+      { to: '/super-admin/tenants',       icon: Building2,       label: 'Organizations' },
+      { to: '/super-admin/users',         icon: Users,           label: 'Global Users' },
+      { to: '/super-admin/courses',       icon: BookOpen,        label: 'Content Library' },
+      { to: '/super-admin/announcements', icon: Megaphone,       label: 'Announcements' },
+      { to: '/super-admin/support',       icon: LifeBuoy,        label: 'Support Tickets' },
+    ]},
+    { section: 'System', items: [
+      { to: '/super-admin/audit-logs',    icon: ClipboardList,   label: 'Audit Logs' },
+      { to: '/super-admin/billing',       icon: CreditCard,      label: 'Billing' },
+      { to: '/super-admin/settings',      icon: Settings,        label: 'Settings' },
     ]},
   ],
 };
 
+
 const roleConfig = {
-  student:     { label: 'Student', gradient: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#4f46e5', light: '#eef2ff', glow: '0 4px 14px rgba(99,102,241,0.3)' },
-  teacher:     { label: 'Teacher', gradient: 'linear-gradient(135deg, #059669, #0d9488)', color: '#059669', light: '#ecfdf5', glow: '0 4px 14px rgba(16,185,129,0.3)' },
-  admin:       { label: 'Admin',   gradient: 'linear-gradient(135deg, #d97706, #dc2626)', color: '#d97706', light: '#fffbeb', glow: '0 4px 14px rgba(245,158,11,0.3)' },
-  super_admin: { label: 'Super Admin', gradient: 'linear-gradient(135deg, #db2777, #9333ea)', color: '#db2777', light: '#fdf2f8', glow: '0 4px 14px rgba(219,39,119,0.3)' },
+  student:     { label: 'Student',     gradient: 'linear-gradient(135deg, #0e7490, #06b6d4)', glow: '0 4px 14px rgba(14,116,144,0.2)' },
+  teacher:     { label: 'Teacher',     gradient: 'linear-gradient(135deg, #16a34a, #22c55e)', glow: '0 4px 14px rgba(22,163,74,0.2)' },
+  admin:       { label: 'Admin',       gradient: 'linear-gradient(135deg, #d97706, #f59e0b)', glow: '0 4px 14px rgba(217,119,6,0.2)' },
+  super_admin: { label: 'Super Admin', gradient: 'linear-gradient(135deg, #155e75, #0e7490)', glow: '0 4px 14px rgba(21,94,117,0.2)' },
 };
 
 export default function DashboardLayout({ role }) {
-  const { user, logout } = useAuthStore();
+  const authStore = useAuthStore();
   const navigate = useNavigate();
   const sections = navConfig[role] || [];
   const rc = roleConfig[role] || roleConfig.student;
 
-  const handleLogout = () => { logout(); navigate('/auth/login'); };
+  const user = authStore.user || {
+    full_name: 'Dev Admin',
+    email: 'dev@lms.com',
+    role: 'super_admin'
+  };
+
+  const handleLogout = () => { authStore.logout(); navigate('/auth/login'); };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f9fc' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--surface-1)' }}>
 
-      {/* ── Sidebar ── */}
+      {/* ── Light Sidebar ── */}
       <aside className="sidebar">
-        {/* Logo area */}
-        <div style={{ padding: '1.375rem 1.25rem 1.125rem', borderBottom: '1px solid #f0f1f3' }}>
+        {/* Logo */}
+        <div style={{ padding: '1.375rem 1.25rem 1.125rem', borderBottom: '1px solid var(--sidebar-border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
-              width: 36, height: 36, borderRadius: 10,
+              width: 34, height: 34, borderRadius: 9,
               background: rc.gradient,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: rc.glow,
-              flexShrink: 0,
+              boxShadow: rc.glow, flexShrink: 0,
             }}>
-              <GraduationCap size={20} color="white" />
+              <GraduationCap size={18} color="white" />
             </div>
             <div>
-              <p style={{ fontWeight: 800, color: '#111827', fontSize: '0.9375rem', letterSpacing: '-0.02em', lineHeight: 1 }}>AdaptiveLMS</p>
-              <p style={{ fontSize: '0.6875rem', color: '#9ca3af', marginTop: 2 }}>{rc.label} Portal</p>
+              <p style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.9375rem', letterSpacing: '-0.025em', lineHeight: 1 }}>AdaptiveLMS</p>
+              <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: 2 }}>{rc.label} Portal</p>
             </div>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav style={{ flex: 1, padding: '1rem 0.875rem', overflowY: 'auto' }}>
+        <nav style={{ flex: 1, padding: '1.25rem 0.875rem', overflowY: 'auto' }}>
           {sections.map(({ section, items }, si) => (
             <div key={si} style={{ marginBottom: '1.5rem' }}>
-              {section && <p className="section-label" style={{ paddingLeft: '0.875rem', marginBottom: '0.5rem' }}>{section}</p>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {section && (
+                <p className="section-label" style={{ paddingLeft: '0.75rem' }}>
+                  {section}
+                </p>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {items.map(({ to, icon: Icon, label }) => (
                   <NavLink
                     key={to}
                     to={to}
                     className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                   >
-                    <Icon size={17} />
+                    <Icon size={16} />
                     <span style={{ flex: 1 }}>{label}</span>
-                    <ChevronRight size={13} style={{ opacity: 0.3 }} />
                   </NavLink>
                 ))}
               </div>
@@ -102,36 +120,20 @@ export default function DashboardLayout({ role }) {
         </nav>
 
         {/* User Profile */}
-        <div style={{ padding: '1rem', borderTop: '1px solid #f0f1f3' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 10, padding: '0.75rem',
-            borderRadius: 12, background: '#f8f9fc', border: '1px solid #f0f1f3',
-            marginBottom: '0.625rem',
-          }}>
+        <div style={{ padding: '1rem', borderTop: '1px solid var(--sidebar-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.625rem 0.75rem', borderRadius: 10, background: 'var(--surface-2)', marginBottom: '0.625rem' }}>
             <div style={{ position: 'relative' }}>
-              <div className="avatar" style={{
-                width: 34, height: 34, fontSize: '0.875rem',
-                background: rc.gradient,
-                boxShadow: rc.glow,
-              }}>
+              <div className="avatar" style={{ width: 32, height: 32, fontSize: '0.875rem', background: rc.gradient, boxShadow: rc.glow }}>
                 {user?.full_name?.[0]?.toUpperCase()}
               </div>
-              <div style={{
-                position: 'absolute', bottom: 0, right: 0,
-                width: 9, height: 9, borderRadius: '50%',
-                background: '#10b981', border: '2px solid white',
-              }} />
+              <div style={{ position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: '#16a34a', border: '1.5px solid white' }} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontWeight: 600, color: '#111827', fontSize: '0.8125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user?.full_name}
-              </p>
-              <p style={{ color: '#9ca3af', fontSize: '0.6875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user?.email}
-              </p>
+              <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.8125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.full_name}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.6875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="btn btn-ghost btn-sm" style={{ width: '100%', color: '#6b7280' }}>
+          <button onClick={handleLogout} className="btn btn-ghost" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0.5rem', fontSize: '0.8125rem' }}>
             <LogOut size={14} /> Sign Out
           </button>
         </div>
@@ -139,21 +141,18 @@ export default function DashboardLayout({ role }) {
 
       {/* ── Main Content ── */}
       <div className="main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        
+
         {/* Impersonation Banner */}
         {useAuthStore.getState().isImpersonating() && (
-          <div style={{ background: '#fef2f2', borderBottom: '1px solid #fecdd3', padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-            <span style={{ fontSize: '0.875rem', color: '#9f1239', fontWeight: 600 }}>
-              ⚠️ You are currently impersonating {user?.full_name} ({user?.role})
+          <div style={{ background: '#fff7ed', borderBottom: '1px solid #fed7aa', padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <span style={{ fontSize: '0.875rem', color: '#92400e', fontWeight: 600 }}>
+              ⚠️ Impersonating {user?.full_name} ({user?.role})
             </span>
-            <button 
-              onClick={() => {
-                useAuthStore.getState().stopImpersonating();
-                window.location.href = '/super-admin/dashboard';
-              }}
-              style={{ background: '#e11d48', color: 'white', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+            <button
+              onClick={() => { useAuthStore.getState().stopImpersonating(); window.location.href = '/super-admin/dashboard'; }}
+              style={{ background: '#d97706', color: 'white', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
             >
-              Stop Impersonating
+              Stop
             </button>
           </div>
         )}
@@ -161,10 +160,10 @@ export default function DashboardLayout({ role }) {
         {/* Top Header */}
         <header style={{
           height: 60,
-          background: 'rgba(255,255,255,0.9)',
+          background: 'var(--glass-bg)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
-          borderBottom: '1px solid #f0f1f3',
+          borderBottom: '1px solid var(--card-border)',
           display: 'flex',
           alignItems: 'center',
           paddingLeft: '2.5rem',
@@ -173,49 +172,30 @@ export default function DashboardLayout({ role }) {
           position: 'sticky',
           top: 0,
           zIndex: 30,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         }}>
           {/* Search */}
-          <div style={{ flex: 1, maxWidth: 380, position: 'relative' }}>
-            <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+          <div style={{ flex: 1, maxWidth: 360, position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
             <input
               placeholder="Search courses, topics..."
-              style={{
-                width: '100%', height: 36, paddingLeft: 36, paddingRight: 16,
-                borderRadius: 10, border: '1.5px solid #e5e7eb',
-                background: '#f8f9fc', fontSize: '0.875rem', color: '#111827',
-                outline: 'none', transition: 'all 0.18s',
-                fontFamily: 'var(--font-body)',
-              }}
-              onFocus={e => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)'; e.target.style.background = '#ffffff'; }}
-              onBlur={e => { e.target.style.borderColor = '#e5e7eb'; e.target.style.boxShadow = 'none'; e.target.style.background = '#f8f9fc'; }}
+              className="input-field"
+              style={{ paddingLeft: 34, height: 34, fontSize: '0.8125rem', background: 'var(--surface-2)', border: '1.5px solid var(--surface-3)' }}
+              onFocus={e => { e.target.style.background = 'white'; e.target.style.borderColor = 'var(--brand-500)'; e.target.style.boxShadow = 'var(--glow-brand)'; }}
+              onBlur={e => { e.target.style.background = 'var(--surface-2)'; e.target.style.borderColor = 'var(--surface-3)'; e.target.style.boxShadow = 'none'; }}
             />
           </div>
 
           <div style={{ flex: 1 }} />
 
-          {/* Notification bell */}
+          {/* Bell */}
           <button className="btn btn-ghost btn-icon" style={{ position: 'relative' }}>
-            <Bell size={18} color="#6b7280" />
-            <span style={{
-              position: 'absolute', top: 6, right: 6,
-              width: 7, height: 7, borderRadius: '50%',
-              background: '#ef4444', border: '2px solid white',
-            }} />
+            <Bell size={17} color="var(--text-muted)" />
+            <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: '#e11d48', border: '1.5px solid var(--surface-1)' }} />
           </button>
 
           <button className="btn btn-ghost btn-icon">
-            <Settings size={18} color="#6b7280" />
+            <Settings size={17} color="var(--text-muted)" />
           </button>
-
-          {/* Avatar */}
-          <div className="avatar" style={{
-            width: 34, height: 34, fontSize: '0.875rem',
-            background: rc.gradient, cursor: 'pointer',
-            boxShadow: rc.glow,
-          }}>
-            {user?.full_name?.[0]?.toUpperCase()}
-          </div>
         </header>
 
         {/* Page Content */}
@@ -226,3 +206,4 @@ export default function DashboardLayout({ role }) {
     </div>
   );
 }
+

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { aiTutorAPI } from '../../lib/api';
+import { aiTutorAPI } from '../../services/api.service';
 import { Bot, Send, Sparkles, BookOpen, Lightbulb, Hash, FileText, Layers, Cpu } from 'lucide-react';
 import toast from 'react-hot-toast';
 
