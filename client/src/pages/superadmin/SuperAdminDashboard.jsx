@@ -4,7 +4,7 @@ import { tenantsAPI, adminAPI } from '../../services/api.service';
 import {
   Building2, Plus, TrendingUp, Server, Globe, ArrowRight,
   DollarSign, Users, Activity, BarChart3, Megaphone,
-  ClipboardList, Settings, HeartPulse, Crown, Zap, Star,
+  ClipboardList, Settings, HeartPulse, Crown, Zap, Star, Shield,
 } from 'lucide-react';
 import Loader from '../../components/ui/Loader';
 
@@ -15,11 +15,11 @@ const PLAN_META = {
 };
 
 const QUICK_ACTIONS = [
-  { label: 'New Org',      icon: Plus,          color: '#155e75', bg: '#ecfeff', to: '/super-admin/tenants' },
-  { label: 'Announce',     icon: Megaphone,      color: '#16a34a', bg: '#f0fdf4', to: '/super-admin/announcements' },
-  { label: 'Audit Logs',   icon: ClipboardList,  color: '#d97706', bg: '#fffbeb', to: '/super-admin/audit-logs' },
-  { label: 'Analytics',    icon: BarChart3,      color: '#7c3aed', bg: '#f5f3ff', to: '/super-admin/analytics' },
-  { label: 'Platform Health', icon: HeartPulse,  color: '#dc2626', bg: '#fef2f2', to: '/super-admin/health' },
+  { label: 'New Org',      icon: Plus,          color: '#155e75', bg: '#ecfeff', to: '/super-admin/directory' },
+  { label: 'Communication',icon: Megaphone,      color: '#16a34a', bg: '#f0fdf4', to: '/super-admin/announcements' },
+  { label: 'Security & Audit', icon: Shield,         color: '#d97706', bg: '#fffbeb', to: '/super-admin/audit-logs' },
+  { label: 'System Data',  icon: BarChart3,      color: '#7c3aed', bg: '#f5f3ff', to: '/super-admin/system-data' },
+  { label: 'Monetization', icon: Crown,          color: '#dc2626', bg: '#fef2f2', to: '/super-admin/plans' },
   { label: 'Settings',     icon: Settings,       color: '#4b5563', bg: '#f3f4f6', to: '/super-admin/settings' },
 ];
 
@@ -60,7 +60,7 @@ export default function SuperAdminDashboard() {
           <h1 className="page-title">Platform Control Center</h1>
           <p className="page-subtitle">Global overview across all {tenants?.length || 0} organizations.</p>
         </div>
-        <button className="btn btn-primary" style={{ gap: 8 }} onClick={() => navigate('/super-admin/tenants')}>
+        <button className="btn btn-primary" style={{ gap: 8 }} onClick={() => navigate('/super-admin/directory')}>
           <Plus size={16} /> Deploy Organization
         </button>
       </div>
@@ -153,7 +153,7 @@ export default function SuperAdminDashboard() {
             <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Globe size={17} color="var(--brand-500)" /> Deployed Organizations
             </h2>
-            <button onClick={() => navigate('/super-admin/tenants')} className="btn btn-ghost btn-sm" style={{ fontWeight: 600 }}>
+            <button onClick={() => navigate('/super-admin/directory')} className="btn btn-ghost btn-sm" style={{ fontWeight: 600 }}>
               All Orgs <ArrowRight size={13} />
             </button>
           </div>
