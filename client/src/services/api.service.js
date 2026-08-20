@@ -60,6 +60,15 @@ export const tenantsAPI = {
   get: (id) => api.get(`/api/tenants/${id}`),
   update: (id, data) => api.put(`/api/tenants/${id}`, data),
   deactivate: (id) => api.delete(`/api/tenants/${id}`),
+  getDashboardNarrative: (id) => api.get(`/api/tenants/${id}/dashboard-narrative`),
+  getCohortsPulse: (id) => api.get(`/api/tenants/${id}/cohorts-pulse`),
+  getAnalytics: (id) => api.get(`/api/tenants/${id}/analytics`),
+  getCourses: (id) => api.get(`/api/tenants/${id}/courses`),
+  toggleCoursePublish: (tenantId, courseId) => api.patch(`/api/tenants/${tenantId}/courses/${courseId}/toggle-publish`),
+  getAuditLogs: (id) => api.get(`/api/tenants/${id}/audit-logs`),
+  listUsers: (id) => api.get(`/api/tenants/${id}/users`),
+  createUser: (id, data) => api.post(`/api/tenants/${id}/users`, data),
+  deactivateUser: (tenantId, userId) => api.patch(`/api/tenants/${tenantId}/users/${userId}/deactivate`),
 };
 
 // --- Courses ---

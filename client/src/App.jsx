@@ -27,19 +27,26 @@ import ProctoringReportsPage from './pages/teacher/ProctoringReportsPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
-import SuperAdminDashboard from './pages/admin/SuperAdminDashboard';
-import TenantManagementPage from './pages/admin/TenantManagementPage';
-import TenantDetailsPage from './pages/admin/TenantDetailsPage';
-import GlobalUsersPage from './pages/admin/GlobalUsersPage';
-import GlobalCoursesPage from './pages/admin/GlobalCoursesPage';
-import AuditLogsPage from './pages/admin/AuditLogsPage';
-import BillingPage from './pages/admin/BillingPage';
-import GlobalSettingsPage from './pages/admin/GlobalSettingsPage';
-import AnalyticsPage from './pages/admin/AnalyticsPage';
-import AnnouncementsPage from './pages/admin/AnnouncementsPage';
-import HealthPage from './pages/admin/HealthPage';
-import SupportTicketsPage from './pages/admin/SupportTicketsPage';
-import ManageUsersPage from './pages/admin/ManageUsersPage';
+import OrgCoursesPage from './pages/admin/OrgCoursesPage';
+import OrgAuditLogsPage from './pages/admin/OrgAuditLogsPage';
+import OrgMembersPage from './pages/admin/OrgMembersPage';
+import OrgCohortsPage from './pages/admin/OrgCohortsPage';
+import OrgCertificatesPage from './pages/admin/OrgCertificatesPage';
+import OrgBroadcastsPage from './pages/admin/OrgBroadcastsPage';
+import OrgDataHub from './pages/admin/OrgDataHub';
+import OrgSettingsHub from './pages/admin/OrgSettingsHub';
+
+// Super Admin Pages
+import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
+import TenantDetailsPage from './pages/superadmin/TenantDetailsPage';
+import GlobalContentHub from './pages/superadmin/GlobalContentHub';
+import GlobalSecurityHub from './pages/superadmin/GlobalSecurityHub';
+import GlobalCommunicationHub from './pages/superadmin/GlobalCommunicationHub';
+import GlobalServiceHub from './pages/superadmin/GlobalServiceHub';
+import SystemDataHub from './pages/superadmin/SystemDataHub';
+import GlobalSettingsHub from './pages/superadmin/GlobalSettingsHub';
+import GlobalDirectoryHub from './pages/superadmin/GlobalDirectoryHub';
+import GlobalMonetizationHub from './pages/superadmin/GlobalMonetizationHub';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -110,7 +117,14 @@ export default function App() {
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
-            <Route path="users" element={<ManageUsersPage />} />
+            <Route path="data-hub" element={<OrgDataHub />} />
+            <Route path="members" element={<OrgMembersPage />} />
+            <Route path="courses" element={<OrgCoursesPage />} />
+            <Route path="cohorts" element={<OrgCohortsPage />} />
+            <Route path="certificates" element={<OrgCertificatesPage />} />
+            <Route path="broadcasts" element={<OrgBroadcastsPage />} />
+            <Route path="audit" element={<OrgAuditLogsPage />} />
+            <Route path="settings" element={<OrgSettingsHub />} />
           </Route>
 
           {/* Super Admin Routes */}
@@ -121,17 +135,15 @@ export default function App() {
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<SuperAdminDashboard />} />
-            <Route path="tenants" element={<TenantManagementPage />} />
+            <Route path="system-data" element={<SystemDataHub />} />
+            <Route path="directory" element={<GlobalDirectoryHub />} />
             <Route path="tenants/:id" element={<TenantDetailsPage />} />
-            <Route path="users" element={<GlobalUsersPage />} />
-            <Route path="courses" element={<GlobalCoursesPage />} />
-            <Route path="audit-logs" element={<AuditLogsPage />} />
-            <Route path="billing" element={<BillingPage />} />
-            <Route path="settings" element={<GlobalSettingsPage />} />
-            <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="announcements" element={<AnnouncementsPage />} />
-            <Route path="health" element={<HealthPage />} />
-            <Route path="support" element={<SupportTicketsPage />} />
+            <Route path="courses" element={<GlobalContentHub />} />
+            <Route path="plans" element={<GlobalMonetizationHub />} />
+            <Route path="announcements" element={<GlobalCommunicationHub />} />
+            <Route path="support" element={<GlobalServiceHub />} />
+            <Route path="audit-logs" element={<GlobalSecurityHub />} />
+            <Route path="settings" element={<GlobalSettingsHub />} />
           </Route>
 
           {/* Fallback */}

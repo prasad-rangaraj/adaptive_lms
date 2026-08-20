@@ -5,6 +5,7 @@ import {
   LogOut, GraduationCap, Brain,
   Bell, Search, Settings, ChevronRight, Users, CreditCard,
   BarChart3, Megaphone, ClipboardList, HeartPulse, LifeBuoy,
+  Palette, BarChart2, BookMarked, UserCog, ScrollText, Award, Puzzle, Crown,
 } from 'lucide-react';
 
 const navConfig = {
@@ -23,28 +24,41 @@ const navConfig = {
     ]},
   ],
   admin: [
-    { section: null, items: [
-      { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/admin/users', icon: Building2, label: 'Manage Users' },
+    { section: 'Overview', items: [
+      { to: '/admin/dashboard',   icon: LayoutDashboard, label: 'Workspace' },
+      { to: '/admin/data-hub',    icon: BarChart3,       label: 'Data Hub' },
+    ]},
+    { section: 'People', items: [
+      { to: '/admin/members',     icon: Users,           label: 'Members' },
+    ]},
+    { section: 'Learning', items: [
+      { to: '/admin/courses',     icon: BookOpen,        label: 'Curriculum Library' },
+      { to: '/admin/cohorts',     icon: Users,           label: 'Cohorts & Batches' },
+      { to: '/admin/certificates',icon: Award,           label: 'Certificates' },
+    ]},
+    { section: 'Communication', items: [
+      { to: '/admin/broadcasts',  icon: Megaphone,       label: 'Broadcasts' },
+    ]},
+    { section: 'Administration', items: [
+      { to: '/admin/audit',       icon: ClipboardList,   label: 'Audit Trail' },
+      { to: '/admin/settings',    icon: Settings,        label: 'Settings Hub' },
     ]},
   ],
   super_admin: [
     { section: 'Overview', items: [
-      { to: '/super-admin/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/super-admin/analytics',     icon: BarChart3,       label: 'Analytics' },
-      { to: '/super-admin/health',        icon: HeartPulse,      label: 'System Health' },
+      { to: '/super-admin/dashboard',     icon: LayoutDashboard, label: 'Workspace' },
+      { to: '/super-admin/system-data',   icon: BarChart3,       label: 'System Data' },
     ]},
     { section: 'Platform', items: [
-      { to: '/super-admin/tenants',       icon: Building2,       label: 'Organizations' },
-      { to: '/super-admin/users',         icon: Users,           label: 'Global Users' },
-      { to: '/super-admin/courses',       icon: BookOpen,        label: 'Content Library' },
-      { to: '/super-admin/announcements', icon: Megaphone,       label: 'Announcements' },
-      { to: '/super-admin/support',       icon: LifeBuoy,        label: 'Support Tickets' },
+      { to: '/super-admin/directory',     icon: Users,           label: 'Global Directory' },
+      { to: '/super-admin/courses',       icon: BookOpen,        label: 'Content Hub' },
+      { to: '/super-admin/plans',         icon: Crown,           label: 'Monetization Hub' },
+      { to: '/super-admin/announcements', icon: Megaphone,       label: 'Communication Hub' },
     ]},
     { section: 'System', items: [
-      { to: '/super-admin/audit-logs',    icon: ClipboardList,   label: 'Audit Logs' },
-      { to: '/super-admin/billing',       icon: CreditCard,      label: 'Billing' },
-      { to: '/super-admin/settings',      icon: Settings,        label: 'Settings' },
+      { to: '/super-admin/support',       icon: LifeBuoy,        label: 'Service Hub' },
+      { to: '/super-admin/audit-logs',    icon: Shield,          label: 'Security & Audit' },
+      { to: '/super-admin/settings',      icon: Settings,        label: 'Global Settings' },
     ]},
   ],
 };
@@ -53,7 +67,7 @@ const navConfig = {
 const roleConfig = {
   student:     { label: 'Student',     gradient: 'linear-gradient(135deg, #0e7490, #06b6d4)', glow: '0 4px 14px rgba(14,116,144,0.2)' },
   teacher:     { label: 'Teacher',     gradient: 'linear-gradient(135deg, #16a34a, #22c55e)', glow: '0 4px 14px rgba(22,163,74,0.2)' },
-  admin:       { label: 'Admin',       gradient: 'linear-gradient(135deg, #d97706, #f59e0b)', glow: '0 4px 14px rgba(217,119,6,0.2)' },
+  admin:       { label: 'Admin',       gradient: 'linear-gradient(135deg, var(--brand-600), var(--brand-400))', glow: 'var(--glow-brand)' },
   super_admin: { label: 'Super Admin', gradient: 'linear-gradient(135deg, #155e75, #0e7490)', glow: '0 4px 14px rgba(21,94,117,0.2)' },
 };
 
