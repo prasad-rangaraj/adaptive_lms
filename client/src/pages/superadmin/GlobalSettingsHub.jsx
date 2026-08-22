@@ -4,7 +4,7 @@ import { adminAPI } from '../../services/api.service';
 import { 
   Settings, ShieldAlert, Zap, Save, RotateCcw,
   CreditCard, TrendingUp, Building2, AlertCircle, Download, Crown, Star,
-  Flag, Code, Link2, Key, Users
+  Flag, Code, Link2, Key, Users, Palette, FileText, FileBadge, Bot, Lock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Loader from '../../components/ui/Loader';
@@ -28,14 +28,22 @@ function Toggle({ checked, onChange, color = 'var(--brand-500)' }) {
   );
 }
 
-function SettingRow({ title, description, value, onChange, color, danger }) {
+function SettingRow({ title, description, value, onChange, color, danger, icon: Icon }) {
+  const accent = danger ? '#e11d48' : (color || 'var(--brand-500)');
+  const bgAccent = danger ? '#fff1f2' : `${accent}10`;
+  
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '2rem', padding: '1.25rem 0', borderBottom: '1px solid var(--glass-border)' }}>
-      <div style={{ flex: 1 }}>
-        <p style={{ fontWeight: 600, color: danger && value ? '#e11d48' : 'var(--text-primary)', fontSize: '0.9375rem', marginBottom: 4 }}>{title}</p>
-        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>{description}</p>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem', padding: '1.25rem', background: 'var(--card-bg)', borderRadius: '1rem', border: `1px solid ${value ? accent + '40' : 'var(--glass-border)'}`, boxShadow: value ? `0 4px 20px ${accent}15` : 'none', transition: 'all 0.3s ease' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flex: 1 }}>
+        <div style={{ width: 42, height: 42, borderRadius: '0.75rem', background: bgAccent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: accent, transition: 'all 0.3s' }}>
+          {Icon ? <Icon size={20} /> : <Settings size={20} />}
+        </div>
+        <div>
+          <p style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9375rem', marginBottom: 2 }}>{title}</p>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{description}</p>
+        </div>
       </div>
-      <Toggle checked={value} onChange={onChange} color={danger ? '#e11d48' : color} />
+      <Toggle checked={value} onChange={onChange} color={accent} />
     </div>
   );
 }
@@ -81,28 +89,30 @@ function GlobalConfigTab() {
         </div>
       )}
 
-      <div className="glass-card" style={{ padding: '1.75rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.25rem' }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fff1f2', border: '1px solid #fecdd3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShieldAlert size={16} color="#e11d48" /></div>
-          <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Critical Controls</h2>
-          <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#e11d48', background: '#fff1f2', border: '1px solid #fecdd3', padding: '2px 8px', borderRadius: 999, marginLeft: 2 }}>HIGH IMPACT</span>
+      <div className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '0.5rem' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fff1f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShieldAlert size={18} color="#e11d48" /></div>
+          <div>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>Critical Controls <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'white', background: '#e11d48', padding: '2px 8px', borderRadius: 999 }}>HIGH IMPACT</span></h2>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>These settings affect the entire platform immediately.</p>
+          </div>
         </div>
-        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>These settings affect the entire platform immediately. Use with caution.</p>
 
-        <SettingRow title="Maintenance Mode" description="Lock down the platform for all users. Only Super Admins can log in. Use during database migrations or critical updates." value={settings.maintenanceMode} onChange={set('maintenanceMode')} danger />
-        <div style={{ borderBottom: 'none' }}><SettingRow title="Allow New Tenant Registrations" description="When disabled, new organizations cannot register. Existing tenants are unaffected." value={settings.allowNewRegistrations} onChange={set('allowNewRegistrations')} color="#059669" /></div>
+        <SettingRow icon={Lock} title="Maintenance Mode" description="Lock down the platform for all users. Only Super Admins can log in." value={settings.maintenanceMode} onChange={set('maintenanceMode')} danger />
+        <SettingRow icon={Users} title="Allow New Tenant Registrations" description="When disabled, new organizations cannot register." value={settings.allowNewRegistrations} onChange={set('allowNewRegistrations')} color="#10b981" />
       </div>
 
-      <div className="glass-card" style={{ padding: '1.75rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.25rem' }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--brand-50)', border: '1px solid var(--brand-100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={16} color="var(--brand-600)" /></div>
-          <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>AI Feature Flags</h2>
+      <div className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1rem' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--brand-50)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={18} color="var(--brand-600)" /></div>
+          <div>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--text-primary)' }}>AI Feature Flags</h2>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>Globally enable or disable AI capabilities.</p>
+          </div>
         </div>
-        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Toggle AI-powered features globally. Individual tenants can further restrict these.</p>
-
-        <SettingRow title="AI Tutor Engine" description="Enables the generative AI tutor assistant for all students platform-wide." value={settings.aiTutor} onChange={set('aiTutor')} color="var(--brand-500)" />
-        <SettingRow title="AI Exam Proctoring" description="Enable webcam-based behavioral monitoring and browser lockdown during exams globally." value={settings.aiProctoring} onChange={set('aiProctoring')} color="var(--brand-500)" />
-        <div style={{ borderBottom: 'none' }}><SettingRow title="AI Course Recommendations" description="Serve personalized course recommendations based on each student's cognitive profile." value={settings.aiRecommendations} onChange={set('aiRecommendations')} color="var(--brand-500)" /></div>
+        <SettingRow icon={Bot} title="Global AI Tutor Engine" description="If disabled, AI Tutor features will be hidden for all tenants." value={settings.aiTutor} onChange={set('aiTutor')} color="#3b82f6" />
+        <SettingRow icon={ShieldAlert} title="AI Exam Proctoring" description="If disabled, automated proctoring falls back to manual review." value={settings.aiProctoring} onChange={set('aiProctoring')} color="#8b5cf6" />
+        <SettingRow icon={Star} title="AI Recommendation Engine" description="If disabled, standard sequential learning paths are used." value={settings.aiRecommendations} onChange={set('aiRecommendations')} color="#10b981" />
       </div>
 
       <div className="glass-card" style={{ padding: '1.75rem' }}>
@@ -300,22 +310,90 @@ function DeveloperWebhooksTab() {
   );
 }
 
+// ── Tab 5: Platform Branding (White-Labeling) ─────────────────────────────────
+function BrandingTab() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: 780 }}>
+      <div className="glass-card" style={{ padding: '2rem' }}>
+        <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}><Palette size={20} color="var(--brand-500)" /> Global White-Labeling</h2>
+        <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Configure the default branding and themes for new tenants. Enterprise tenants can override these settings.</p>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Global Primary Color</label>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <input type="color" defaultValue="#4f46e5" style={{ width: 40, height: 40, padding: 0, border: 'none', borderRadius: 8, cursor: 'pointer' }} />
+              <input value="#4f46e5" readOnly className="input-field" style={{ width: 120, fontFamily: 'monospace' }} />
+            </div>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Default Logo URL</label>
+            <input placeholder="https://cdn.example.com/logo.png" className="input-field" style={{ width: '100%' }} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Custom CSS Overrides</label>
+            <textarea placeholder=":root { --border-radius: 12px; }" rows={4} className="input-field" style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.8125rem' }} />
+          </div>
+          <button className="btn btn-primary" style={{ width: 120 }}>Save Theme</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Tab 6: Legal & Compliance ─────────────────────────────────────────────────
+function LegalTab() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: 860 }}>
+      <div className="glass-card" style={{ padding: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}><FileBadge size={20} color="var(--brand-500)" /> Legal Documents</h2>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Manage global Terms of Service and Privacy Policies. Force tenants to re-accept upon next login when updated.</p>
+          </div>
+          <button className="btn btn-primary" style={{ gap: 6 }}><FileText size={15} /> Upload New Version</button>
+        </div>
+
+        <table className="table" style={{ marginTop: '1rem' }}>
+          <thead><tr><th>Document</th><th>Current Version</th><th>Published Date</th><th>Acceptance Rate</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Terms of Service</span></td>
+              <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 999 }}>v2.4.1</span></td>
+              <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Oct 12, 2025</span></td>
+              <td><span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#059669' }}>100% (All Active Orgs)</span></td>
+            </tr>
+            <tr>
+              <td><span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Privacy Policy (GDPR)</span></td>
+              <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 999 }}>v3.0.0</span></td>
+              <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Yesterday</span></td>
+              <td><span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#d97706' }}>42% (Pending)</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Hub ──────────────────────────────────────────────────────────────────
 export default function GlobalSettingsHub() {
   const [activeTab, setActiveTab] = useState('config'); // 'config' | 'gateways'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', borderBottom: '1px solid var(--glass-border)', paddingBottom: '1.5rem' }}>
-        <div>
-          <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-600)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Global System</p>
-          <h1 style={{ fontSize: '1.875rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.1 }}>Settings Hub</h1>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', justifyContent: 'space-between', borderBottom: '1px solid var(--glass-border)', paddingBottom: '1.5rem' }}>
+        <div style={{ flexShrink: 0 }}>
+          <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-500)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Global System</p>
+          <h1 style={{ fontSize: '2.25rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.04em', lineHeight: 1.1 }}>Settings Hub</h1>
         </div>
         
-        <div style={{ display: 'flex', background: 'var(--surface-1)', padding: 6, borderRadius: 16, border: '1px solid var(--glass-border)', gap: 4, overflowX: 'auto' }}>
+        <div className="hide-scrollbar" style={{ display: 'flex', background: 'var(--surface-1)', padding: 6, borderRadius: 16, border: '1px solid var(--glass-border)', gap: 4, overflowX: 'auto', flexWrap: 'nowrap' }}>
           {[
             { id: 'config', label: 'Platform Config', icon: Settings },
+            { id: 'branding', label: 'White-Labeling', icon: Palette },
             { id: 'gateways', label: 'Payment Gateways', icon: CreditCard },
+            { id: 'legal', label: 'Compliance', icon: FileBadge },
             { id: 'flags', label: 'Feature Flags', icon: Flag },
             { id: 'webhooks', label: 'Developer API', icon: Code },
           ].map(t => (
@@ -336,7 +414,9 @@ export default function GlobalSettingsHub() {
       </div>
 
       {activeTab === 'config' && <GlobalConfigTab />}
+      {activeTab === 'branding' && <BrandingTab />}
       {activeTab === 'gateways' && <PaymentGatewaysTab />}
+      {activeTab === 'legal' && <LegalTab />}
       {activeTab === 'flags' && <FeatureFlagsTab />}
       {activeTab === 'webhooks' && <DeveloperWebhooksTab />}
     </div>

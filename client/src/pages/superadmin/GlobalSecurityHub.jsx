@@ -5,7 +5,7 @@ import {
   Activity, RefreshCw, UserPlus, BookOpen, Shield,
   ShieldAlert, Globe, User as UserIcon, Search, Filter,
   CheckCircle, AlertTriangle, AlertOctagon, Info, Download, 
-  Calendar, Lock, Key, Server, EyeOff, ShieldCheck, MapPin
+  Calendar, Lock, Key, Server, EyeOff, ShieldCheck, MapPin, Fingerprint, Plus
 } from 'lucide-react';
 import Loader from '../../components/ui/Loader';
 
@@ -230,6 +230,46 @@ function ThreatDefenseTab() {
   );
 }
 
+// ── Tab 4: Identity Providers (SSO) ───────────────────────────────────────────
+function IdentityProvidersTab() {
+  const [providers, setProviders] = useState([
+    { id: 1, name: 'Google Workspace', protocol: 'OAuth 2.0', status: 'active', users: 1420 },
+    { id: 2, name: 'Microsoft Entra ID', protocol: 'SAML 2.0', status: 'active', users: 3105 },
+    { id: 3, name: 'Okta Enterprise', protocol: 'SAML 2.0', status: 'inactive', users: 0 },
+  ]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: 860 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button className="btn btn-primary" style={{ gap: 6 }}><Plus size={15} /> Add Provider</button>
+      </div>
+      
+      <div className="glass-card" style={{ padding: '2rem' }}>
+        <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}><Fingerprint size={20} color="var(--brand-500)" /> Global SSO Configurations</h2>
+        <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Manage the Identity Providers available for tenants to use. Tenants can enable/disable these within their own settings.</p>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {providers.map(p => (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem', background: 'var(--surface-1)', border: '1px solid var(--glass-border)', borderRadius: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--brand-50)', border: '1px solid var(--brand-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-600)' }}><Server size={18} /></div>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-primary)' }}>{p.name}</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.protocol}</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                <div style={{ textAlign: 'right' }}><p style={{ fontWeight: 700, fontSize: '0.875rem' }}>{p.users}</p><p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Active Users</p></div>
+                <Toggle checked={p.status === 'active'} onChange={() => {}} color="#059669" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Hub ──────────────────────────────────────────────────────────────────
 export default function GlobalSecurityHub() {
   const [activeTab, setActiveTab] = useState('audit'); // 'audit' | 'policies' | 'threats'
@@ -247,6 +287,7 @@ export default function GlobalSecurityHub() {
             { id: 'audit', label: 'Audit Trail', icon: Activity },
             { id: 'policies', label: 'Access Policies', icon: ShieldCheck },
             { id: 'threats', label: 'Threat Defense', icon: EyeOff },
+            { id: 'sso', label: 'Identity Providers', icon: Fingerprint },
           ].map(t => (
             <button 
               key={t.id}
@@ -267,6 +308,7 @@ export default function GlobalSecurityHub() {
       {activeTab === 'audit' && <AuditTrailTab />}
       {activeTab === 'policies' && <AccessPoliciesTab />}
       {activeTab === 'threats' && <ThreatDefenseTab />}
+      {activeTab === 'sso' && <IdentityProvidersTab />}
     </div>
   );
 }

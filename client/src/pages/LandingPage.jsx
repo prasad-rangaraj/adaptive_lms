@@ -113,7 +113,7 @@ const stats = [
 const testimonials = [
   {
     name: 'Dr. Priya Sharma', role: 'Head of EdTech, Sunrise University',
-    text: 'AdaptiveLMS transformed how we teach. Our dropout rate dropped by 40% in one semester. The cognitive profiling alone is worth the subscription.',
+    text: 'Lumina transformed how we teach. Our dropout rate dropped by 40% in one semester. The cognitive profiling alone is worth the subscription.',
     avatar: 'P', gradient: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
   },
   {
@@ -203,9 +203,9 @@ export default function LandingPage() {
 
           {/* Logo Section */}
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', flexShrink: 0 }}>
-            <img src={logoUrl} alt="AdaptiveLMS Logo" style={{ width: 42, height: 42, objectFit: 'contain', borderRadius: 10, boxShadow: '0 4px 14px rgba(0,0,0,0.07)' }} />
-            <span style={{ fontWeight: 900, fontSize: '1.3rem', color: '#111827', letterSpacing: '-0.03em' }}>
-              AdaptiveLMS
+            <img src={logoUrl} alt="Lumina Logo" style={{ width: 42, height: 42, objectFit: 'contain', borderRadius: 10, boxShadow: '0 4px 14px rgba(0,0,0,0.07)' }} />
+            <span style={{ fontWeight: 900, fontSize: '1.5rem', color: '#111827', letterSpacing: '-0.02em' }}>
+              Lumina
             </span>
           </Link>
 
@@ -449,7 +449,7 @@ export default function LandingPage() {
                 Ready to transform your learning?
               </h2>
               <p style={{ color: 'rgba(255,255,255,0.75)', marginBottom: '2.25rem', fontSize: '1.1rem', lineHeight: 1.6, maxWidth: 480, margin: '0 auto 2.25rem' }}>
-                Join 50,000+ students and institutions already using AdaptiveLMS. No credit card required.
+                Join 50,000+ students and institutions already using Lumina. No credit card required.
               </p>
               <Link to="/auth/register" style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -472,8 +472,8 @@ export default function LandingPage() {
             {/* Brand column */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1.25rem' }}>
-                <img src={logoUrl} alt="AdaptiveLMS" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'contain' }} />
-                <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#111827', letterSpacing: '-0.02em' }}>AdaptiveLMS</span>
+                <img src={logoUrl} alt="Lumina" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'contain' }} />
+                <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#111827', letterSpacing: '-0.02em' }}>Lumina</span>
               </div>
               <p style={{ color: '#6b7280', fontSize: '0.9rem', lineHeight: 1.7, maxWidth: 240, marginBottom: '1.5rem' }}>
                 The AI-first learning management system for institutions that demand results.
@@ -522,7 +522,7 @@ export default function LandingPage() {
           {/* Bottom bar */}
           <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', padding: '1.25rem 2rem' }}>
             <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-              <p style={{ color: '#9ca3af', fontSize: '0.8125rem' }}>© 2026 AdaptiveLMS · Built with FastAPI, React & OpenAI · Made in India 🇮🇳</p>
+              <p style={{ color: '#9ca3af', fontSize: '0.8125rem' }}>© 2026 Lumina · Built with FastAPI, React & OpenAI · Made in India 🇮🇳</p>
               <div style={{ display: 'flex', gap: 20 }}>
                 {['Privacy Policy', 'Terms of Service', 'Cookie Policy'].map(t => (
                   <a key={t} href="#" style={{ color: '#9ca3af', fontSize: '0.8125rem', textDecoration: 'none' }}
