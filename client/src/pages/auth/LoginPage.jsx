@@ -50,7 +50,7 @@ export default function LoginPage() {
               <GraduationCap size={24} color="white" />
             </div>
             <span style={{ fontWeight: 900, fontSize: '1.5rem', color: '#111827', letterSpacing: '-0.02em' }}>
-              AdaptiveLMS
+              Lumina
             </span>
           </Link>
         </div>

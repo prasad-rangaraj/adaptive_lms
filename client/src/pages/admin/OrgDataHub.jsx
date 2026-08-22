@@ -165,28 +165,28 @@ function ReportsTab() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1.5rem 2.5rem' }}>
           {DUMMY_REPORTS.map((r, i) => (
-            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.5fr 1.5fr auto', gap: '1.5rem', alignItems: 'center', padding: '1.5rem 2.5rem', borderBottom: i === DUMMY_REPORTS.length -1 ? 'none' : '1px solid var(--surface-2)' }}>
+            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.5fr 1.5fr auto', gap: '1.5rem', alignItems: 'center', padding: '1.25rem 1.5rem', background: 'var(--surface-0)', border: '1px solid var(--glass-border)', borderRadius: 16, transition: 'all 0.2s', cursor: 'pointer' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FileSpreadsheet size={20} color="var(--text-secondary)" />
+                  <FileSpreadsheet size={20} color="var(--brand-500)" />
                 </div>
                 <div>
-                  <p style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '1rem' }}>{r.name}</p>
-                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: 4 }}>{r.type}</p>
+                  <p style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.9375rem' }}>{r.name}</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>{r.type}</p>
                 </div>
               </div>
               <div>
-                <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Schedule</p>
-                <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-primary)', marginTop: 4 }}>{r.frequency}</p>
+                <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Schedule</p>
+                <p style={{ fontWeight: 800, fontSize: '0.875rem', color: 'var(--text-primary)', marginTop: 4 }}>{r.frequency}</p>
               </div>
               <div>
-                <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Last Run</p>
-                <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-primary)', marginTop: 4 }}>{r.last_run}</p>
+                <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Last Run</p>
+                <p style={{ fontWeight: 800, fontSize: '0.875rem', color: 'var(--text-primary)', marginTop: 4 }}>{r.last_run}</p>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn btn-secondary btn-sm" style={{ padding: '0.5rem 1rem', borderRadius: 8, fontWeight: 700, gap: 6 }}>
+                <button className="btn btn-secondary btn-sm" style={{ padding: '0.5rem 1rem', borderRadius: 10, fontWeight: 700, gap: 6, fontSize: '0.75rem' }}>
                   <Download size={14} /> Download
                 </button>
               </div>

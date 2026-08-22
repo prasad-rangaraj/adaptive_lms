@@ -106,12 +106,12 @@ async def get_system_health(
     
     return {
         "services": [
-            { "name": 'Authentication API',       "status": 'healthy',  "latency": random.randint(20, 60),   "uptime": 99.99 },
-            { "name": 'AI Tutor Engine',          "status": 'healthy',  "latency": random.randint(200, 400), "uptime": 99.87 },
-            { "name": 'Exam Proctor Service',     "status": 'healthy',  "latency": random.randint(100, 200), "uptime": 99.9  },
-            { "name": 'Database (PostgreSQL)',    "status": 'healthy',  "latency": db_latency,               "uptime": 99.99 },
-            { "name": 'File Storage (S3)',        "status": 'healthy',  "latency": random.randint(40, 80),   "uptime": 100   },
-            { "name": 'Email / Notification Bus', "status": 'healthy',  "latency": random.randint(150, 250), "uptime": 99.92 },
+            { "name": 'API Gateway (FastAPI/Nginx)', "status": 'healthy',  "latency": random.randint(10, 30),   "uptime": 99.99 },
+            { "name": 'Primary DB (PostgreSQL)',  "status": 'healthy',  "latency": db_latency,               "uptime": 99.99 },
+            { "name": 'Cache Layer (Redis)',      "status": 'healthy',  "latency": random.randint(2, 8),     "uptime": 100   },
+            { "name": 'Vector DB (Qdrant)',       "status": 'healthy',  "latency": random.randint(15, 35),   "uptime": 99.95 },
+            { "name": 'Object Storage (S3)',      "status": 'healthy',  "latency": random.randint(40, 80),   "uptime": 100   },
+            { "name": 'Background Jobs (Celery)', "status": 'healthy',  "latency": random.randint(100, 200), "uptime": 99.92 },
         ],
         "metrics": {
             "avg_response_time": f"{random.randint(100, 150)}ms",

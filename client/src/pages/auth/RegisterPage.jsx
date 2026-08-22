@@ -64,7 +64,7 @@ export default function RegisterPage() {
               <GraduationCap size={24} color="white" />
             </div>
             <span style={{ fontWeight: 900, fontSize: '1.5rem', color: '#111827', letterSpacing: '-0.02em' }}>
-              AdaptiveLMS
+              Lumina
             </span>
           </Link>
         </div>
@@ -126,7 +126,7 @@ export default function RegisterPage() {
                   required
                 />
                 <span style={{ padding: '0 0.875rem', color: '#9ca3af', fontSize: '0.8125rem', whiteSpace: 'nowrap', borderLeft: '1px solid #f0f1f3', height: '100%', display: 'flex', alignItems: 'center' }}>
-                  .adaptiveLMS.com
+                  .lumina.com
                 </span>
               </div>
             </div>

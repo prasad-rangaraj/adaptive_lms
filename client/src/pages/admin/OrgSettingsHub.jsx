@@ -113,7 +113,7 @@ function GeneralTab({ tenantId }) {
                 <div style={{ display: 'flex', background: 'var(--surface-1)', border: '1.5px solid var(--glass-border)', borderRadius: 12, overflow: 'hidden' }}>
                   <span style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', background: 'var(--surface-1)', borderRight: '1.5px solid var(--glass-border)', color: 'var(--text-muted)', fontSize: '0.9375rem', fontWeight: 600 }}>https://</span>
                   <input value={form.subdomain} onChange={e => set('subdomain')(e.target.value)} style={{ flex: 1, border: 'none', outline: 'none', padding: '0.75rem', fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-primary)', background: 'transparent' }} placeholder="your-org" />
-                  <span style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', background: 'var(--surface-1)', borderLeft: '1.5px solid var(--glass-border)', color: 'var(--text-muted)', fontSize: '0.9375rem', fontWeight: 600 }}>.adaptivelms.io</span>
+                  <span style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', background: 'var(--surface-1)', borderLeft: '1.5px solid var(--glass-border)', color: 'var(--text-muted)', fontSize: '0.9375rem', fontWeight: 600 }}>.lumina.io</span>
                 </div>
               </div>
             </div>

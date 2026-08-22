@@ -270,6 +270,16 @@ function HealthTab() {
             <p style={{ fontSize: '2rem', fontWeight: 900, color: '#16a34a' }}>99.3%</p>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>1 incident this period</p>
           </div>
+          <div style={{ marginTop: '1.25rem', padding: '1rem', borderRadius: 10, background: 'var(--surface-1)', border: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Last DB Snapshot</p>
+              <p style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>14 mins ago</p>
+              <p style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle size={11} /> Verified Restorable</p>
+            </div>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#ecfdf5', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
+              <Database size={16} />
+            </div>
+          </div>
         </div>
       </div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>

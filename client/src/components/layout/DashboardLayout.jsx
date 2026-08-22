@@ -4,44 +4,67 @@ import {
   LayoutDashboard, BookOpen, Bot, Shield, Building2,
   LogOut, GraduationCap, Brain,
   Bell, Search, Settings, ChevronRight, Users, CreditCard,
-  BarChart3, Megaphone, ClipboardList, HeartPulse, LifeBuoy,
-  Palette, BarChart2, BookMarked, UserCog, ScrollText, Award, Puzzle, Crown,
+  BarChart3, Megaphone, ClipboardList, HeartPulse, LifeBuoy, Compass,
+  Palette, BarChart2, BookMarked, UserCog, ScrollText, Award, Puzzle, Crown, BrainCircuit, Video, TrendingUp
 } from 'lucide-react';
 
 const navConfig = {
   student: [
-    { section: null, items: [
-      { to: '/student/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { section: 'My Learning', items: [
+      { to: '/student/dashboard', icon: LayoutDashboard, label: 'Nexus' },
+      { to: '/student/explore', icon: Compass, label: 'Explore Hub' },
+      { to: '/student/course/1', icon: BookOpen, label: 'Learning Canvas' },
       { to: '/student/ai-tutor', icon: Bot, label: 'AI Tutor' },
-      { to: '/student/profile/cognitive', icon: Brain, label: 'Cognitive Profile' },
+    ]},
+    { section: 'Performance', items: [
+      { to: '/student/cognitive', icon: Brain, label: 'Cognitive Profile' },
+      { to: '/student/exam/1', icon: Shield, label: 'Exam Arena' },
+    ]},
+    { section: 'Academic', items: [
+      { to: '/student/academic', icon: GraduationCap, label: 'Academic Hub' },
+    ]},
+    { section: 'Community', items: [
+      { to: '/student/community', icon: Users, label: 'Community Hub' },
+    ]},
+    { section: 'Future', items: [
+      { to: '/student/career', icon: TrendingUp, label: 'Career Horizon' },
     ]},
   ],
   teacher: [
-    { section: null, items: [
-      { to: '/teacher/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/teacher/courses/builder', icon: BookOpen, label: 'Course Builder' },
-      { to: '/teacher/proctoring/reports', icon: Shield, label: 'Proctor Monitor' },
+    { section: 'Command Center', items: [
+      { to: '/teacher/dashboard', icon: LayoutDashboard, label: 'Dashboard & Analytics' },
+    ]},
+    { section: 'Creator Studio', items: [
+      { to: '/teacher/studio', icon: BookOpen, label: 'Course Studio' },
+      { to: '/teacher/inbox', icon: MessageSquare, label: 'Faculty Inbox' },
+    ]},
+    { section: 'Evaluation & Operations', items: [
+      { to: '/teacher/forge', icon: Puzzle, label: 'Exam Forge' },
+      { to: '/teacher/assessment', icon: Shield, label: 'Assessment Hub' },
+      { to: '/teacher/desk', icon: ClipboardList, label: 'Academic Desk' },
+    ]},
+    { section: 'Community & Live', items: [
+      { to: '/teacher/live', icon: Video, label: 'Live Sessions' },
+      { to: '/teacher/mentorship', icon: HeartPulse, label: 'Mentorship Hub' },
     ]},
   ],
   admin: [
-    { section: 'Overview', items: [
-      { to: '/admin/dashboard',   icon: LayoutDashboard, label: 'Workspace' },
-      { to: '/admin/data-hub',    icon: BarChart3,       label: 'Data Hub' },
+
+    { section: 'Organization', items: [
+      { to: '/admin/dashboard',     icon: LayoutDashboard, label: 'Overview' },
+      { to: '/admin/data-hub',      icon: BarChart3,       label: 'Data Hub' },
     ]},
-    { section: 'People', items: [
-      { to: '/admin/members',     icon: Users,           label: 'Members' },
+    { section: 'Intelligence', items: [
+      { to: '/admin/ai',            icon: BrainCircuit,    label: 'Org AI Hub' },
     ]},
-    { section: 'Learning', items: [
-      { to: '/admin/courses',     icon: BookOpen,        label: 'Curriculum Library' },
-      { to: '/admin/cohorts',     icon: Users,           label: 'Cohorts & Batches' },
-      { to: '/admin/certificates',icon: Award,           label: 'Certificates' },
-    ]},
-    { section: 'Communication', items: [
-      { to: '/admin/broadcasts',  icon: Megaphone,       label: 'Broadcasts' },
+    { section: 'Management', items: [
+      { to: '/admin/directory',     icon: Users,           label: 'Directory Hub' },
+      { to: '/admin/content',       icon: BookOpen,        label: 'Content Hub' },
+      { to: '/admin/communication', icon: Megaphone,       label: 'Communication Hub' },
     ]},
     { section: 'Administration', items: [
-      { to: '/admin/audit',       icon: ClipboardList,   label: 'Audit Trail' },
-      { to: '/admin/settings',    icon: Settings,        label: 'Settings Hub' },
+      { to: '/admin/security',      icon: Shield,          label: 'Security Hub' },
+      { to: '/admin/settings',      icon: Settings,        label: 'Settings Hub' },
     ]},
   ],
   super_admin: [
@@ -55,6 +78,9 @@ const navConfig = {
       { to: '/super-admin/plans',         icon: Crown,           label: 'Monetization Hub' },
       { to: '/super-admin/announcements', icon: Megaphone,       label: 'Communication Hub' },
     ]},
+    { section: 'Intelligence', items: [
+      { to: '/super-admin/ai-hub',        icon: BrainCircuit,    label: 'Global AI Hub' },
+    ]},
     { section: 'System', items: [
       { to: '/super-admin/support',       icon: LifeBuoy,        label: 'Service Hub' },
       { to: '/super-admin/audit-logs',    icon: Shield,          label: 'Security & Audit' },
@@ -65,10 +91,10 @@ const navConfig = {
 
 
 const roleConfig = {
-  student:     { label: 'Student',     gradient: 'linear-gradient(135deg, #0e7490, #06b6d4)', glow: '0 4px 14px rgba(14,116,144,0.2)' },
-  teacher:     { label: 'Teacher',     gradient: 'linear-gradient(135deg, #16a34a, #22c55e)', glow: '0 4px 14px rgba(22,163,74,0.2)' },
+  student:     { label: 'Student',     gradient: 'linear-gradient(135deg, var(--brand-600), var(--brand-400))', glow: 'var(--glow-brand)' },
+  teacher:     { label: 'Teacher',     gradient: 'linear-gradient(135deg, var(--brand-600), var(--brand-400))', glow: 'var(--glow-brand)' },
   admin:       { label: 'Admin',       gradient: 'linear-gradient(135deg, var(--brand-600), var(--brand-400))', glow: 'var(--glow-brand)' },
-  super_admin: { label: 'Super Admin', gradient: 'linear-gradient(135deg, #155e75, #0e7490)', glow: '0 4px 14px rgba(21,94,117,0.2)' },
+  super_admin: { label: 'Super Admin', gradient: 'linear-gradient(135deg, var(--brand-600), var(--brand-400))', glow: 'var(--glow-brand)' },
 };
 
 export default function DashboardLayout({ role }) {
@@ -91,7 +117,7 @@ export default function DashboardLayout({ role }) {
       {/* ── Light Sidebar ── */}
       <aside className="sidebar">
         {/* Logo */}
-        <div style={{ padding: '1.375rem 1.25rem 1.125rem', borderBottom: '1px solid var(--sidebar-border)' }}>
+        <div style={{ height: 60, display: 'flex', alignItems: 'center', padding: '0 1.25rem', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 34, height: 34, borderRadius: 9,
@@ -102,29 +128,29 @@ export default function DashboardLayout({ role }) {
               <GraduationCap size={18} color="white" />
             </div>
             <div>
-              <p style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.9375rem', letterSpacing: '-0.025em', lineHeight: 1 }}>AdaptiveLMS</p>
+              <p style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.9375rem', letterSpacing: '-0.025em', lineHeight: 1 }}>Lumina</p>
               <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: 2 }}>{rc.label} Portal</p>
             </div>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav style={{ flex: 1, padding: '1.25rem 0.875rem', overflowY: 'auto' }}>
+        <nav style={{ flex: 1, padding: '1.25rem 0.75rem', overflowY: 'auto', overflowX: 'hidden' }}>
           {sections.map(({ section, items }, si) => (
-            <div key={si} style={{ marginBottom: '1.5rem' }}>
+            <div key={si} style={{ marginBottom: '1rem' }}>
               {section && (
-                <p className="section-label" style={{ paddingLeft: '0.75rem' }}>
+                <p className="section-label">
                   {section}
                 </p>
               )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {items.map(({ to, icon: Icon, label }) => (
                   <NavLink
                     key={to}
                     to={to}
                     className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                   >
-                    <Icon size={16} />
+                    <Icon size={15} />
                     <span style={{ flex: 1 }}>{label}</span>
                   </NavLink>
                 ))}

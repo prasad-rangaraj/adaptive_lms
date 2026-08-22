@@ -4,7 +4,7 @@ import { tenantsAPI, adminAPI } from '../../services/api.service';
 import {
   Building2, Plus, TrendingUp, Server, Globe, ArrowRight,
   DollarSign, Users, Activity, BarChart3, Megaphone,
-  ClipboardList, Settings, HeartPulse, Crown, Zap, Star, Shield,
+  ClipboardList, Settings, HeartPulse, Crown, Zap, Star, Shield, BrainCircuit
 } from 'lucide-react';
 import Loader from '../../components/ui/Loader';
 
@@ -19,6 +19,7 @@ const QUICK_ACTIONS = [
   { label: 'Communication',icon: Megaphone,      color: '#16a34a', bg: '#f0fdf4', to: '/super-admin/announcements' },
   { label: 'Security & Audit', icon: Shield,         color: '#d97706', bg: '#fffbeb', to: '/super-admin/audit-logs' },
   { label: 'System Data',  icon: BarChart3,      color: '#7c3aed', bg: '#f5f3ff', to: '/super-admin/system-data' },
+  { label: 'AI Hub',       icon: BrainCircuit,   color: '#0ea5e9', bg: '#e0f2fe', to: '/super-admin/ai-hub' },
   { label: 'Monetization', icon: Crown,          color: '#dc2626', bg: '#fef2f2', to: '/super-admin/plans' },
   { label: 'Settings',     icon: Settings,       color: '#4b5563', bg: '#f3f4f6', to: '/super-admin/settings' },
 ];
@@ -66,7 +67,7 @@ export default function SuperAdminDashboard() {
       </div>
 
       {/* Quick Actions Tray */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.75rem' }}>
         {QUICK_ACTIONS.map(({ label, icon: Icon, color, bg, to }) => (
           <button
             key={label}
