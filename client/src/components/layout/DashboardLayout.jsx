@@ -5,7 +5,7 @@ import {
   LogOut, GraduationCap, Brain,
   Bell, Search, Settings, ChevronRight, Users, CreditCard,
   BarChart3, Megaphone, ClipboardList, HeartPulse, LifeBuoy, Compass,
-  Palette, BarChart2, BookMarked, UserCog, ScrollText, Award, Puzzle, Crown, BrainCircuit, Video, TrendingUp
+  Palette, BarChart2, BookMarked, UserCog, ScrollText, Award, Puzzle, Crown, BrainCircuit, Video, TrendingUp, MessageSquare
 } from 'lucide-react';
 
 const navConfig = {
