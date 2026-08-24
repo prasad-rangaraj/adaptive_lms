@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     CHAT_MODEL: str = "gpt-4o"
 
+    # --- LiveKit ---
+    LIVEKIT_URL: str = "wss://human-ai-16pkp4sz.livekit.cloud"
+    LIVEKIT_API_KEY: str = ""
+    LIVEKIT_API_SECRET: str = ""
+
     # S3 / MinIO
     S3_ENDPOINT_URL: str = "http://localhost:9000"
     S3_ACCESS_KEY: str = "minioadmin"

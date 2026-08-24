@@ -74,6 +74,7 @@ export const tenantsAPI = {
 // --- Courses ---
 export const coursesAPI = {
   list: () => api.get('/api/courses'),
+  getEnrolledCourses: () => api.get('/api/courses/enrolled'),
   get: (id) => api.get(`/api/courses/${id}`),
   create: (data) => api.post('/api/courses', data),
   publish: (id) => api.patch(`/api/courses/${id}/publish`),
@@ -84,6 +85,7 @@ export const coursesAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  getMaterials: (courseId) => api.get(`/api/courses/${courseId}/materials`),
 };
 
 // --- AI Tutor ---
@@ -115,6 +117,11 @@ export const assignmentsAPI = {
 // --- Proctoring ---
 export const proctoringAPI = {
   getReport: (examId) => api.get(`/api/proctoring/reports/${examId}`),
+};
+
+// --- Live Classes & Meetings ---
+export const liveAPI = {
+  createOrGetRoom: (roomName) => api.post(`/api/live/rooms?room_name=${roomName}`),
 };
 
 export default api;

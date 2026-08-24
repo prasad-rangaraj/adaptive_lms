@@ -46,28 +46,33 @@ def decode_token(token: str) -> dict:
 
 
 async def get_current_user(
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ):
     """FastAPI dependency to retrieve the current authenticated user."""
     from models.user import User
 
-    # DEV BYPASS: Return the first super_admin user (or a mock one) to make all routes public
-    user = db.query(User).filter(User.role == "super_admin").first()
+    payload = decode_token(token)
+    user_id = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+        
+    user = db.query(User).filter(User.id == int(user_id)).first()
     if not user:
-        user = User(
-            id=1,
-            email="dev@example.com",
-            full_name="Dev Admin",
-            role="super_admin",
-            is_active=True,
-            tenant_id=None
-        )
+        raise HTTPException(status_code=401, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+        
     return user
 
 
 def require_role(*roles: str):
     """Dependency factory to enforce role-based access."""
     async def role_checker(current_user=Depends(get_current_user)):
-        # DEV BYPASS: Disable role enforcement so any user can access any route
+        if current_user.role not in roles and current_user.role != "super_admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Operation not permitted. Required one of: {', '.join(roles)}"
+            )
         return current_user
     return role_checker

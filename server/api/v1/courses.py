@@ -4,7 +4,7 @@ from db.database import get_db
 from core.security import get_current_user, require_role
 from models.course import Course, CourseMaterial
 from models.user import User
-from schemas.schemas import CourseCreateRequest, CourseResponse
+from schemas.schemas import CourseCreateRequest, CourseResponse, CourseMaterialResponse
 from tasks.ai_tasks import process_material_embeddings
 from typing import List
 import boto3
@@ -53,6 +53,24 @@ async def list_courses(
     ).all()
 
 
+@router.get("/enrolled", response_model=List[CourseResponse])
+async def list_enrolled_courses(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List courses the current student is enrolled in."""
+    from models.enrollment import Enrollment
+    enrollments = db.query(Enrollment).filter(Enrollment.student_id == current_user.id).all()
+    course_ids = [e.course_id for e in enrollments]
+    if not course_ids:
+        return []
+    
+    return db.query(Course).filter(
+        Course.id.in_(course_ids),
+        Course.is_published == True
+    ).all()
+
+
 @router.get("/{course_id}", response_model=CourseResponse)
 async def get_course(
     course_id: int,
@@ -67,6 +85,25 @@ async def get_course(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     return course
+
+
+@router.get("/{course_id}/materials", response_model=List[CourseMaterialResponse])
+async def list_course_materials(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List materials for a course. Basic check ensures tenant isolation."""
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.tenant_id == current_user.tenant_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    return db.query(CourseMaterial).filter(
+        CourseMaterial.course_id == course_id
+    ).order_by(CourseMaterial.order_index.asc()).all()
 
 
 @router.post("/{course_id}/materials/upload")
