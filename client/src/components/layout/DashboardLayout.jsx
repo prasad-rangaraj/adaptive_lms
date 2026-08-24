@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import {
   LayoutDashboard, BookOpen, Bot, Shield, Building2,
@@ -25,6 +25,7 @@ const navConfig = {
     ]},
     { section: 'Community', items: [
       { to: '/student/community', icon: Users, label: 'Community Hub' },
+      { to: '/student/live', icon: Video, label: 'Live Classroom' },
     ]},
     { section: 'Future', items: [
       { to: '/student/career', icon: TrendingUp, label: 'Career Horizon' },
@@ -97,11 +98,19 @@ const roleConfig = {
   super_admin: { label: 'Super Admin', gradient: 'linear-gradient(135deg, var(--brand-600), var(--brand-400))', glow: 'var(--glow-brand)' },
 };
 
+// Routes that should use the full page (no max-width, edge-to-edge)
+const FULL_PAGE_ROUTES = ['/live', '/live/'];
+function isFullPage(pathname) {
+  return FULL_PAGE_ROUTES.some(r => pathname.endsWith(r) || pathname.includes('/live/'));
+}
+
 export default function DashboardLayout({ role }) {
   const authStore = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const sections = navConfig[role] || [];
   const rc = roleConfig[role] || roleConfig.student;
+  const fullPage = isFullPage(location.pathname);
 
   const user = authStore.user || {
     full_name: 'Dev Admin',
@@ -180,7 +189,7 @@ export default function DashboardLayout({ role }) {
       </aside>
 
       {/* ── Main Content ── */}
-      <div className="main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div className="main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
 
         {/* Impersonation Banner */}
         {useAuthStore.getState().isImpersonating() && (
@@ -239,7 +248,12 @@ export default function DashboardLayout({ role }) {
         </header>
 
         {/* Page Content */}
-        <div className="content-area" style={{ padding: '2rem 2.5rem' }}>
+        <div
+          style={fullPage
+            ? { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: 'calc(100vh - 60px)', padding: '1.5rem 1.75rem', boxSizing: 'border-box' }
+            : { padding: '2rem 2.5rem', maxWidth: 1280 }
+          }
+        >
           <Outlet />
         </div>
       </div>

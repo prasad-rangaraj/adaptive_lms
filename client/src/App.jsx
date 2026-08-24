@@ -12,6 +12,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 
 // Public
 import LandingPage from './pages/LandingPage';
+import MeetingArena from './pages/shared/MeetingArena';
 
 // Student Pages
 import StudentDashboard from './pages/student/StudentDashboard';
@@ -23,6 +24,7 @@ import AiTutorPage from './pages/student/AiTutorPage';
 import StudentAcademicHub from './pages/student/StudentAcademicHub';
 import StudentCommunityHub from './pages/student/StudentCommunityHub';
 import StudentExploreHub from './pages/student/StudentExploreHub';
+import StudentLiveArena from './pages/student/StudentLiveArena';
 import StudentOnboarding from './pages/student/StudentOnboarding';
 
 // Teacher Pages
@@ -66,10 +68,9 @@ const queryClient = new QueryClient({
 
 // Protected route wrapper
 function ProtectedRoute({ children, allowedRoles }) {
-  // Bypassed for now: making all routes public
-  // const { isAuthenticated, user } = useAuthStore();
-  // if (!isAuthenticated) return <Navigate to="/auth/login" replace />;
-  // if (allowedRoles && !allowedRoles.includes(user?.role)) return <Navigate to="/" replace />;
+  const { isAuthenticated, user } = useAuthStore();
+  if (!isAuthenticated) return <Navigate to="/auth/login" replace />;
+  if (allowedRoles && !allowedRoles.includes(user?.role)) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -81,10 +82,16 @@ export default function App() {
           position="top-right"
           toastOptions={{
             style: {
-              background: '#1a1a2e',
-              color: '#e2e8f0',
-              border: '1px solid rgba(255,255,255,0.1)',
+              background: '#ffffff',
+              color: '#0f172a',
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
             },
+            success: { iconTheme: { primary: '#16a34a', secondary: '#fff' } },
+            error: { iconTheme: { primary: '#dc2626', secondary: '#fff' } },
           }}
         />
         <Routes>
@@ -92,6 +99,11 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/auth/register" element={<RegisterPage />} />
+          <Route path="/meet/:meetingId" element={
+            <ProtectedRoute>
+              <MeetingArena />
+            </ProtectedRoute>
+          } />
 
           {/* Student Routes */}
           <Route path="/student" element={
@@ -109,6 +121,8 @@ export default function App() {
             <Route path="academic" element={<StudentAcademicHub />} />
             <Route path="community" element={<StudentCommunityHub />} />
             <Route path="career" element={<StudentCareerHub />} />
+            <Route path="live/:courseId" element={<StudentLiveArena />} />
+            <Route path="live" element={<StudentLiveArena />} /> {/* default for testing */}
           </Route>
           
           {/* Onboarding is outside the main dashboard layout but protected */}
