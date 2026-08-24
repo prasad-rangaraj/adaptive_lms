@@ -293,6 +293,20 @@ a { color: inherit; text-decoration: none; }
 .btn-icon { padding: 0.5rem; border-radius: var(--r-md); }
 
 /* ── Input Fields ── */
+.input-group {
+  position: relative;
+}
+.input-icon {
+  position: absolute;
+  left: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.input-group .input {
+  padding-left: 2.5rem;
+}
 .input, .input-field {
   width: 100%;
   padding: 0.5625rem 0.875rem;
