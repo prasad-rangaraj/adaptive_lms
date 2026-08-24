@@ -116,6 +116,22 @@ class CourseCreateRequest(BaseModel):
     price: float = 0.0
 
 
+class CourseMaterialResponse(BaseModel):
+    id: int
+    course_id: int
+    title: str
+    material_type: str
+    s3_url: Optional[str]
+    external_url: Optional[str]
+    duration_seconds: Optional[int]
+    order_index: int
+    is_processed: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class CourseResponse(BaseModel):
     id: int
     tenant_id: int
@@ -196,6 +212,35 @@ class AuditLogResponse(BaseModel):
     details: Optional[dict]
     ip_address: Optional[str]
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --- Live Session Schemas ---
+
+class LiveSessionCreateRequest(BaseModel):
+    title: str
+    description: Optional[str] = None
+    course_id: Optional[int] = None
+    scheduled_at: Optional[datetime] = None
+
+
+class LiveSessionResponse(BaseModel):
+    id: int
+    tenant_id: int
+    teacher_id: int
+    course_id: Optional[int]
+    title: str
+    description: Optional[str]
+    room_name: str
+    status: str
+    scheduled_at: Optional[datetime]
+    started_at: Optional[datetime]
+    ended_at: Optional[datetime]
+    created_at: datetime
+    teacher_name: Optional[str] = None
+    duration_minutes: Optional[int] = None
 
     class Config:
         from_attributes = True

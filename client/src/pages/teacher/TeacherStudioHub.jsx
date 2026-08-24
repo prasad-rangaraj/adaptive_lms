@@ -1,23 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Plus, Settings, PlayCircle, GripVertical, CheckCircle2, ChevronRight,
-  Video, FileText, HelpCircle, UserX, MessageSquare, Send, Sparkles, BrainCircuit, Mic
+  Video, FileText, HelpCircle, UserX, MessageSquare, Send, Sparkles, BrainCircuit, Mic, Loader2
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { coursesAPI } from '../../services/api.service';
 
 // ── Tab: Course Builder (Editorial Style) ─────────────────────────────────
-function BuilderTab() {
+function BuilderTab({ courseId }) {
   const [activeModule, setActiveModule] = useState(1);
-  const modules = [
-    { id: 1, title: 'Introduction to Neural Networks', duration: '1h 24m', items: [
-      { id: 101, type: 'video', title: 'What is a Perceptron?', duration: '12:30', status: 'Published' },
-      { id: 102, type: 'document', title: 'Reading: Activation Functions', status: 'Published' },
-      { id: 103, type: 'quiz', title: 'Knowledge Check 1', questions: 5, status: 'Draft' }
-    ]},
-    { id: 2, title: 'Deep Learning Architectures', duration: '2h 10m', items: [
-      { id: 201, type: 'video', title: 'Convolutional Neural Networks', duration: '24:15', status: 'Draft' }
-    ]}
-  ];
+  const [modules, setModules] = useState([{ id: 1, title: 'Main Curriculum', duration: '-', items: [] }]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!courseId) return;
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await coursesAPI.getMaterials(courseId);
+        setModules([{
+          id: 1,
+          title: 'Main Curriculum',
+          duration: '-',
+          items: res.data.map(m => ({
+            id: m.id,
+            type: m.material_type,
+            title: m.title,
+            duration: m.duration_seconds ? `${Math.floor(m.duration_seconds/60)}m` : null,
+            status: m.is_processed ? 'Processed' : 'Draft'
+          }))
+        }]);
+      } catch (err) {
+        console.error("Failed to fetch materials", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [courseId]);
 
   const getTypeIcon = (type) => {
     switch(type) {
@@ -45,7 +65,8 @@ function BuilderTab() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {modules.map((mod, index) => (
+          {loading && <div style={{display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-muted)'}}><Loader2 size={16} className="animate-spin" /> Loading curriculum...</div>}
+          {!loading && modules.map((mod, index) => (
             <div key={mod.id} style={{ position: 'relative' }}>
               
               {/* Module Header (Borderless) */}
@@ -266,6 +287,21 @@ function AnnouncementsTab() {
 // ── Main Hub ──────────────────────────────────────────────────────────────
 export default function TeacherStudioHub() {
   const [activeTab, setActiveTab] = useState('builder');
+  const [courses, setCourses] = useState([]);
+  
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const res = await coursesAPI.list();
+        setCourses(res.data);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchCourses();
+  }, []);
+  
+  const activeCourse = courses.length > 0 ? courses[0] : null;
 
   return (
     <div style={{ position: 'relative', minHeight: '100%', paddingBottom: '4rem', overflow: 'hidden' }}>
@@ -278,7 +314,7 @@ export default function TeacherStudioHub() {
         {/* ── Editorial Header & Minimal Tabs ── */}
         <div style={{ marginBottom: '2rem' }}>
           <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--brand-500)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '1rem' }}>
-            Advanced Machine Learning
+            {activeCourse ? activeCourse.title : 'Loading Course...'}
           </p>
           
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '2rem' }}>
@@ -318,9 +354,9 @@ export default function TeacherStudioHub() {
 
         {/* ── Tab Content ── */}
         <div style={{ minHeight: '600px' }}>
-          {activeTab === 'builder' && <BuilderTab />}
-          {activeTab === 'cohort' && <CohortTab />}
-          {activeTab === 'announcements' && <AnnouncementsTab />}
+          {activeTab === 'builder' && <BuilderTab courseId={activeCourse?.id} />}
+          {activeTab === 'cohort' && <CohortTab courseId={activeCourse?.id} />}
+          {activeTab === 'announcements' && <AnnouncementsTab courseId={activeCourse?.id} />}
         </div>
 
       </div>

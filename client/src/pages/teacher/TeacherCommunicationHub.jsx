@@ -155,7 +155,7 @@ function OfficeHoursTab() {
                 </p>
                 <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>{b.student}</h4>
                 <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>{b.topic}</p>
-                <button style={{ width: '100%', background: 'var(--brand-500)', color: 'white', border: 'none', padding: '8px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <button onClick={() => window.location.href = `/meet/booking-${b.id}`} style={{ width: '100%', background: 'var(--brand-500)', color: 'white', border: 'none', padding: '8px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                   <Video size={14} /> Join Meeting
                 </button>
               </div>

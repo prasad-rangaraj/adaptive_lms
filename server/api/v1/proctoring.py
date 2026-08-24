@@ -1,7 +1,8 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from sqlalchemy.orm import Session
 from db.database import get_db
-from core.security import decode_token
+from core.security import decode_token, require_role
+from models.user import User
 from models.proctor_log import ProctorLog
 from models.exam import ExamAttempt
 from schemas.schemas import ProctoringViolationEvent
@@ -152,6 +153,7 @@ async def teacher_monitor_ws(exam_id: int, websocket: WebSocket, token: str):
 async def get_proctor_report(
     exam_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
 ):
     """Generate a full proctoring violation report for a given exam."""
     logs = db.query(ProctorLog).filter(ProctorLog.exam_id == exam_id).all()

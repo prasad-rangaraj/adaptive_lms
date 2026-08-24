@@ -1,18 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Play, Pause, Volume2, Settings, Maximize, ChevronRight, Sparkles, X,
   HelpCircle, FileText, Lightbulb, SkipForward, List,
-  BookOpen, Download, Search, Users
+  BookOpen, Download, Search, Users, Loader2
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { coursesAPI } from '../../services/api.service';
 
-const modules = [
-  { id: 1, title: 'Introduction & Setup', done: true },
-  { id: 2, title: 'Recursion Deep Dive', done: true },
-  { id: 3, title: 'Binary Trees Explained', done: false, active: true },
-  { id: 4, title: 'Sorting Algorithms', done: false },
-  { id: 5, title: 'Graph Traversal', done: false },
-];
+// Modules state handled internally now
 
 const aiActions = [
   { icon: HelpCircle, label: 'Explain this concept', color: '#4f46e5' },
@@ -36,6 +31,7 @@ const transcript = [
 ];
 
 export default function StudentLearningCanvas() {
+  const { courseId } = useParams();
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(38);
   const [showAI, setShowAI] = useState(false);
@@ -43,6 +39,37 @@ export default function StudentLearningCanvas() {
   const [activeTab, setActiveTab] = useState('playlist');
   const [aiQuery, setAiQuery] = useState('');
   const navigate = useNavigate();
+
+  const [course, setCourse] = useState(null);
+  const [modules, setModules] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    if (!courseId) return;
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [courseRes, materialsRes] = await Promise.all([
+          coursesAPI.get(courseId),
+          coursesAPI.getMaterials(courseId)
+        ]);
+        setCourse(courseRes.data);
+        setModules(materialsRes.data.map((m, i) => ({
+          id: m.id,
+          title: m.title,
+          done: m.is_processed,
+          active: i === 0, // Mock first as active
+          type: m.material_type,
+          url: m.s3_url
+        })));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [courseId]);
 
   return (
     <div style={{ position: 'relative', height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', margin: '-2rem -2.5rem', padding: '0' }}>
@@ -66,8 +93,8 @@ export default function StudentLearningCanvas() {
           {/* Top Bar (Course Title) */}
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '1.5rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Data Structures & Algorithms</p>
-              <h2 style={{ color: 'white', fontSize: '1.25rem', fontWeight: 800, marginTop: 4 }}>Binary Trees Explained</h2>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{course ? course.category || 'Course' : 'Loading...'}</p>
+              <h2 style={{ color: 'white', fontSize: '1.25rem', fontWeight: 800, marginTop: 4 }}>{course ? course.title : 'Loading...'}</h2>
             </div>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button
@@ -206,16 +233,27 @@ export default function StudentLearningCanvas() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 0' }} className="hide-scrollbar">
               
               {/* PLAYLIST */}
-              {activeTab === 'playlist' && modules.map((m, i) => (
-                <div key={m.id} style={{ padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', background: m.active ? 'var(--brand-50)' : 'transparent', borderLeft: m.active ? '3px solid var(--brand-500)' : '3px solid transparent', cursor: 'pointer', transition: 'all 0.2s' }}>
-                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: m.done ? '#10b981' : m.active ? 'var(--brand-500)' : 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontSize: '0.75rem', fontWeight: 800 }}>
-                    {m.done ? '✓' : i + 1}
-                  </div>
-                  <p style={{ fontSize: '0.875rem', fontWeight: m.active ? 800 : 600, color: m.active ? 'var(--brand-700)' : m.done ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: m.done ? 'line-through' : 'none' }}>
-                    {m.title}
-                  </p>
-                </div>
-              ))}
+              {activeTab === 'playlist' && (
+                <>
+                  {loading && <div style={{padding: '2rem', display: 'flex', justifyContent: 'center'}}><Loader2 className="animate-spin text-muted" size={24} /></div>}
+                  {!loading && modules.map((m, i) => (
+                    <div key={m.id} style={{ padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', background: m.active ? 'var(--brand-50)' : 'transparent', borderLeft: m.active ? '3px solid var(--brand-500)' : '3px solid transparent', cursor: 'pointer', transition: 'all 0.2s' }}>
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: m.done ? '#10b981' : m.active ? 'var(--brand-500)' : 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontSize: '0.75rem', fontWeight: 800 }}>
+                        {m.done ? '✓' : i + 1}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: '0.875rem', fontWeight: m.active ? 800 : 600, color: m.active ? 'var(--brand-700)' : m.done ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: m.done ? 'line-through' : 'none' }}>
+                          {m.title}
+                        </p>
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{m.type}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {!loading && modules.length === 0 && (
+                    <p style={{textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem', padding: '2rem'}}>No modules uploaded yet.</p>
+                  )}
+                </>
+              )}
 
               {/* RESOURCES */}
               {activeTab === 'resources' && (
