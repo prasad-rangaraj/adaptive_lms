@@ -24,6 +24,7 @@ export default function LoginPage() {
       toast.success(`Welcome back, ${full_name}! 👋`);
       if (role === 'student') navigate('/student/dashboard');
       else if (role === 'teacher') navigate('/teacher/dashboard');
+      else if (role === 'super_admin') navigate('/super-admin/dashboard');
       else navigate('/admin/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Incorrect email or password');
