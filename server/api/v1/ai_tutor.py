@@ -9,7 +9,10 @@ from models.vector_embedding import VectorEmbedding
 from schemas.schemas import AiTutorMessageRequest, AiTutorMessageResponse
 
 router = APIRouter(prefix="/api/ai-tutor", tags=["AI Tutor"])
-openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+openai_client = OpenAI(
+    api_key=settings.OPENAI_API_KEY,
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+)
 
 
 def get_question_embedding(text: str) -> list[float]:

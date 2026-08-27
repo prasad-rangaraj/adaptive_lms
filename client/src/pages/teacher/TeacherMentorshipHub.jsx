@@ -90,35 +90,35 @@ function MentorshipTab() {
   ];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '4rem', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '3rem', alignItems: 'start' }}>
       
       {/* ── Left: Mentees ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Your Assigned Mentees</h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Track their career goals and schedule 1-on-1 sessions.</p>
+          <h2 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Your Assigned Mentees</h2>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Track their career goals and schedule 1-on-1 sessions.</p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {mentees.map(mentee => (
-            <div key={mentee.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 16, padding: '1.5rem' }}>
+            <div key={mentee.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 12, padding: '1.25rem' }}>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.875rem' }}>
                   {mentee.name.charAt(0)}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>{mentee.name}</h3>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Goal: <span style={{ fontWeight: 700 }}>{mentee.goal}</span></p>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>{mentee.name}</h3>
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Goal: <span style={{ fontWeight: 700 }}>{mentee.goal}</span></p>
                 </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--brand-500)' }}>{mentee.progress}%</span>
+                <span style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--brand-500)' }}>{mentee.progress}%</span>
               </div>
 
               <div style={{ display: 'flex', gap: '1rem', flexShrink: 0 }}>
-                <button style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-3)', color: 'var(--text-primary)', padding: '10px 16px', borderRadius: 8, fontSize: '0.875rem', fontWeight: 800, cursor: 'pointer' }}>
+                <button style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-3)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer' }}>
                   Review Profile
                 </button>
               </div>
@@ -130,15 +130,15 @@ function MentorshipTab() {
 
       {/* ── Right: Incoming Requests ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '1rem' }}>Mentorship Requests</h3>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 16, padding: '1.25rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Mentorship Requests</h3>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
             2 students have requested you as their primary faculty mentor.
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {['Arun Patel', 'Jessica Liu'].map(name => (
-              <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--surface-2)', paddingBottom: '1rem' }}>
-                <span style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-primary)' }}>{name}</span>
+              <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--surface-2)', paddingBottom: '0.75rem' }}>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-primary)' }}>{name}</span>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button style={{ background: '#10b981', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}>Accept</button>
                 </div>
@@ -166,16 +166,10 @@ export default function TeacherMentorshipHub() {
 
         {/* ── Editorial Header ── */}
         <div style={{ marginBottom: '2rem' }}>
-          <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#d97706', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '1rem' }}>
-            Faculty Guidance
-          </p>
           
-          <h1 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.15 }}>
-            Mentorship Hub
-          </h1>
 
           {/* Borderless Text Tabs */}
-          <div style={{ display: 'flex', gap: '3rem', marginTop: '3rem', borderBottom: '1px solid var(--surface-3)' }}>
+          <div style={{ display: 'flex', gap: '3rem', marginTop: '0', borderBottom: '1px solid var(--surface-3)' }}>
             {[
               { id: 'bounty', label: 'Bounty Board Moderation' },
               { id: 'mentorship', label: 'My Mentees' },

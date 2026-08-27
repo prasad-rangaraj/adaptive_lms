@@ -181,16 +181,10 @@ export default function TeacherExamForge() {
 
         {/* ── Editorial Header ── */}
         <div style={{ marginBottom: '2rem' }}>
-          <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--brand-500)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '1rem' }}>
-            Evaluation Operations
-          </p>
           
-          <h1 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.15 }}>
-            Exam Forge
-          </h1>
 
           {/* Borderless Text Tabs */}
-          <div style={{ display: 'flex', gap: '3rem', marginTop: '3rem', borderBottom: '1px solid var(--surface-3)' }}>
+          <div style={{ display: 'flex', gap: '3rem', marginTop: '0', borderBottom: '1px solid var(--surface-3)' }}>
             {[
               { id: 'bank', label: 'Question Bank' },
               { id: 'assembler', label: 'Exam Assembler' },

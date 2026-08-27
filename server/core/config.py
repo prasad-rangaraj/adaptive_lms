@@ -18,12 +18,12 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "change-this-secret-key-in-production"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
-    # OpenAI
+    # AI Config (Using Gemini via OpenAI compatibility)
     OPENAI_API_KEY: str = ""
-    EMBEDDING_MODEL: str = "text-embedding-3-small"
-    CHAT_MODEL: str = "gpt-4o"
+    EMBEDDING_MODEL: str = "text-embedding-004"
+    CHAT_MODEL: str = "gemini-1.5-pro"
 
     # --- LiveKit ---
     LIVEKIT_URL: str = "wss://human-ai-16pkp4sz.livekit.cloud"

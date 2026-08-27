@@ -74,18 +74,22 @@ export const tenantsAPI = {
 // --- Courses ---
 export const coursesAPI = {
   list: () => api.get('/api/courses'),
+  myCourses: () => api.get('/api/courses/my'),
   getEnrolledCourses: () => api.get('/api/courses/enrolled'),
   get: (id) => api.get(`/api/courses/${id}`),
   create: (data) => api.post('/api/courses', data),
   publish: (id) => api.patch(`/api/courses/${id}/publish`),
-  uploadMaterial: (courseId, file) => {
+  uploadMaterial: (courseId, moduleId, file) => {
     const form = new FormData();
     form.append('file', file);
-    return api.post(`/api/courses/${courseId}/materials/upload`, form, {
+    return api.post(`/api/courses/${courseId}/modules/${moduleId}/materials/upload`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  getMaterials: (courseId) => api.get(`/api/courses/${courseId}/materials`),
+  getModules: (courseId) => api.get(`/api/courses/${courseId}/modules`),
+  createModule: (courseId, title) => api.post(`/api/courses/${courseId}/modules`, { title }),
+  getAssignments: (courseId) => api.get(`/api/courses/${courseId}/assignments`),
+  createAssignment: (courseId, data) => api.post(`/api/courses/${courseId}/assignments`, data),
 };
 
 // --- AI Tutor ---
@@ -112,6 +116,8 @@ export const assignmentsAPI = {
   },
   getResult: (assignmentId, submissionId) =>
     api.get(`/api/assignments/${assignmentId}/submissions/${submissionId}`),
+  getSubmissions: (assignmentId) => api.get(`/api/assignments/${assignmentId}/submissions`),
+  gradeSubmission: (assignmentId, submissionId, data) => api.patch(`/api/assignments/${assignmentId}/submissions/${submissionId}/grade`, data),
 };
 
 // --- Proctoring ---
@@ -121,6 +127,21 @@ export const proctoringAPI = {
 
 // --- Live Classes & Meetings ---
 export const liveAPI = {
+  // Session CRUD
+  createSession: (data) => api.post('/api/live/sessions', data),
+  listSessions: (status) => api.get('/api/live/sessions', { params: status ? { status } : {} }),
+  getSession: (id) => api.get(`/api/live/sessions/${id}`),
+  deleteSession: (id) => api.delete(`/api/live/sessions/${id}`),
+
+  // Session Lifecycle
+  startSession: (id) => api.post(`/api/live/sessions/${id}/start`),
+  joinSession: (id) => api.post(`/api/live/sessions/${id}/join`),
+  endSession: (id) => api.post(`/api/live/sessions/${id}/end`),
+
+  // Participants
+  getParticipants: (id) => api.get(`/api/live/sessions/${id}/participants`),
+
+  // Legacy: ad-hoc room for office hours / MeetingArena
   createOrGetRoom: (roomName) => api.post(`/api/live/rooms?room_name=${roomName}`),
 };
 

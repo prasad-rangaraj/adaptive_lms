@@ -1,43 +1,69 @@
 import { useState, useEffect } from 'react';
 import { 
   Plus, Settings, PlayCircle, GripVertical, CheckCircle2, ChevronRight,
-  Video, FileText, HelpCircle, UserX, MessageSquare, Send, Sparkles, BrainCircuit, Mic, Loader2
+  Video, FileText, HelpCircle, UserX, MessageSquare, Send, Sparkles, BrainCircuit, Mic, Loader2, BookOpen
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { coursesAPI } from '../../services/api.service';
 
 // ── Tab: Course Builder (Editorial Style) ─────────────────────────────────
 function BuilderTab({ courseId }) {
-  const [activeModule, setActiveModule] = useState(1);
-  const [modules, setModules] = useState([{ id: 1, title: 'Main Curriculum', duration: '-', items: [] }]);
+  const [activeModule, setActiveModule] = useState(null);
+  const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [newModuleName, setNewModuleName] = useState('');
+  const [isAddingModule, setIsAddingModule] = useState(false);
+
+  const loadModules = async () => {
+    if (!courseId) return;
+    try {
+      setLoading(true);
+      const res = await coursesAPI.getModules(courseId);
+      setModules(res.data.map(m => ({
+        id: m.id,
+        title: m.title,
+        duration: '-',
+        items: m.materials.map(mat => ({
+          id: mat.id,
+          type: mat.material_type,
+          title: mat.title,
+          duration: mat.duration_seconds ? `${Math.floor(mat.duration_seconds/60)}m` : null,
+          status: mat.is_processed ? 'Processed' : 'Draft'
+        }))
+      })));
+    } catch (err) {
+      console.error("Failed to fetch modules", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!courseId) return;
-    const load = async () => {
-      try {
-        setLoading(true);
-        const res = await coursesAPI.getMaterials(courseId);
-        setModules([{
-          id: 1,
-          title: 'Main Curriculum',
-          duration: '-',
-          items: res.data.map(m => ({
-            id: m.id,
-            type: m.material_type,
-            title: m.title,
-            duration: m.duration_seconds ? `${Math.floor(m.duration_seconds/60)}m` : null,
-            status: m.is_processed ? 'Processed' : 'Draft'
-          }))
-        }]);
-      } catch (err) {
-        console.error("Failed to fetch materials", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    loadModules();
   }, [courseId]);
+
+  const handleAddModule = async () => {
+    if (!newModuleName.trim()) return;
+    try {
+      await coursesAPI.createModule(courseId, newModuleName);
+      setNewModuleName('');
+      setIsAddingModule(false);
+      loadModules();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleFileUpload = async (moduleId, e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      await coursesAPI.uploadMaterial(courseId, moduleId, file);
+      loadModules();
+    } catch (err) {
+      console.error("Upload failed", err);
+    }
+  };
 
   const getTypeIcon = (type) => {
     switch(type) {
@@ -59,10 +85,17 @@ function BuilderTab({ courseId }) {
             <h2 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.1 }}>Curriculum</h2>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: 8 }}>Drag modules to reorganize your syllabus.</p>
           </div>
-          <button style={{ background: 'var(--text-primary)', color: 'white', border: 'none', padding: '10px 20px', borderRadius: 999, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Plus size={16} /> Add Module
+          <button onClick={() => setIsAddingModule(!isAddingModule)} style={{ background: 'var(--text-primary)', color: 'white', border: 'none', padding: '10px 20px', borderRadius: 999, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Plus size={16} /> {isAddingModule ? 'Cancel' : 'Add Module'}
           </button>
         </div>
+
+        {isAddingModule && (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input value={newModuleName} onChange={e => setNewModuleName(e.target.value)} placeholder="Module Title..." style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'transparent', color: 'var(--text-primary)' }} />
+            <button onClick={handleAddModule} style={{ background: 'var(--brand-500)', color: 'white', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>Save</button>
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           {loading && <div style={{display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-muted)'}}><Loader2 size={16} className="animate-spin" /> Loading curriculum...</div>}
@@ -108,10 +141,13 @@ function BuilderTab({ courseId }) {
                       </div>
                     </div>
                   ))}
-
-                  <button style={{ alignSelf: 'flex-start', background: 'transparent', border: 'none', color: 'var(--brand-600)', fontSize: '0.875rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '0.5rem 0', marginTop: '0.5rem' }}>
-                    <Plus size={16} /> Add Material
-                  </button>
+                  
+                  <div style={{ position: 'relative' }}>
+                    <input type="file" onChange={(e) => handleFileUpload(mod.id, e)} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
+                    <button style={{ alignSelf: 'flex-start', background: 'transparent', border: 'none', color: 'var(--brand-600)', fontSize: '0.875rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '0.5rem 0', marginTop: '0.5rem' }}>
+                      <Plus size={16} /> Add Material
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -288,20 +324,52 @@ function AnnouncementsTab() {
 export default function TeacherStudioHub() {
   const [activeTab, setActiveTab] = useState('builder');
   const [courses, setCourses] = useState([]);
-  
-  useEffect(() => {
-    const fetchCourses = async () => {
+  const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [showNewCourse, setShowNewCourse] = useState(false);
+  const [newCourseTitle, setNewCourseTitle] = useState('');
+  const [newCourseDesc, setNewCourseDesc] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  const loadCourses = async () => {
+    try {
+      const res = await coursesAPI.myCourses();
+      setCourses(res.data);
+      if (res.data.length > 0 && !selectedCourseId) setSelectedCourseId(res.data[0].id);
+    } catch (e) {
       try {
-        const res = await coursesAPI.list();
-        setCourses(res.data);
-      } catch (e) {
-        console.error(e);
-      }
-    };
-    fetchCourses();
-  }, []);
+        const res2 = await coursesAPI.list();
+        setCourses(res2.data);
+        if (res2.data.length > 0 && !selectedCourseId) setSelectedCourseId(res2.data[0].id);
+      } catch { console.error(e); }
+    }
+  };
+
+  useEffect(() => { loadCourses(); }, []);
   
-  const activeCourse = courses.length > 0 ? courses[0] : null;
+  const activeCourse = courses.find(c => c.id === selectedCourseId) || courses[0] || null;
+
+  const handleCreateCourse = async () => {
+    if (!newCourseTitle.trim()) return;
+    try {
+      setCreating(true);
+      const res = await coursesAPI.create({ title: newCourseTitle, description: newCourseDesc || null });
+      setNewCourseTitle(''); setNewCourseDesc(''); setShowNewCourse(false);
+      await loadCourses();
+      setSelectedCourseId(res.data.id);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!activeCourse) return;
+    try {
+      await coursesAPI.publish(activeCourse.id);
+      await loadCourses();
+    } catch (e) { console.error(e); }
+  };
 
   return (
     <div style={{ position: 'relative', minHeight: '100%', paddingBottom: '4rem', overflow: 'hidden' }}>
@@ -311,20 +379,62 @@ export default function TeacherStudioHub() {
       
       <div style={{ position: 'relative', zIndex: 10 }}>
 
+        {/* ── Create Course Modal ── */}
+        {showNewCourse && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowNewCourse(false)}>
+            <div className="card animate-scale-in" style={{ width: '100%', maxWidth: 460, padding: '1.75rem', borderRadius: 20 }} onClick={e => e.stopPropagation()}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '1.5rem' }}>Create New Course</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label className="label">Course Title <span style={{ color: '#dc2626' }}>*</span></label>
+                  <input autoFocus value={newCourseTitle} onChange={e => setNewCourseTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleCreateCourse()} placeholder="e.g. Advanced Machine Learning" className="input" />
+                </div>
+                <div>
+                  <label className="label">Description <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+                  <textarea value={newCourseDesc} onChange={e => setNewCourseDesc(e.target.value)} placeholder="Brief overview of what students will learn..." className="input" rows={3} style={{ resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
+                <button onClick={() => setShowNewCourse(false)} className="btn btn-secondary">Cancel</button>
+                <button onClick={handleCreateCourse} disabled={creating || !newCourseTitle.trim()} className="btn btn-primary" style={{ minWidth: 130 }}>
+                  {creating ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+                  {creating ? 'Creating…' : 'Create Course'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Editorial Header & Minimal Tabs ── */}
         <div style={{ marginBottom: '2rem' }}>
-          <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--brand-500)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '1rem' }}>
-            {activeCourse ? activeCourse.title : 'Loading Course...'}
-          </p>
           
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '2rem' }}>
-            <h1 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.15 }}>
-              Course Studio
-            </h1>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
             
-            <button style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: 0 }}>
-              <Settings size={18} /> Course Settings
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {/* Course Selector */}
+              {courses.length > 0 && (
+                <select
+                  value={selectedCourseId || ''}
+                  onChange={e => setSelectedCourseId(parseInt(e.target.value))}
+                  className="input"
+                  style={{ width: 'auto', minWidth: 180, padding: '0.5rem 2rem 0.5rem 0.75rem', fontSize: '0.875rem', fontWeight: 700 }}
+                >
+                  {courses.map(c => (
+                    <option key={c.id} value={c.id}>{c.title}{!c.is_published ? ' (Draft)' : ''}</option>
+                  ))}
+                </select>
+              )}
+              {/* Publish button */}
+              {activeCourse && !activeCourse.is_published && (
+                <button onClick={handlePublish} className="btn btn-secondary" style={{ fontSize: '0.8125rem' }}>
+                  <PlayCircle size={14} /> Publish
+                </button>
+              )}
+              <button onClick={() => setShowNewCourse(true)} style={{ background: 'var(--text-primary)', color: 'white', border: 'none', padding: '8px 18px', borderRadius: 999, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Plus size={15} /> New Course
+              </button>
+            </div>
           </div>
 
           {/* Borderless Text Tabs */}
@@ -352,12 +462,26 @@ export default function TeacherStudioHub() {
           </div>
         </div>
 
+        {/* ── No courses state ── */}
+        {courses.length === 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px', gap: '1rem' }}>
+            <BookOpen size={48} color="var(--surface-4)" />
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>No Courses Yet</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9375rem' }}>Create your first course to get started.</p>
+            <button onClick={() => setShowNewCourse(true)} className="btn btn-primary btn-lg" style={{ marginTop: '0.5rem' }}>
+              <Plus size={18} /> Create First Course
+            </button>
+          </div>
+        )}
+
         {/* ── Tab Content ── */}
-        <div style={{ minHeight: '600px' }}>
-          {activeTab === 'builder' && <BuilderTab courseId={activeCourse?.id} />}
-          {activeTab === 'cohort' && <CohortTab courseId={activeCourse?.id} />}
-          {activeTab === 'announcements' && <AnnouncementsTab courseId={activeCourse?.id} />}
-        </div>
+        {activeCourse && (
+          <div style={{ minHeight: '600px' }}>
+            {activeTab === 'builder' && <BuilderTab courseId={activeCourse?.id} />}
+            {activeTab === 'cohort' && <CohortTab courseId={activeCourse?.id} />}
+            {activeTab === 'announcements' && <AnnouncementsTab courseId={activeCourse?.id} />}
+          </div>
+        )}
 
       </div>
     </div>

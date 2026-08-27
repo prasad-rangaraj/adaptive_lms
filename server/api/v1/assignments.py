@@ -5,6 +5,8 @@ from core.security import get_current_user
 from models.assignment import Assignment, AssignmentSubmission
 from models.user import User
 from tasks.ai_tasks import evaluate_assignment_submission
+from schemas.schemas import AssignmentSubmissionResponse
+from typing import List
 import boto3
 from core.config import settings
 import uuid
@@ -93,3 +95,43 @@ async def get_submission_result(
         "feedback": submission.feedback_json,
         "final_score": submission.final_score,
     }
+
+@router.get("/{assignment_id}/submissions", response_model=List[AssignmentSubmissionResponse])
+async def get_all_submissions(
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user), # should require teacher role
+):
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+        
+    return db.query(AssignmentSubmission).filter(AssignmentSubmission.assignment_id == assignment_id).all()
+
+from pydantic import BaseModel
+class GradeSubmissionRequest(BaseModel):
+    final_score: float
+    teacher_feedback: str
+
+@router.patch("/{assignment_id}/submissions/{submission_id}/grade", response_model=AssignmentSubmissionResponse)
+async def grade_submission(
+    assignment_id: int,
+    submission_id: int,
+    payload: GradeSubmissionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    submission = db.query(AssignmentSubmission).filter(
+        AssignmentSubmission.id == submission_id,
+        AssignmentSubmission.assignment_id == assignment_id
+    ).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+        
+    submission.final_score = payload.final_score
+    submission.teacher_feedback = payload.teacher_feedback
+    submission.status = "evaluated"
+    
+    db.commit()
+    db.refresh(submission)
+    return submission
