@@ -42,6 +42,8 @@ export default function StudentExamArena() {
   const [answers, setAnswers] = useState({});
   const [timeLeft, setTimeLeft] = useState(0);
   const [focusWarning, setFocusWarning] = useState(false);
+  const [keyWarning, setKeyWarning] = useState('');
+  const [fsWarning, setFsWarning] = useState(false);
   
   const [hardwareChecked, setHardwareChecked] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -66,11 +68,40 @@ export default function StudentExamArena() {
     return () => { window.removeEventListener('blur', onBlur); window.removeEventListener('focus', onFocus); };
   }, [examState]);
 
+  // Functional Key Blocker
+  useEffect(() => {
+    if (examState !== 'active') return;
+    const onKeyDown = (e) => {
+      // Block F1 - F12
+      if (e.key.match(/^F(1[0-2]|[1-9])$/)) {
+        e.preventDefault();
+        setKeyWarning(`Action Blocked: ${e.key} key is not allowed during the exam.`);
+        setTimeout(() => setKeyWarning(''), 5000);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [examState]);
+
+  // Fullscreen Exit Warning
+  useEffect(() => {
+    if (examState !== 'active') return;
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        setFsWarning(true);
+      }
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, [examState]);
+
   // Webcam access - Only request when in Lobby or Active!
   useEffect(() => {
     if (examState === 'list' || examState === 'submitted') {
       if (videoRef.current && videoRef.current.srcObject) {
         videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+        setHardwareChecked(false);
       }
       return;
     }
@@ -133,10 +164,20 @@ export default function StudentExamArena() {
       flex: 1, display: 'flex', flexDirection: 'column', fontFamily: 'inherit', minHeight: '100%', position: 'relative'
     }}>
 
-      {/* ── Focus Warning ── */}
+      {/* ── Focus & Security Warnings ── */}
       {focusWarning && examState === 'active' && (
         <div style={{ background: '#ef4444', color: 'white', padding: '0.625rem 2rem', display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'center', fontSize: '0.875rem', fontWeight: 700, animation: 'slideDown 0.3s ease' }}>
           <AlertCircle size={16} /> Focus Warning: You navigated away. This has been recorded.
+        </div>
+      )}
+      {keyWarning && examState === 'active' && (
+        <div style={{ background: '#f59e0b', color: 'white', padding: '0.625rem 2rem', display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'center', fontSize: '0.875rem', fontWeight: 700, animation: 'slideDown 0.3s ease' }}>
+          <AlertCircle size={16} /> {keyWarning}
+        </div>
+      )}
+      {fsWarning && examState === 'active' && (
+        <div style={{ background: '#ef4444', color: 'white', padding: '0.625rem 2rem', display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'center', fontSize: '0.875rem', fontWeight: 700, animation: 'slideDown 0.3s ease' }}>
+          <ShieldAlert size={16} /> Security Warning: Fullscreen mode was exited during the exam!
         </div>
       )}
 
@@ -409,7 +450,14 @@ export default function StudentExamArena() {
                       Next <ChevronRight size={18} />
                     </button>
                   ) : (
-                    <button onClick={() => setExamState('submitted')} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#10b981', color: 'white', border: 'none', padding: '10px 24px', borderRadius: 999, fontWeight: 800, fontSize: '0.9375rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}>
+                    <button onClick={async () => {
+                      setExamState('submitted');
+                      try {
+                        if (document.fullscreenElement && document.exitFullscreen) {
+                          await document.exitFullscreen();
+                        }
+                      } catch (err) {}
+                    }} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#10b981', color: 'white', border: 'none', padding: '10px 24px', borderRadius: 999, fontWeight: 800, fontSize: '0.9375rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}>
                       <ShieldCheck size={18} /> Submit Exam
                     </button>
                   )}

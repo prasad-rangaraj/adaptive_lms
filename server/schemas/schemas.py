@@ -118,7 +118,7 @@ class CourseCreateRequest(BaseModel):
 
 class CourseMaterialResponse(BaseModel):
     id: int
-    course_id: int
+    module_id: int
     title: str
     material_type: str
     s3_url: Optional[str]
@@ -127,6 +127,20 @@ class CourseMaterialResponse(BaseModel):
     order_index: int
     is_processed: bool
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CourseModuleCreateRequest(BaseModel):
+    title: str
+
+class CourseModuleResponse(BaseModel):
+    id: int
+    course_id: int
+    title: str
+    order_index: int
+    materials: list[CourseMaterialResponse] = []
 
     class Config:
         from_attributes = True
@@ -143,6 +157,7 @@ class CourseResponse(BaseModel):
     is_published: bool
     price: float
     created_at: datetime
+    modules: list[CourseModuleResponse] = []
 
     class Config:
         from_attributes = True
@@ -180,6 +195,38 @@ class CognitiveProfileResponse(BaseModel):
 
 
 # --- Assignment Schemas ---
+
+class AssignmentCreateRequest(BaseModel):
+    title: str
+    description: Optional[str] = None
+    due_date: Optional[datetime] = None
+    total_marks: float = 100.0
+
+class AssignmentResponse(BaseModel):
+    id: int
+    course_id: int
+    title: str
+    description: Optional[str]
+    due_date: Optional[datetime]
+    total_marks: float
+    is_published: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class AssignmentSubmissionResponse(BaseModel):
+    id: int
+    assignment_id: int
+    student_id: int
+    file_url: Optional[str]
+    ai_score: Optional[float]
+    final_score: Optional[float]
+    status: str
+    submitted_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 class AssignmentEvaluationResponse(BaseModel):
     submission_id: int

@@ -25,12 +25,13 @@ function InboxTab() {
             <div 
               key={msg.id} 
               onClick={() => setActiveMessage(msg.id)}
-              style={{ background: activeMessage === msg.id ? 'var(--surface-1)' : 'transparent', border: '1px solid', borderColor: activeMessage === msg.id ? 'var(--surface-3)' : 'transparent', borderRadius: 12, padding: '1rem', cursor: 'pointer', transition: 'all 0.2s', position: 'relative' }}
+              style={{ background: 'var(--surface-0)', border: '1px solid', borderColor: activeMessage === msg.id ? 'var(--brand-400)' : 'var(--surface-2)', boxShadow: activeMessage === msg.id ? 'var(--shadow-md)' : 'var(--shadow-xs)', borderRadius: 12, padding: '1rem', cursor: 'pointer', transition: 'all 0.2s', position: 'relative' }}
             >
-              {msg.unread && <div style={{ position: 'absolute', top: 16, right: 16, width: 8, height: 8, borderRadius: '50%', background: 'var(--brand-500)' }} />}
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.25rem' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: msg.unread ? 900 : 700, color: 'var(--text-primary)' }}>{msg.sender}</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: msg.unread ? 900 : 700, color: 'var(--text-primary)' }}>{msg.sender}</h3>
+                  {msg.unread && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--brand-500)', flexShrink: 0 }} />}
+                </div>
                 <span style={{ fontSize: '0.75rem', color: msg.unread ? 'var(--brand-600)' : 'var(--text-muted)' }}>{msg.time}</span>
               </div>
               <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>{msg.course}</p>
@@ -187,16 +188,10 @@ export default function TeacherCommunicationHub() {
 
         {/* ── Editorial Header ── */}
         <div style={{ marginBottom: '2rem' }}>
-          <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#3b82f6', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '1rem' }}>
-            Faculty Inbox & Calendar
-          </p>
           
-          <h1 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.15 }}>
-            Communications Hub
-          </h1>
 
           {/* Borderless Text Tabs */}
-          <div style={{ display: 'flex', gap: '3rem', marginTop: '3rem', borderBottom: '1px solid var(--surface-3)' }}>
+          <div style={{ display: 'flex', gap: '3rem', marginTop: '0', borderBottom: '1px solid var(--surface-3)' }}>
             {[
               { id: 'inbox', label: 'Unified Inbox' },
               { id: 'office_hours', label: 'Office Hours Scheduler' },

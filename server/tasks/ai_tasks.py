@@ -8,7 +8,10 @@ from db.database import SessionLocal
 from core.config import settings
 from openai import OpenAI
 
-openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+openai_client = OpenAI(
+    api_key=settings.OPENAI_API_KEY,
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+)
 
 
 def get_db() -> Session:

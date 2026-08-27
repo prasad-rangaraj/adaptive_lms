@@ -126,7 +126,7 @@ export default function DashboardLayout({ role }) {
       {/* ── Light Sidebar ── */}
       <aside className="sidebar">
         {/* Logo */}
-        <div style={{ height: 60, display: 'flex', alignItems: 'center', padding: '0 1.25rem', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}>
+        <div style={{ height: 65, display: 'flex', alignItems: 'center', padding: '0 1.25rem', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 34, height: 34, borderRadius: 9,
@@ -208,7 +208,7 @@ export default function DashboardLayout({ role }) {
 
         {/* Top Header */}
         <header style={{
-          height: 60,
+          height: 65,
           background: 'var(--glass-bg)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
@@ -248,13 +248,15 @@ export default function DashboardLayout({ role }) {
         </header>
 
         {/* Page Content */}
-        <div
-          style={fullPage
-            ? { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: 'calc(100vh - 60px)', padding: '1.5rem 1.75rem', boxSizing: 'border-box' }
-            : { padding: '2rem 2.5rem', maxWidth: 1280 }
-          }
-        >
-          <Outlet />
+        <div style={{ flex: 1, overflowY: fullPage ? 'hidden' : 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div
+            style={fullPage
+              ? { flex: 1, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)', padding: '1.5rem 1.75rem', boxSizing: 'border-box' }
+              : { flex: 1, padding: '1.5rem 2.5rem', maxWidth: 1280, width: '100%', boxSizing: 'border-box' }
+            }
+          >
+            <Outlet />
+          </div>
         </div>
       </div>
     </div>

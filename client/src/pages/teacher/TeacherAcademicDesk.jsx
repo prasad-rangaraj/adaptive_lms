@@ -105,36 +105,36 @@ function ApprovalsTab() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
       <div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Pending Approvals</h2>
-        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Review leave and On-Duty requests from your mentees and class representatives.</p>
+        <h2 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Pending Approvals</h2>
+        <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Review leave and On-Duty requests from your mentees and class representatives.</p>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {requests.map(req => (
-          <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.5rem', background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 16 }}>
+          <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem', background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 12 }}>
             
             <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)' }}>{req.student}</h3>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, background: 'var(--brand-50)', color: 'var(--brand-700)', padding: '4px 10px', borderRadius: 999 }}>{req.type}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-primary)' }}>{req.student}</h3>
+                <span style={{ fontSize: '0.6875rem', fontWeight: 800, background: 'var(--brand-50)', color: 'var(--brand-700)', padding: '3px 8px', borderRadius: 999 }}>{req.type}</span>
               </div>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>{req.reason}</p>
+              <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>{req.reason}</p>
               
-              <div style={{ display: 'flex', gap: '1.5rem' }}>
+              <div style={{ display: 'flex', gap: '1.25rem' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--text-muted)' }}><Calendar size={14} /> {req.dates}</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}>View Proof Document ({req.docs})</span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '1rem', flexShrink: 0 }}>
-              <button style={{ background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '10px 16px', borderRadius: 8, fontSize: '0.875rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <XCircle size={16} /> Reject
+            <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
+              <button style={{ background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '8px 12px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <XCircle size={14} /> Reject
               </button>
-              <button style={{ background: '#10b981', border: 'none', color: 'white', padding: '10px 16px', borderRadius: 8, fontSize: '0.875rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <CheckCircle2 size={16} /> Approve
+              <button style={{ background: '#10b981', border: 'none', color: 'white', padding: '8px 12px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <CheckCircle2 size={14} /> Approve
               </button>
             </div>
 
@@ -160,16 +160,10 @@ export default function TeacherAcademicDesk() {
 
         {/* ── Editorial Header ── */}
         <div style={{ marginBottom: '2rem' }}>
-          <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--brand-500)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '1rem' }}>
-            Academic Operations
-          </p>
           
-          <h1 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.15 }}>
-            Academic Desk
-          </h1>
 
           {/* Borderless Text Tabs */}
-          <div style={{ display: 'flex', gap: '3rem', marginTop: '3rem', borderBottom: '1px solid var(--surface-3)' }}>
+          <div style={{ display: 'flex', gap: '3rem', marginTop: '0', borderBottom: '1px solid var(--surface-3)' }}>
             {[
               { id: 'attendance', label: 'Attendance Register' },
               { id: 'approvals', label: 'Leave & OD Approvals' },

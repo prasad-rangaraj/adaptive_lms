@@ -49,19 +49,28 @@ export default function StudentLearningCanvas() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [courseRes, materialsRes] = await Promise.all([
+        const [courseRes, modulesRes] = await Promise.all([
           coursesAPI.get(courseId),
-          coursesAPI.getMaterials(courseId)
+          coursesAPI.getModules(courseId)
         ]);
         setCourse(courseRes.data);
-        setModules(materialsRes.data.map((m, i) => ({
-          id: m.id,
-          title: m.title,
-          done: m.is_processed,
-          active: i === 0, // Mock first as active
-          type: m.material_type,
-          url: m.s3_url
-        })));
+        
+        // Flatten modules into a list of items for the playlist
+        const playlistItems = [];
+        modulesRes.data.forEach((mod, modIdx) => {
+          mod.materials.forEach((m, matIdx) => {
+            playlistItems.push({
+              id: m.id,
+              moduleTitle: mod.title,
+              title: m.title,
+              done: m.is_processed, // Mocking done state with is_processed
+              active: modIdx === 0 && matIdx === 0, // Mock first as active
+              type: m.material_type,
+              url: m.s3_url
+            });
+          });
+        });
+        setModules(playlistItems);
       } catch (err) {
         console.error(err);
       } finally {
@@ -245,7 +254,7 @@ export default function StudentLearningCanvas() {
                         <p style={{ fontSize: '0.875rem', fontWeight: m.active ? 800 : 600, color: m.active ? 'var(--brand-700)' : m.done ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: m.done ? 'line-through' : 'none' }}>
                           {m.title}
                         </p>
-                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{m.type}</p>
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{m.moduleTitle} • {m.type}</p>
                       </div>
                     </div>
                   ))}
