@@ -13,35 +13,6 @@ class UserRegisterRequest(BaseModel):
     tenant_id: Optional[int] = None
 
 
-class OrgRegisterRequest(BaseModel):
-    """Public self-signup: creates a Tenant + tenant_admin in one call."""
-    org_name: str
-    subdomain: str
-    full_name: str
-    email: EmailStr
-    password: str
-
-
-class AdminCreateUserRequest(BaseModel):
-    """Tenant admin creates a student or teacher account."""
-    full_name: str
-    email: EmailStr
-    role: str  # "student" or "teacher"
-    password: Optional[str] = None  # auto-generated if omitted
-
-
-class AdminCreateUserResponse(BaseModel):
-    id: int
-    full_name: str
-    email: str
-    role: str
-    tenant_id: Optional[int]
-    temp_password: Optional[str]  # shown once, then discarded
-
-    class Config:
-        from_attributes = True
-
-
 class UserLoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -82,15 +53,6 @@ class TenantCreateRequest(BaseModel):
     secondary_color: str = "#8B5CF6"
 
 
-class TenantUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    subdomain: Optional[str] = None
-    plan: Optional[str] = None
-    primary_color: Optional[str] = None
-    secondary_color: Optional[str] = None
-    is_active: Optional[bool] = None
-
-
 class TenantResponse(BaseModel):
     id: int
     name: str
@@ -116,36 +78,6 @@ class CourseCreateRequest(BaseModel):
     price: float = 0.0
 
 
-class CourseMaterialResponse(BaseModel):
-    id: int
-    module_id: int
-    title: str
-    material_type: str
-    s3_url: Optional[str]
-    external_url: Optional[str]
-    duration_seconds: Optional[int]
-    order_index: int
-    is_processed: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class CourseModuleCreateRequest(BaseModel):
-    title: str
-
-class CourseModuleResponse(BaseModel):
-    id: int
-    course_id: int
-    title: str
-    order_index: int
-    materials: list[CourseMaterialResponse] = []
-
-    class Config:
-        from_attributes = True
-
-
 class CourseResponse(BaseModel):
     id: int
     tenant_id: int
@@ -157,7 +89,6 @@ class CourseResponse(BaseModel):
     is_published: bool
     price: float
     created_at: datetime
-    modules: list[CourseModuleResponse] = []
 
     class Config:
         from_attributes = True
@@ -168,7 +99,6 @@ class CourseResponse(BaseModel):
 class AiTutorMessageRequest(BaseModel):
     course_id: int
     message: str
-    persona: str = "tutor"
 
 
 class AiTutorMessageResponse(BaseModel):
@@ -197,38 +127,6 @@ class CognitiveProfileResponse(BaseModel):
 
 # --- Assignment Schemas ---
 
-class AssignmentCreateRequest(BaseModel):
-    title: str
-    description: Optional[str] = None
-    due_date: Optional[datetime] = None
-    total_marks: float = 100.0
-
-class AssignmentResponse(BaseModel):
-    id: int
-    course_id: int
-    title: str
-    description: Optional[str]
-    due_date: Optional[datetime]
-    total_marks: float
-    is_published: bool
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
-
-class AssignmentSubmissionResponse(BaseModel):
-    id: int
-    assignment_id: int
-    student_id: int
-    file_url: Optional[str]
-    ai_score: Optional[float]
-    final_score: Optional[float]
-    status: str
-    submitted_at: datetime
-    
-    class Config:
-        from_attributes = True
-
 class AssignmentEvaluationResponse(BaseModel):
     submission_id: int
     ai_score: float
@@ -248,47 +146,3 @@ class ProctoringViolationEvent(BaseModel):
     severity: str = "medium"
     description: Optional[str] = None
     screenshot_base64: Optional[str] = None
-
-# --- Audit Logs Schemas ---
-
-class AuditLogResponse(BaseModel):
-    id: int
-    tenant_id: Optional[int]
-    user_id: Optional[int]
-    action: str
-    resource: str
-    details: Optional[dict]
-    ip_address: Optional[str]
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# --- Live Session Schemas ---
-
-class LiveSessionCreateRequest(BaseModel):
-    title: str
-    description: Optional[str] = None
-    course_id: Optional[int] = None
-    scheduled_at: Optional[datetime] = None
-
-
-class LiveSessionResponse(BaseModel):
-    id: int
-    tenant_id: int
-    teacher_id: int
-    course_id: Optional[int]
-    title: str
-    description: Optional[str]
-    room_name: str
-    status: str
-    scheduled_at: Optional[datetime]
-    started_at: Optional[datetime]
-    ended_at: Optional[datetime]
-    created_at: datetime
-    teacher_name: Optional[str] = None
-    duration_minutes: Optional[int] = None
-
-    class Config:
-        from_attributes = True

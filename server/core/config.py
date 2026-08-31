@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     # Database
-    DATABASE_URL: str = "postgresql://postgres:2006@127.0.0.1:5432/adaptive_lms"
+    DATABASE_URL: str = "postgresql://postgres:2006@127.0.0.1:5433/adaptive_lms"
 
     # Redis & Celery
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -18,17 +18,12 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "change-this-secret-key-in-production"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
-    # AI Config (Using Gemini via OpenAI compatibility)
+    # OpenAI
     OPENAI_API_KEY: str = ""
-    EMBEDDING_MODEL: str = "text-embedding-004"
-    CHAT_MODEL: str = "gemini-1.5-pro"
-
-    # --- LiveKit ---
-    LIVEKIT_URL: str = "wss://human-ai-16pkp4sz.livekit.cloud"
-    LIVEKIT_API_KEY: str = ""
-    LIVEKIT_API_SECRET: str = ""
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    CHAT_MODEL: str = "gpt-4o"
 
     # S3 / MinIO
     S3_ENDPOINT_URL: str = "http://localhost:9000"

@@ -12,56 +12,22 @@ import RegisterPage from './pages/auth/RegisterPage';
 
 // Public
 import LandingPage from './pages/LandingPage';
-import MeetingArena from './pages/shared/MeetingArena';
 
 // Student Pages
 import StudentDashboard from './pages/student/StudentDashboard';
-import StudentCognitiveHub from './pages/student/StudentCognitiveHub';
-import StudentLearningCanvas from './pages/student/StudentLearningCanvas';
-import StudentExamArena from './pages/student/StudentExamArena';
-import StudentCareerHub from './pages/student/StudentCareerHub';
 import AiTutorPage from './pages/student/AiTutorPage';
-import StudentAcademicHub from './pages/student/StudentAcademicHub';
-import StudentCommunityHub from './pages/student/StudentCommunityHub';
-import StudentExploreHub from './pages/student/StudentExploreHub';
-import StudentLiveArena from './pages/student/StudentLiveArena';
-import StudentOnboarding from './pages/student/StudentOnboarding';
+import CoursePlayerPage from './pages/student/CoursePlayerPage';
+import ExamProctoringPage from './pages/student/ExamProctoringPage';
+import CognitiveProfilePage from './pages/student/CognitiveProfilePage';
 
 // Teacher Pages
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
-import TeacherStudioHub from './pages/teacher/TeacherStudioHub';
-import TeacherAssessmentHub from './pages/teacher/TeacherAssessmentHub';
-import TeacherLiveHub from './pages/teacher/TeacherLiveHub';
-import TeacherAcademicDesk from './pages/teacher/TeacherAcademicDesk';
-import TeacherMentorshipHub from './pages/teacher/TeacherMentorshipHub';
-import TeacherExamForge from './pages/teacher/TeacherExamForge';
-import TeacherCommunicationHub from './pages/teacher/TeacherCommunicationHub';
+import CourseBuilderPage from './pages/teacher/CourseBuilderPage';
+import ProctoringReportsPage from './pages/teacher/ProctoringReportsPage';
 
 // Admin Pages
-import OrgDashboard from './pages/admin/AdminDashboard'; // Assuming AdminDashboard is the org dashboard
-import OrgDataHub from './pages/admin/OrgDataHub';
-import OrgDirectoryHub from './pages/admin/OrgDirectoryHub';
-import OrgContentHub from './pages/admin/OrgContentHub';
-import OrgCommunicationHub from './pages/admin/OrgCommunicationHub';
-import OrgSecurityHub from './pages/admin/OrgSecurityHub';
-import OrgAiHub from './pages/admin/OrgAiHub';
-import OrgSettingsHub from './pages/admin/OrgSettingsHub';
-import OrgAcademicMonitor from './pages/admin/OrgAcademicMonitor';
-import OrgAssessmentMonitor from './pages/admin/OrgAssessmentMonitor';
-import OrgLiveMonitor from './pages/admin/OrgLiveMonitor';
-
-// Super Admin Pages
-import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
-import TenantDetailsPage from './pages/superadmin/TenantDetailsPage';
-import GlobalContentHub from './pages/superadmin/GlobalContentHub';
-import GlobalSecurityHub from './pages/superadmin/GlobalSecurityHub';
-import GlobalAiHub from './pages/superadmin/GlobalAiHub';
-import GlobalCommunicationHub from './pages/superadmin/GlobalCommunicationHub';
-import GlobalServiceHub from './pages/superadmin/GlobalServiceHub';
-import SystemDataHub from './pages/superadmin/SystemDataHub';
-import GlobalSettingsHub from './pages/superadmin/GlobalSettingsHub';
-import GlobalDirectoryHub from './pages/superadmin/GlobalDirectoryHub';
-import GlobalMonetizationHub from './pages/superadmin/GlobalMonetizationHub';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import TenantManagementPage from './pages/admin/TenantManagementPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,16 +51,10 @@ export default function App() {
           position="top-right"
           toastOptions={{
             style: {
-              background: '#ffffff',
-              color: '#0f172a',
-              border: '1px solid #e2e8f0',
-              borderRadius: '10px',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+              background: '#1a1a2e',
+              color: '#e2e8f0',
+              border: '1px solid rgba(255,255,255,0.1)',
             },
-            success: { iconTheme: { primary: '#16a34a', secondary: '#fff' } },
-            error: { iconTheme: { primary: '#dc2626', secondary: '#fff' } },
           }}
         />
         <Routes>
@@ -102,11 +62,6 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/auth/register" element={<RegisterPage />} />
-          <Route path="/meet/:meetingId" element={
-            <ProtectedRoute>
-              <MeetingArena />
-            </ProtectedRoute>
-          } />
 
           {/* Student Routes */}
           <Route path="/student" element={
@@ -117,23 +72,10 @@ export default function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="ai-tutor" element={<AiTutorPage />} />
-            <Route path="course/:courseId" element={<StudentLearningCanvas />} />
-            <Route path="exam/:examId" element={<StudentExamArena />} />
-            <Route path="cognitive" element={<StudentCognitiveHub />} />
-            <Route path="explore" element={<StudentExploreHub />} />
-            <Route path="academic" element={<StudentAcademicHub />} />
-            <Route path="community" element={<StudentCommunityHub />} />
-            <Route path="career" element={<StudentCareerHub />} />
-            <Route path="live/:courseId" element={<StudentLiveArena />} />
-            <Route path="live" element={<StudentLiveArena />} /> {/* default for testing */}
+            <Route path="course/:courseId" element={<CoursePlayerPage />} />
+            <Route path="exam/:examId" element={<ExamProctoringPage />} />
+            <Route path="profile/cognitive" element={<CognitiveProfilePage />} />
           </Route>
-          
-          {/* Onboarding is outside the main dashboard layout but protected */}
-          <Route path="/student/onboarding" element={
-            <ProtectedRoute allowedRoles={['student']}>
-              <StudentOnboarding />
-            </ProtectedRoute>
-          } />
 
           {/* Teacher Routes */}
           <Route path="/teacher" element={
@@ -143,53 +85,19 @@ export default function App() {
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<TeacherDashboard />} />
-            <Route path="studio" element={<TeacherStudioHub />} />
-            <Route path="assessment" element={<TeacherAssessmentHub />} />
-            <Route path="live" element={<TeacherLiveHub />} />
-            <Route path="desk" element={<TeacherAcademicDesk />} />
-            <Route path="mentorship" element={<TeacherMentorshipHub />} />
-            <Route path="forge" element={<TeacherExamForge />} />
-            <Route path="inbox" element={<TeacherCommunicationHub />} />
+            <Route path="courses/builder" element={<CourseBuilderPage />} />
+            <Route path="proctoring/reports" element={<ProctoringReportsPage />} />
           </Route>
 
-          {/* Admin Routes (Tenant Admin) */}
+          {/* Admin Routes */}
           <Route path="/admin" element={
-            <ProtectedRoute allowedRoles={['tenant_admin']}>
+            <ProtectedRoute allowedRoles={['super_admin', 'tenant_admin']}>
               <DashboardLayout role="admin" />
             </ProtectedRoute>
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<OrgDashboard />} />
-            <Route path="data-hub" element={<OrgDataHub />} />
-            <Route path="ai" element={<OrgAiHub />} />
-            <Route path="directory" element={<OrgDirectoryHub />} />
-            <Route path="content" element={<OrgContentHub />} />
-            <Route path="communication" element={<OrgCommunicationHub />} />
-            <Route path="security" element={<OrgSecurityHub />} />
-            <Route path="settings" element={<OrgSettingsHub />} />
-            <Route path="academic" element={<OrgAcademicMonitor />} />
-            <Route path="assessment" element={<OrgAssessmentMonitor />} />
-            <Route path="live" element={<OrgLiveMonitor />} />
-          </Route>
-
-          {/* Super Admin Routes */}
-          <Route path="/super-admin" element={
-            <ProtectedRoute allowedRoles={['super_admin']}>
-              <DashboardLayout role="super_admin" />
-            </ProtectedRoute>
-          }>
-            <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<SuperAdminDashboard />} />
-            <Route path="system-data" element={<SystemDataHub />} />
-            <Route path="directory" element={<GlobalDirectoryHub />} />
-            <Route path="tenants/:id" element={<TenantDetailsPage />} />
-            <Route path="courses" element={<GlobalContentHub />} />
-            <Route path="plans" element={<GlobalMonetizationHub />} />
-            <Route path="announcements" element={<GlobalCommunicationHub />} />
-            <Route path="support" element={<GlobalServiceHub />} />
-            <Route path="audit-logs" element={<GlobalSecurityHub />} />
-            <Route path="ai-hub" element={<GlobalAiHub />} />
-            <Route path="settings" element={<GlobalSettingsHub />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="tenants" element={<TenantManagementPage />} />
           </Route>
 
           {/* Fallback */}
