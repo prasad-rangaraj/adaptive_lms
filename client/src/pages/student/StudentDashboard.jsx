@@ -1,168 +1,180 @@
 import { useAuthStore } from '../../store/authStore';
-import { BookOpen, Flame, Star, Clock, Bot, Target, ArrowRight, TrendingUp, Zap, Award, ChevronRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Flame, Sparkles, ArrowRight, ChevronRight, PlayCircle, AlertCircle, Clock, CheckCircle2, FileText, Calendar } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
-const stats = [
-  { label: 'Courses Enrolled', value: '6', icon: BookOpen, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', trend: '+1 this month', trendUp: true },
-  { label: 'Learning Streak', value: '12 days', icon: Flame, color: '#be185d', bg: '#fdf2f8', border: '#fbcfe8', trend: 'Personal best!', trendUp: true },
-  { label: 'Avg. Score', value: '84%', icon: Star, color: '#d97706', bg: '#fffbeb', border: '#fde68a', trend: '+6% this week', trendUp: true },
-  { label: 'Hours Studied', value: '47h', icon: Clock, color: '#059669', bg: '#ecfdf5', border: '#bbf7d0', trend: 'This month', trendUp: false },
+const recentItems = [
+  { id: 1, type: 'video', title: 'AVL Tree Rotations', course: 'Data Structures', progress: 85, timeleft: '2 mins left', img: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80', color: '#4f46e5' },
+  { id: 2, type: 'pdf', title: 'Unit 2: Normalization Notes', course: 'DBMS', progress: 45, timeleft: 'Page 12 of 28', img: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=800&q=80', color: '#0891b2' },
+  { id: 3, type: 'video', title: 'Process Scheduling', course: 'OS Theory', progress: 10, timeleft: '42 mins left', img: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=800&q=80', color: '#7c3aed' },
 ];
 
-const courses = [
-  { id: 1, title: 'Advanced Python Programming', progress: 72, category: 'Technology', color: '#4f46e5', emoji: '🐍' },
-  { id: 2, title: 'Data Structures & Algorithms', progress: 45, category: 'CS Fundamentals', color: '#059669', emoji: '🌲' },
-  { id: 3, title: 'Machine Learning Basics', progress: 30, category: 'AI / ML', color: '#d97706', emoji: '🤖' },
+const path = [
+  { step: 1, type: 'urgent_exam', title: 'CA1 Exam: Data Structures', course: 'Tomorrow 9:00 AM', done: false, active: true },
+  { step: 2, type: 'assignment', title: 'Submit DBMS Mini Project', course: 'Due Today 11:59 PM', done: false, active: false, warning: true },
+  { step: 3, type: 'video', title: 'Watch: B-Trees (Important for CA1)', course: 'Data Structures', done: false, active: false },
+  { step: 4, type: 'quiz', title: 'Practice: Tree Traversals', course: 'Data Structures', done: false, active: false },
+  { step: 5, type: 'live', title: 'Live Revision: OS Theory', course: 'Today 5:00 PM', done: false, active: false },
 ];
 
-const aiSuggestions = [
-  { text: 'Review Chapter 4 of Python — you scored 60% on the last quiz.', icon: '📚', color: '#4f46e5' },
-  { text: 'Try a flashcard session for Data Structures today.', icon: '🃏', color: '#059669' },
-  { text: 'Your focus score dipped this week. Try a 25-min Pomodoro session.', icon: '🎯', color: '#d97706' },
-];
+const typeColors = { video: '#4f46e5', quiz: '#0891b2', live: '#f59e0b', assignment: '#ef4444', urgent_exam: '#ef4444' };
 
-export default function StudentDashboard() {
+export default function StudentNexus() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const greeting = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div style={{ position: 'relative', minHeight: '100%', paddingBottom: '3rem', overflow: 'hidden' }}>
 
-      {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 className="page-title">
-            {greeting}, <span className="text-gradient">{user?.full_name?.split(' ')[0]}</span> 👋
-          </h1>
-          <p className="page-subtitle">Here's what's happening on your learning journey today.</p>
-        </div>
-        <Link to="/student/ai-tutor" className="btn btn-primary" style={{ gap: 8 }}>
-          <Bot size={16} /> Ask AI Tutor
-        </Link>
-      </div>
+      {/* ── Organic Background Orbs ── */}
+      <div style={{ position: 'absolute', top: '-10%', left: '-5%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, rgba(79,70,229,0.05) 0%, transparent 70%)', filter: 'blur(60px)', zIndex: 0, pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: '40%', right: '0', width: '25vw', height: '25vw', background: 'radial-gradient(circle, rgba(14,116,144,0.04) 0%, transparent 70%)', filter: 'blur(60px)', zIndex: 0, pointerEvents: 'none' }} />
 
-      {/* ── Stats ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-        {stats.map(({ label, value, icon: Icon, color, bg, border, trend, trendUp }, i) => (
-          <div key={label} className="stat-card animate-fade-up" style={{ animationDelay: `${i * 0.07}s` }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <div style={{
-                width: 42, height: 42, borderRadius: 12, background: bg,
-                border: `1px solid ${border}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Icon size={20} color={color} />
-              </div>
-              <span style={{
-                fontSize: '0.7rem', color: trendUp ? '#059669' : '#6b7280',
-                background: trendUp ? '#ecfdf5' : '#f3f4f6',
-                padding: '2px 8px', borderRadius: 999,
-                border: `1px solid ${trendUp ? '#bbf7d0' : '#e5e7eb'}`,
-              }}>
-                {trend}
-              </span>
-            </div>
-            <p style={{ fontSize: '1.875rem', fontWeight: 900, color: '#111827', letterSpacing: '-0.04em', lineHeight: 1 }}>
-              {value}
+      <div style={{ position: 'relative', zIndex: 10 }}>
+
+        {/* ── Header Row ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div>
+            <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-500)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+              {greeting}, {user?.full_name?.split(' ')[0] || 'Scholar'}
             </p>
-            <p style={{ fontSize: '0.8125rem', color: '#6b7280', marginTop: 6 }}>{label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Main Grid ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', alignItems: 'start' }}>
-
-        {/* Continue Learning */}
-        <div className="card animate-fade-up delay-200" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-            <h2 style={{ fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <BookOpen size={18} color="#4f46e5" /> Continue Learning
-            </h2>
-            <Link to="/student/courses" style={{ fontSize: '0.8125rem', color: '#4f46e5', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-              View all <ArrowRight size={13} />
-            </Link>
+            <h1 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.15 }}>
+              Your Learning <span style={{ color: 'var(--text-muted)' }}>Nexus.</span>
+            </h1>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-            {courses.map((course) => (
-              <Link key={course.id} to={`/student/course/${course.id}`} style={{ textDecoration: 'none' }}>
-                <div style={{
-                  display: 'flex', gap: '1rem', alignItems: 'center',
-                  padding: '1rem', borderRadius: 14,
-                  border: '1px solid #f0f1f3', background: '#fafbff',
-                  transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)', cursor: 'pointer',
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = `${course.color}40`; e.currentTarget.style.transform = 'translateX(4px)'; e.currentTarget.style.background = '#f5f7ff'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#f0f1f3'; e.currentTarget.style.transform = 'translateX(0)'; e.currentTarget.style.background = '#fafbff'; }}
-                >
-                  <div style={{
-                    width: 50, height: 50, borderRadius: 13, flexShrink: 0,
-                    background: `${course.color}15`,
-                    border: `1px solid ${course.color}25`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '1.5rem',
-                  }}>
-                    {course.emoji}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-                      <p style={{ fontWeight: 600, color: '#111827', fontSize: '0.9375rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '75%' }}>{course.title}</p>
-                      <span style={{ fontWeight: 800, fontSize: '0.875rem', color: course.color, flexShrink: 0 }}>{course.progress}%</span>
-                    </div>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${course.progress}%`, background: `linear-gradient(90deg, ${course.color}80, ${course.color})` }} />
-                    </div>
-                    <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: 6 }}>{course.category}</p>
-                  </div>
-                  <ChevronRight size={16} color="var(--text-muted)" />
-                </div>
-              </Link>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            {/* Streak */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg, #f59e0b, #ef4444)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Flame size={18} color="white" />
+              </div>
+              <div>
+                <p style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>12</p>
+                <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-muted)', marginTop: 2 }}>Day Streak</p>
+              </div>
+            </div>
+            <button onClick={() => navigate('/student/ai-tutor')} style={{ background: 'var(--text-primary)', color: 'white', border: 'none', padding: '9px 18px', borderRadius: 999, fontSize: '0.875rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Sparkles size={15} /> Ask AI Tutor
+            </button>
           </div>
         </div>
 
-        {/* Right Column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* ── Academic Pulse Strip ── */}
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '2.5rem', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 12, padding: '0.875rem 1.25rem', background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 14 }}>
+            <Calendar size={18} color="var(--brand-500)" />
+            <div>
+              <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Next Class</p>
+              <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-primary)' }}>OS Theory · 10:00 AM</p>
+            </div>
+          </div>
+          <div style={{ flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 12, padding: '0.875rem 1.25rem', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14 }}>
+            <Clock size={18} color="#d97706" />
+            <div>
+              <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Urgent Deadline</p>
+              <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#92400e' }}>DBMS Project · Due Today</p>
+            </div>
+          </div>
+          <div style={{ flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 12, padding: '0.875rem 1.25rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 14 }}>
+            <AlertCircle size={18} color="#ef4444" />
+            <div>
+              <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attendance Warning</p>
+              <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#991b1b' }}>Maths III · 72% (Danger)</p>
+            </div>
+          </div>
+        </div>
 
-          {/* AI Insights */}
-          <div className="card animate-fade-up delay-300" style={{ padding: '1.5rem' }}>
-            <h2 style={{ fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
-              <Zap size={17} color="#4f46e5" /> AI Insights
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {aiSuggestions.map((s, i) => (
-                <div key={i} style={{
-                  display: 'flex', gap: 12, padding: '0.875rem',
-                  borderRadius: 12, background: '#fafbff',
-                  border: `1px solid ${s.color}20`,
-                  borderLeft: `3px solid ${s.color}80`,
-                }}>
-                  <span style={{ fontSize: '1.125rem', lineHeight: 1, marginTop: 1, flexShrink: 0 }}>{s.icon}</span>
-                  <p style={{ fontSize: '0.8125rem', color: '#4b5563', lineHeight: 1.55 }}>{s.text}</p>
-                </div>
+        {/* ── Main 2-Column Layout ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '3rem', alignItems: 'start' }}>
+
+          {/* LEFT: Pick up where you left off */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', minWidth: 0 }}>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--text-primary)' }}>Pick Up Where You Left Off</h2>
+              <button style={{ background: 'transparent', border: 'none', color: 'var(--brand-600)', fontSize: '0.8125rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: 0 }}>All Courses <ChevronRight size={14} /></button>
+            </div>
+
+            {/* Recent Items Stack */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {recentItems.map(item => (
+                <Link key={item.id} to={`/student/course/${item.id}`} style={{ textDecoration: 'none' }}>
+                  <div style={{ borderRadius: 20, overflow: 'hidden', position: 'relative', height: '120px', cursor: 'pointer', flexShrink: 0, border: '1px solid var(--surface-3)' }}>
+                    <img src={item.img} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease', opacity: 0.85 }}
+                      onMouseEnter={e => e.target.style.transform = 'scale(1.05)'}
+                      onMouseLeave={e => e.target.style.transform = 'scale(1)'}
+                    />
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 40%, transparent 100%)' }} />
+
+                    <div style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: '1.5rem', right: '7rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.375rem' }}>
+                        {item.type === 'video' ? <PlayCircle size={14} color="#818cf8" fill="rgba(129, 140, 248, 0.2)" /> : <FileText size={14} color="#38bdf8" fill="rgba(56, 189, 248, 0.2)" />}
+                        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{item.course}</p>
+                      </div>
+                      <h3 style={{ color: 'white', fontSize: '1rem', fontWeight: 800, lineHeight: 1.25, marginBottom: '0.625rem' }}>{item.title}</h3>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.2)', width: '60%' }}>
+                          <div style={{ width: `${item.progress}%`, height: '100%', background: 'white', borderRadius: 999 }} />
+                        </div>
+                        <span style={{ fontSize: '0.6875rem', color: 'rgba(255,255,255,0.8)', fontWeight: 700 }}>{item.timeleft}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', right: '1.5rem', width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                      <ChevronRight size={18} />
+                    </div>
+                  </div>
+                </Link>
               ))}
             </div>
-            <Link to="/student/profile/cognitive" className="btn btn-secondary btn-sm" style={{ width: '100%', marginTop: '1rem' }}>
-              <Target size={14} /> View Full Profile
-            </Link>
+
+            {/* Quick Links */}
+            <div style={{ display: 'flex', gap: '1.5rem', paddingTop: '0.5rem' }}>
+              <button onClick={() => navigate('/student/cognitive')} style={{ background: 'transparent', border: 'none', padding: 0, color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                Cognitive Profile <ArrowRight size={16} color="var(--brand-500)" />
+              </button>
+              <button onClick={() => navigate('/student/academic')} style={{ background: 'transparent', border: 'none', padding: 0, color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                Academic Hub <ArrowRight size={16} color="var(--brand-500)" />
+              </button>
+            </div>
           </div>
 
-          {/* Daily Goal */}
-          <div className="card-brand animate-fade-up delay-400" style={{ padding: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.875rem' }}>
-              <Award size={20} color="rgba(255,255,255,0.9)" />
-              <p style={{ fontWeight: 700, color: 'white', fontSize: '0.9375rem' }}>Daily Goal</p>
+          {/* RIGHT: Today's Path Timeline */}
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.75rem' }}>
+              <h2 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-primary)' }}>Today's Path</h2>
+              <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#ef4444', background: '#fef2f2', border: '1px solid #fecaca', padding: '3px 8px', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Flame size={12} /> Exam Mode
+              </span>
             </div>
-            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.875rem', marginBottom: '1rem', lineHeight: 1.55 }}>
-              Complete 1 module and review flashcards for 15 minutes today.
-            </p>
-            <div style={{ background: 'rgba(255,255,255,0.25)', borderRadius: 999, height: 7, overflow: 'hidden', marginBottom: 6 }}>
-              <div style={{ width: '60%', height: '100%', background: 'white', borderRadius: 999, transition: 'width 0.8s' }} />
+
+            <div style={{ position: 'relative', paddingLeft: '1.5rem' }}>
+              <div style={{ position: 'absolute', top: 6, bottom: 6, left: '5px', width: 2, background: 'linear-gradient(to bottom, var(--brand-500) 40%, var(--surface-3) 100%)' }} />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {path.map((item) => (
+                  <div key={item.step} style={{ position: 'relative', opacity: item.done ? 0.45 : 1 }}>
+                    <div style={{ position: 'absolute', left: '-1.5rem', width: 12, height: 12, borderRadius: '50%', background: item.done ? 'var(--surface-4)' : item.active ? typeColors[item.type] : 'var(--surface-1)', border: `2px solid ${item.done ? 'var(--surface-4)' : typeColors[item.type]}`, top: 4 }} />
+
+                    <div style={{ padding: '0.75rem', background: item.active ? `${typeColors[item.type]}08` : item.warning ? '#fffbeb' : 'transparent', borderRadius: 10, border: item.active ? `1px solid ${typeColors[item.type]}25` : item.warning ? '1px solid #fde68a' : '1px solid transparent' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.125rem' }}>
+                        <span style={{ fontSize: '0.625rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: typeColors[item.type] }}>
+                          {item.type === 'urgent_exam' ? 'CRITICAL EXAM' : item.type}
+                        </span>
+                        {item.active && <span style={{ fontSize: '0.625rem', fontWeight: 800, color: 'white', background: typeColors[item.type], padding: '1px 6px', borderRadius: 999 }}>Up Next</span>}
+                        {item.warning && <span style={{ fontSize: '0.625rem', fontWeight: 800, color: '#d97706', background: '#fef3c7', padding: '1px 6px', borderRadius: 999 }}>Warning</span>}
+                      </div>
+                      <h4 style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.3, marginBottom: '0.125rem' }}>{item.title}</h4>
+                      <p style={{ fontSize: '0.6875rem', fontWeight: 600, color: item.type === 'urgent_exam' ? '#ef4444' : 'var(--text-muted)' }}>{item.course}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.75rem' }}>60% complete — keep it up!</p>
           </div>
+
         </div>
       </div>
     </div>

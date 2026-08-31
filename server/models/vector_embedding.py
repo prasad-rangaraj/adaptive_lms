@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
-from core.database import Base
+from db.database import Base
 
 
 class VectorEmbedding(Base):

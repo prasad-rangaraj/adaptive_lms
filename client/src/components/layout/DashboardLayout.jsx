@@ -1,77 +1,162 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import {
   LayoutDashboard, BookOpen, Bot, Shield, Building2,
   LogOut, GraduationCap, Brain,
-  Bell, Search, Settings, ChevronRight,
+  Bell, Search, Settings, ChevronRight, Users, CreditCard,
+  BarChart3, Megaphone, ClipboardList, HeartPulse, LifeBuoy, Compass,
+  Palette, BarChart2, BookMarked, UserCog, ScrollText, Award, Puzzle, Crown, BrainCircuit, Video, TrendingUp, MessageSquare
 } from 'lucide-react';
 
 const navConfig = {
   student: [
-    { section: null, items: [
-      { to: '/student/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { section: 'My Learning', items: [
+      { to: '/student/dashboard', icon: LayoutDashboard, label: 'Nexus' },
+      { to: '/student/explore', icon: Compass, label: 'Explore Hub' },
+      { to: '/student/course/1', icon: BookOpen, label: 'Learning Canvas' },
       { to: '/student/ai-tutor', icon: Bot, label: 'AI Tutor' },
-      { to: '/student/profile/cognitive', icon: Brain, label: 'Cognitive Profile' },
+    ]},
+    { section: 'Performance', items: [
+      { to: '/student/cognitive', icon: Brain, label: 'Cognitive Profile' },
+      { to: '/student/exam/1', icon: Shield, label: 'Exam Arena' },
+    ]},
+    { section: 'Academic', items: [
+      { to: '/student/academic', icon: GraduationCap, label: 'Academic Hub' },
+    ]},
+    { section: 'Community', items: [
+      { to: '/student/community', icon: Users, label: 'Community Hub' },
+      { to: '/student/live', icon: Video, label: 'Live Classroom' },
+    ]},
+    { section: 'Future', items: [
+      { to: '/student/career', icon: TrendingUp, label: 'Career Horizon' },
     ]},
   ],
   teacher: [
-    { section: null, items: [
-      { to: '/teacher/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/teacher/courses/builder', icon: BookOpen, label: 'Course Builder' },
-      { to: '/teacher/proctoring/reports', icon: Shield, label: 'Proctor Monitor' },
+    { section: 'Command Center', items: [
+      { to: '/teacher/dashboard', icon: LayoutDashboard, label: 'Dashboard & Analytics' },
+    ]},
+    { section: 'Creator Studio', items: [
+      { to: '/teacher/studio', icon: BookOpen, label: 'Course Studio' },
+      { to: '/teacher/inbox', icon: MessageSquare, label: 'Faculty Inbox' },
+    ]},
+    { section: 'Evaluation & Operations', items: [
+      { to: '/teacher/forge', icon: Puzzle, label: 'Exam Forge' },
+      { to: '/teacher/assessment', icon: Shield, label: 'Assessment Hub' },
+      { to: '/teacher/desk', icon: ClipboardList, label: 'Academic Desk' },
+    ]},
+    { section: 'Community & Live', items: [
+      { to: '/teacher/live', icon: Video, label: 'Live Sessions' },
+      { to: '/teacher/mentorship', icon: HeartPulse, label: 'Mentorship Hub' },
     ]},
   ],
   admin: [
-    { section: null, items: [
-      { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/admin/tenants', icon: Building2, label: 'Tenants' },
+
+    { section: 'Organization', items: [
+      { to: '/admin/dashboard',     icon: LayoutDashboard, label: 'Overview' },
+      { to: '/admin/data-hub',      icon: BarChart3,       label: 'Data Hub' },
+    ]},
+    { section: 'Operations', items: [
+      { to: '/admin/academic',      icon: GraduationCap,   label: 'Academic Monitor' },
+      { to: '/admin/assessment',    icon: ClipboardList,   label: 'Assessment Monitor' },
+      { to: '/admin/live',          icon: Video,           label: 'Live Monitor' },
+    ]},
+    { section: 'Intelligence', items: [
+      { to: '/admin/ai',            icon: BrainCircuit,    label: 'Org AI Hub' },
+    ]},
+    { section: 'Management', items: [
+      { to: '/admin/directory',     icon: Users,           label: 'Directory Hub' },
+      { to: '/admin/content',       icon: BookOpen,        label: 'Content Hub' },
+      { to: '/admin/communication', icon: Megaphone,       label: 'Communication Hub' },
+    ]},
+    { section: 'Administration', items: [
+      { to: '/admin/security',      icon: Shield,          label: 'Security Hub' },
+      { to: '/admin/settings',      icon: Settings,        label: 'Settings Hub' },
+    ]},
+  ],
+  super_admin: [
+    { section: 'Overview', items: [
+      { to: '/super-admin/dashboard',     icon: LayoutDashboard, label: 'Workspace' },
+      { to: '/super-admin/system-data',   icon: BarChart3,       label: 'System Data' },
+    ]},
+    { section: 'Platform', items: [
+      { to: '/super-admin/directory',     icon: Users,           label: 'Global Directory' },
+      { to: '/super-admin/courses',       icon: BookOpen,        label: 'Content Hub' },
+      { to: '/super-admin/plans',         icon: Crown,           label: 'Monetization Hub' },
+      { to: '/super-admin/announcements', icon: Megaphone,       label: 'Communication Hub' },
+    ]},
+    { section: 'Intelligence', items: [
+      { to: '/super-admin/ai-hub',        icon: BrainCircuit,    label: 'Global AI Hub' },
+    ]},
+    { section: 'System', items: [
+      { to: '/super-admin/support',       icon: LifeBuoy,        label: 'Service Hub' },
+      { to: '/super-admin/audit-logs',    icon: Shield,          label: 'Security & Audit' },
+      { to: '/super-admin/settings',      icon: Settings,        label: 'Global Settings' },
     ]},
   ],
 };
 
+
 const roleConfig = {
-  student: { label: 'Student', gradient: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#4f46e5', light: '#eef2ff', glow: '0 4px 14px rgba(99,102,241,0.3)' },
-  teacher: { label: 'Teacher', gradient: 'linear-gradient(135deg, #059669, #0d9488)', color: '#059669', light: '#ecfdf5', glow: '0 4px 14px rgba(16,185,129,0.3)' },
-  admin:   { label: 'Admin',   gradient: 'linear-gradient(135deg, #d97706, #dc2626)', color: '#d97706', light: '#fffbeb', glow: '0 4px 14px rgba(245,158,11,0.3)' },
+  student:     { label: 'Student',     gradient: 'linear-gradient(135deg, var(--brand-600), var(--brand-400))', glow: 'var(--glow-brand)' },
+  teacher:     { label: 'Teacher',     gradient: 'linear-gradient(135deg, var(--brand-600), var(--brand-400))', glow: 'var(--glow-brand)' },
+  admin:       { label: 'Admin',       gradient: 'linear-gradient(135deg, var(--brand-600), var(--brand-400))', glow: 'var(--glow-brand)' },
+  super_admin: { label: 'Super Admin', gradient: 'linear-gradient(135deg, var(--brand-600), var(--brand-400))', glow: 'var(--glow-brand)' },
 };
 
+// Routes that should use the full page (no max-width, edge-to-edge)
+const FULL_PAGE_ROUTES = ['/live', '/live/'];
+function isFullPage(pathname) {
+  return FULL_PAGE_ROUTES.some(r => pathname.endsWith(r) || pathname.includes('/live/'));
+}
+
 export default function DashboardLayout({ role }) {
-  const { user, logout } = useAuthStore();
+  const authStore = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const sections = navConfig[role] || [];
   const rc = roleConfig[role] || roleConfig.student;
+  const fullPage = isFullPage(location.pathname);
 
-  const handleLogout = () => { logout(); navigate('/auth/login'); };
+  const user = authStore.user || {
+    full_name: 'Dev Admin',
+    email: 'dev@lms.com',
+    role: 'super_admin'
+  };
+
+  const handleLogout = () => { authStore.logout(); navigate('/auth/login'); };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f9fc' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--surface-1)' }}>
 
-      {/* ── Sidebar ── */}
+      {/* ── Light Sidebar ── */}
       <aside className="sidebar">
-        {/* Logo area */}
-        <div style={{ padding: '1.375rem 1.25rem 1.125rem', borderBottom: '1px solid #f0f1f3' }}>
+        {/* Logo */}
+        <div style={{ height: 65, display: 'flex', alignItems: 'center', padding: '0 1.25rem', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
-              width: 36, height: 36, borderRadius: 10,
+              width: 34, height: 34, borderRadius: 9,
               background: rc.gradient,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: rc.glow,
-              flexShrink: 0,
+              boxShadow: rc.glow, flexShrink: 0,
             }}>
-              <GraduationCap size={20} color="white" />
+              <GraduationCap size={18} color="white" />
             </div>
             <div>
-              <p style={{ fontWeight: 800, color: '#111827', fontSize: '0.9375rem', letterSpacing: '-0.02em', lineHeight: 1 }}>AdaptiveLMS</p>
-              <p style={{ fontSize: '0.6875rem', color: '#9ca3af', marginTop: 2 }}>{rc.label} Portal</p>
+              <p style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.9375rem', letterSpacing: '-0.025em', lineHeight: 1 }}>Lumina</p>
+              <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: 2 }}>{rc.label} Portal</p>
             </div>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav style={{ flex: 1, padding: '1rem 0.875rem', overflowY: 'auto' }}>
+        <nav style={{ flex: 1, padding: '1.25rem 0.75rem', overflowY: 'auto', overflowX: 'hidden' }}>
           {sections.map(({ section, items }, si) => (
-            <div key={si} style={{ marginBottom: '1.5rem' }}>
-              {section && <p className="section-label" style={{ paddingLeft: '0.875rem', marginBottom: '0.5rem' }}>{section}</p>}
+            <div key={si} style={{ marginBottom: '1rem' }}>
+              {section && (
+                <p className="section-label">
+                  {section}
+                </p>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {items.map(({ to, icon: Icon, label }) => (
                   <NavLink
@@ -79,9 +164,8 @@ export default function DashboardLayout({ role }) {
                     to={to}
                     className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                   >
-                    <Icon size={17} />
+                    <Icon size={15} />
                     <span style={{ flex: 1 }}>{label}</span>
-                    <ChevronRight size={13} style={{ opacity: 0.3 }} />
                   </NavLink>
                 ))}
               </div>
@@ -90,50 +174,50 @@ export default function DashboardLayout({ role }) {
         </nav>
 
         {/* User Profile */}
-        <div style={{ padding: '1rem', borderTop: '1px solid #f0f1f3' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 10, padding: '0.75rem',
-            borderRadius: 12, background: '#f8f9fc', border: '1px solid #f0f1f3',
-            marginBottom: '0.625rem',
-          }}>
+        <div style={{ padding: '1rem', borderTop: '1px solid var(--sidebar-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.625rem 0.75rem', borderRadius: 10, background: 'var(--surface-2)', marginBottom: '0.625rem' }}>
             <div style={{ position: 'relative' }}>
-              <div className="avatar" style={{
-                width: 34, height: 34, fontSize: '0.875rem',
-                background: rc.gradient,
-                boxShadow: rc.glow,
-              }}>
+              <div className="avatar" style={{ width: 32, height: 32, fontSize: '0.875rem', background: rc.gradient, boxShadow: rc.glow }}>
                 {user?.full_name?.[0]?.toUpperCase()}
               </div>
-              <div style={{
-                position: 'absolute', bottom: 0, right: 0,
-                width: 9, height: 9, borderRadius: '50%',
-                background: '#10b981', border: '2px solid white',
-              }} />
+              <div style={{ position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: '#16a34a', border: '1.5px solid white' }} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontWeight: 600, color: '#111827', fontSize: '0.8125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user?.full_name}
-              </p>
-              <p style={{ color: '#9ca3af', fontSize: '0.6875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user?.email}
-              </p>
+              <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.8125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.full_name}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.6875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="btn btn-ghost btn-sm" style={{ width: '100%', color: '#6b7280' }}>
+          <button onClick={handleLogout} className="btn btn-ghost" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0.5rem', fontSize: '0.8125rem' }}>
             <LogOut size={14} /> Sign Out
           </button>
         </div>
       </aside>
 
       {/* ── Main Content ── */}
-      <div className="main-content" style={{ flex: 1 }}>
+      <div className="main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+
+        {/* Impersonation Banner */}
+        {useAuthStore.getState().isImpersonating() && (
+          <div style={{ background: '#fff7ed', borderBottom: '1px solid #fed7aa', padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <span style={{ fontSize: '0.875rem', color: '#92400e', fontWeight: 600 }}>
+              ⚠️ Impersonating {user?.full_name} ({user?.role})
+            </span>
+            <button
+              onClick={() => { useAuthStore.getState().stopImpersonating(); window.location.href = '/super-admin/dashboard'; }}
+              style={{ background: '#d97706', color: 'white', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Stop
+            </button>
+          </div>
+        )}
+
         {/* Top Header */}
         <header style={{
-          height: 60,
-          background: 'rgba(255,255,255,0.9)',
+          height: 65,
+          background: 'var(--glass-bg)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
-          borderBottom: '1px solid #f0f1f3',
+          borderBottom: '1px solid var(--card-border)',
           display: 'flex',
           alignItems: 'center',
           paddingLeft: '2.5rem',
@@ -142,56 +226,45 @@ export default function DashboardLayout({ role }) {
           position: 'sticky',
           top: 0,
           zIndex: 30,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         }}>
           {/* Search */}
-          <div style={{ flex: 1, maxWidth: 380, position: 'relative' }}>
-            <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+          <div style={{ flex: 1, maxWidth: 360, position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
             <input
               placeholder="Search courses, topics..."
-              style={{
-                width: '100%', height: 36, paddingLeft: 36, paddingRight: 16,
-                borderRadius: 10, border: '1.5px solid #e5e7eb',
-                background: '#f8f9fc', fontSize: '0.875rem', color: '#111827',
-                outline: 'none', transition: 'all 0.18s',
-                fontFamily: 'var(--font-body)',
-              }}
-              onFocus={e => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)'; e.target.style.background = '#ffffff'; }}
-              onBlur={e => { e.target.style.borderColor = '#e5e7eb'; e.target.style.boxShadow = 'none'; e.target.style.background = '#f8f9fc'; }}
+              className="input-field"
+              style={{ paddingLeft: 34, height: 34, fontSize: '0.8125rem', background: 'var(--surface-2)', border: '1.5px solid var(--surface-3)' }}
+              onFocus={e => { e.target.style.background = 'white'; e.target.style.borderColor = 'var(--brand-500)'; e.target.style.boxShadow = 'var(--glow-brand)'; }}
+              onBlur={e => { e.target.style.background = 'var(--surface-2)'; e.target.style.borderColor = 'var(--surface-3)'; e.target.style.boxShadow = 'none'; }}
             />
           </div>
 
           <div style={{ flex: 1 }} />
 
-          {/* Notification bell */}
+          {/* Bell */}
           <button className="btn btn-ghost btn-icon" style={{ position: 'relative' }}>
-            <Bell size={18} color="#6b7280" />
-            <span style={{
-              position: 'absolute', top: 6, right: 6,
-              width: 7, height: 7, borderRadius: '50%',
-              background: '#ef4444', border: '2px solid white',
-            }} />
+            <Bell size={17} color="var(--text-muted)" />
+            <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: '#e11d48', border: '1.5px solid var(--surface-1)' }} />
           </button>
 
           <button className="btn btn-ghost btn-icon">
-            <Settings size={18} color="#6b7280" />
+            <Settings size={17} color="var(--text-muted)" />
           </button>
-
-          {/* Avatar */}
-          <div className="avatar" style={{
-            width: 34, height: 34, fontSize: '0.875rem',
-            background: rc.gradient, cursor: 'pointer',
-            boxShadow: rc.glow,
-          }}>
-            {user?.full_name?.[0]?.toUpperCase()}
-          </div>
         </header>
 
         {/* Page Content */}
-        <div className="content-area" style={{ padding: '2rem 2.5rem' }}>
-          <Outlet />
+        <div style={{ flex: 1, overflowY: fullPage ? 'hidden' : 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div
+            style={fullPage
+              ? { flex: 1, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)', padding: '1.5rem 1.75rem', boxSizing: 'border-box' }
+              : { flex: 1, padding: '1.5rem 2.5rem', maxWidth: 1280, width: '100%', boxSizing: 'border-box' }
+            }
+          >
+            <Outlet />
+          </div>
         </div>
       </div>
     </div>
   );
 }
+

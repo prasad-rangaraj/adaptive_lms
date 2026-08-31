@@ -4,11 +4,15 @@ These run asynchronously, without blocking the main FastAPI server.
 """
 from celery_worker import celery_app
 from sqlalchemy.orm import Session
-from core.database import SessionLocal
+from db.database import SessionLocal
 from core.config import settings
 from openai import OpenAI
+import httpx
 
-openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+openai_client = OpenAI(
+    api_key=settings.OPENAI_API_KEY,
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+)
 
 
 def get_db() -> Session:
@@ -72,11 +76,20 @@ def process_material_embeddings(self, material_id: int, tenant_id: int):
             if not chunk.strip():
                 continue
 
-            embedding_response = openai_client.embeddings.create(
-                input=chunk,
-                model=settings.EMBEDDING_MODEL,
-            )
-            vector = embedding_response.data[0].embedding
+            # Generate embedding via Gemini REST API
+            model = settings.EMBEDDING_MODEL
+            api_key = settings.OPENAI_API_KEY
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:embedContent?key={api_key}"
+            payload = {
+                "model": f"models/{model}",
+                "content": {"parts": [{"text": chunk}]},
+                "outputDimensionality": 1536
+            }
+            
+            with httpx.Client() as client:
+                resp = client.post(url, json=payload)
+                resp.raise_for_status()
+                vector = resp.json()["embedding"]["values"]
 
             vec_record = VectorEmbedding(
                 tenant_id=tenant_id,
