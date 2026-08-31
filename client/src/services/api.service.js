@@ -94,7 +94,7 @@ export const coursesAPI = {
 
 // --- AI Tutor ---
 export const aiTutorAPI = {
-  ask: (courseId, message) => api.post('/api/ai-tutor/ask', { course_id: courseId, message }),
+  ask: (courseId, message, persona = 'tutor') => api.post('/api/ai-tutor/ask', { course_id: courseId, message, persona }),
   generateQuiz: (courseId, topic, difficulty, numQuestions) =>
     api.post('/api/ai-tutor/generate-quiz', null, {
       params: { course_id: courseId, topic, difficulty, num_questions: numQuestions },
@@ -143,6 +143,12 @@ export const liveAPI = {
 
   // Legacy: ad-hoc room for office hours / MeetingArena
   createOrGetRoom: (roomName) => api.post(`/api/live/rooms?room_name=${roomName}`),
+};
+
+// --- Cognitive Analytics ---
+export const cognitiveAPI = {
+  getProfile: () => api.get('/api/cognitive/me'),
+  evaluate: (performanceData) => api.post('/api/cognitive/evaluate', performanceData),
 };
 
 export default api;

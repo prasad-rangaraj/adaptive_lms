@@ -1,5 +1,5 @@
 import { useAuthStore } from '../../store/authStore';
-import { Flame, Sparkles, ArrowRight, ChevronRight, Play, AlertCircle, Clock, CheckCircle2, FileText, Calendar } from 'lucide-react';
+import { Flame, Sparkles, ArrowRight, ChevronRight, PlayCircle, AlertCircle, Clock, CheckCircle2, FileText, Calendar } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 const recentItems = [
@@ -110,7 +110,7 @@ export default function StudentNexus() {
 
                     <div style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: '1.5rem', right: '7rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.375rem' }}>
-                        {item.type === 'video' ? <Play size={14} color="var(--brand-300)" /> : <FileText size={14} color="#0891b2" />}
+                        {item.type === 'video' ? <PlayCircle size={14} color="#818cf8" fill="rgba(129, 140, 248, 0.2)" /> : <FileText size={14} color="#38bdf8" fill="rgba(56, 189, 248, 0.2)" />}
                         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{item.course}</p>
                       </div>
                       <h3 style={{ color: 'white', fontSize: '1rem', fontWeight: 800, lineHeight: 1.25, marginBottom: '0.625rem' }}>{item.title}</h3>

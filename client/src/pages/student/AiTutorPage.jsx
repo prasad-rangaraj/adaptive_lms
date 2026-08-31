@@ -1,14 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
 import { aiTutorAPI } from '../../services/api.service';
-import { Send, Sparkles, Lightbulb, Hash, FileText, Layers, BookOpen, Paperclip, MessageSquare, History, UserCheck, TerminalSquare, ChevronDown, X } from 'lucide-react';
+import { Send, Sparkles, Lightbulb, Hash, FileText, Layers, BookOpen, Paperclip, MessageSquare, History, UserCheck, TerminalSquare, ChevronDown, X, Menu } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const COURSE_ID = 1;
 
-const WELCOME = {
-  role: 'ai',
-  content: "Hi! I'm your AI Tutor. I have full context of your course materials and can explain concepts, generate quizzes, build flashcards, or summarize any topic. What would you like to explore?",
-  type: 'explanation',
+const WELCOME_MESSAGES = {
+  tutor: {
+    role: 'ai',
+    content: "Hi! I'm your AI Tutor. I have full context of your course materials and can explain concepts, generate quizzes, build flashcards, or summarize any topic. What would you like to explore?",
+    type: 'explanation',
+  },
+  viva: {
+    role: 'ai',
+    content: "Welcome to the Viva Examiner mode! I will ask you challenging questions to test your deep understanding of the course materials. Shall we begin?",
+    type: 'explanation',
+  },
+  debug: {
+    role: 'ai',
+    content: "Code Debugger activated. Paste any failing code snippets or error logs, and we'll figure out what's wrong together.",
+    type: 'explanation',
+  }
 };
 
 const quickPrompts = [
@@ -48,10 +60,11 @@ function AIAvatar({ size = 34 }) {
 }
 
 export default function AiTutorPage() {
-  const [messages, setMessages] = useState([WELCOME]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
   const [activePersona, setActivePersona] = useState('tutor');
+  const [messages, setMessages] = useState([WELCOME_MESSAGES['tutor']]);
+  const [input, setInput] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [attachedContext, setAttachedContext] = useState(null); 
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
@@ -68,7 +81,7 @@ export default function AiTutorPage() {
     setLoading(true);
 
     try {
-      const res = await aiTutorAPI.ask(COURSE_ID, msg);
+      const res = await aiTutorAPI.ask(COURSE_ID, msg, activePersona);
       const { answer, response_type, sources } = res.data;
       setMessages(prev => [...prev, { role: 'ai', content: answer, type: response_type, sources }]);
     } catch {
@@ -80,37 +93,42 @@ export default function AiTutorPage() {
   };
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden', margin: '-2rem -2.5rem', background: 'var(--surface-0)' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden', margin: '-2rem -2.5rem', background: 'var(--surface-0)', position: 'relative' }}>
 
-      {/* ── Left Sidebar (History) ── */}
-      <div style={{ width: 280, background: 'var(--surface-0)', borderRight: '1px solid var(--surface-3)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-        <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <History size={16} /> Chat History
-          </h2>
-        </div>
-        
-        {/* New Chat Button */}
-        <div style={{ padding: '0 1rem 1rem' }}>
-          <button style={{ width: '100%', padding: '0.75rem', background: 'var(--surface-1)', border: '1px solid var(--surface-3)', borderRadius: 12, color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-1)'}>
-            <MessageSquare size={16} /> New Chat
-          </button>
-        </div>
+      {/* ── Left Sidebar (History Overlay) ── */}
+      {showHistory && (
+        <div style={{ width: 280, background: 'var(--surface-0)', borderRight: '1px solid var(--surface-3)', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 30, boxShadow: '4px 0 24px rgba(0,0,0,0.08)' }}>
+          <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <History size={16} /> Chat History
+            </h2>
+            <button onClick={() => setShowHistory(false)} className="btn btn-ghost btn-icon">
+              <X size={18} />
+            </button>
+          </div>
+          
+          {/* New Chat Button */}
+          <div style={{ padding: '0 1rem 1rem' }}>
+            <button style={{ width: '100%', padding: '0.75rem', background: 'var(--surface-1)', border: '1px solid var(--surface-3)', borderRadius: 12, color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-1)'}>
+              <MessageSquare size={16} /> New Chat
+            </button>
+          </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 1rem 1rem' }} className="hide-scrollbar">
-          <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem', paddingLeft: '0.5rem' }}>Recent</p>
-          {historySessions.map(session => (
-            <div key={session.id} style={{ padding: '0.875rem 1rem', borderRadius: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.25rem', transition: 'background 0.2s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-              <h4 style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{session.title}</h4>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{session.context}</span>
-                <span style={{ fontSize: '0.625rem', color: 'var(--text-tertiary)' }}>{session.time}</span>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0 1rem 1rem' }} className="hide-scrollbar">
+            <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem', paddingLeft: '0.5rem' }}>Recent</p>
+            {historySessions.map(session => (
+              <div key={session.id} style={{ padding: '0.875rem 1rem', borderRadius: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.25rem', transition: 'background 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <h4 style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{session.title}</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{session.context}</span>
+                  <span style={{ fontSize: '0.625rem', color: 'var(--text-tertiary)' }}>{session.time}</span>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Main Chat Area ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 10, minWidth: 0 }}>
@@ -120,14 +138,26 @@ export default function AiTutorPage() {
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(var(--surface-3) 1px, transparent 1px)', backgroundSize: '32px 32px', opacity: 0.3, zIndex: -1, pointerEvents: 'none' }} />
 
         {/* ── Top Bar (Floating Personas) ── */}
-        <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, zIndex: 10 }}>
+        <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, zIndex: 10 }}>
+          
+          {/* History Toggle */}
+          <div>
+            {!showHistory && (
+              <button onClick={() => setShowHistory(true)} className="btn btn-secondary" style={{ gap: 8, padding: '8px 16px', borderRadius: 999, background: 'var(--surface-0)', border: '1px solid var(--surface-3)', boxShadow: '0 8px 24px rgba(0,0,0,0.04)' }}>
+                <Menu size={16} /> <span style={{ fontWeight: 800, fontSize: '0.8125rem' }}>History</span>
+              </button>
+            )}
+          </div>
+
           <div style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 999, padding: '0.375rem', display: 'flex', gap: '0.25rem', boxShadow: '0 8px 24px rgba(0,0,0,0.04)' }}>
             {personas.map(p => (
-              <button key={p.id} onClick={() => setActivePersona(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 999, border: 'none', background: activePersona === p.id ? 'var(--brand-50)' : 'transparent', color: activePersona === p.id ? 'var(--brand-700)' : 'var(--text-secondary)', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', transition: 'all 0.2s' }}>
+              <button key={p.id} onClick={() => { setActivePersona(p.id); setMessages([WELCOME_MESSAGES[p.id]]); }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 999, border: 'none', background: activePersona === p.id ? 'var(--brand-50)' : 'transparent', color: activePersona === p.id ? 'var(--brand-700)' : 'var(--text-secondary)', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', transition: 'all 0.2s' }}>
                 <p.icon size={14} /> {p.label}
               </button>
             ))}
           </div>
+
+          <div style={{ width: 100 }} /> {/* Spacer to center the personas */}
         </div>
 
         {/* ── Messages ── */}

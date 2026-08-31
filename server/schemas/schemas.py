@@ -168,6 +168,7 @@ class CourseResponse(BaseModel):
 class AiTutorMessageRequest(BaseModel):
     course_id: int
     message: str
+    persona: str = "tutor"
 
 
 class AiTutorMessageResponse(BaseModel):

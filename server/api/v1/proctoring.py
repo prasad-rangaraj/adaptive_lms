@@ -7,8 +7,37 @@ from models.proctor_log import ProctorLog
 from models.exam import ExamAttempt
 from schemas.schemas import ProctoringViolationEvent
 import json
+import base64
+import numpy as np
+import cv2
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import redis.asyncio as aioredis
 from core.config import settings
+
+# Thread pool for running YOLO without blocking the async event loop
+_yolo_executor = ThreadPoolExecutor(max_workers=1)
+
+# Lazy load YOLO to avoid massive startup overhead
+yolo_model = None
+def get_yolo_model():
+    global yolo_model
+    if yolo_model is None:
+        import torch
+        from ultralytics import YOLO
+        yolo_model = YOLO("yolov8s.pt")
+        # Use FP16 half-precision if GPU available (2x faster, half the memory)
+        if torch.cuda.is_available():
+            yolo_model.model.half()
+            print("[Proctoring] YOLO running on GPU with FP16")
+        else:
+            print("[Proctoring] YOLO running on CPU")
+        # Warm up the model with a dummy frame to avoid first-frame latency spike
+        import numpy as np
+        dummy = np.zeros((416, 416, 3), dtype=np.uint8)
+        yolo_model.predict(dummy, imgsz=416, verbose=False)
+        print("[Proctoring] YOLO warmed up and ready")
+    return yolo_model
 
 router = APIRouter(prefix="/api/proctoring", tags=["Proctoring"])
 
@@ -173,3 +202,88 @@ async def get_proctor_report(
         report[sid]["max_risk_score"] = max(report[sid]["max_risk_score"], log.cumulative_risk_score)
 
     return {"exam_id": exam_id, "student_reports": list(report.values())}
+
+
+@router.websocket("/ws/vision/{exam_id}")
+async def vision_proctor_ws(
+    exam_id: int,
+    websocket: WebSocket,
+    token: str = "mock-token",
+):
+    """
+    WebSocket for processing raw camera frames using YOLOv8.
+    Expects frames as base64 encoded JPEGs.
+    """
+    # Validate token if real
+    user_id = 1 
+    if token and token != "mock-token":
+        try:
+            payload = decode_token(token)
+            user_id = int(payload.get("sub", 1))
+        except:
+            pass
+
+    await websocket.accept()
+    model = get_yolo_model()
+
+    try:
+        while True:
+            # Receive frame data (text base64)
+            data = await websocket.receive_text()
+            
+            try:
+                if data.startswith("data:image"):
+                    header, encoded = data.split(",", 1)
+                    data = encoded
+                
+                # Fix missing padding
+                missing_padding = len(data) % 4
+                if missing_padding:
+                    data += "=" * (4 - missing_padding)
+
+                # Decode base64 to numpy array for OpenCV
+                img_bytes = base64.b64decode(data)
+                np_arr = np.frombuffer(img_bytes, np.uint8)
+                img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+                if img is not None:
+                    # Run YOLO in a thread pool so it doesn't block the async event loop
+                    # imgsz=416 is faster than 640 with minimal accuracy loss for our use case
+                    loop = asyncio.get_event_loop()
+                    results = await loop.run_in_executor(
+                        _yolo_executor,
+                        lambda: model.predict(img, classes=[0, 67], conf=0.15, imgsz=416, verbose=False)
+                    )
+
+                    person_count = 0
+                    phone_detected = False
+
+                    for r in results:
+                        for box in r.boxes:
+                            cls_id = int(box.cls[0])
+                            if cls_id == 0:
+                                person_count += 1
+                            elif cls_id == 67:
+                                phone_detected = True
+
+                    violation = None
+                    if phone_detected:
+                        violation = "phone_detected"
+                    elif person_count > 1:
+                        violation = "multiple_faces"
+
+                    if violation:
+                        # Only encode annotated frame on violations (saves CPU on clean frames)
+                        annotated_frame = results[0].plot()
+                        _, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                        encoded_img = base64.b64encode(buffer).decode('utf-8')
+                        await websocket.send_json({"status": "violation", "type": violation, "frame": encoded_img})
+                    else:
+                        # Clean frame: just send status, no image encoding needed
+                        await websocket.send_json({"status": "ok"})
+            except Exception as e:
+                print(f"Error processing vision frame: {e}")
+                
+    except WebSocketDisconnect:
+        pass
+

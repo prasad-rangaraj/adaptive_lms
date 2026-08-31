@@ -1,22 +1,9 @@
 import { useState } from 'react';
-import { ArrowRight, Trophy, TrendingUp, Target, Activity } from 'lucide-react';
+import { ArrowRight, Trophy, TrendingUp, Target, Activity, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-const domains = [
-  { label: 'Focus',      score: 78, color: '#4f46e5', desc: 'Strong sustained attention.' },
-  { label: 'Memory',     score: 65, color: '#0891b2', desc: 'Retention dips after 20 min.' },
-  { label: 'Speed',      score: 88, color: '#10b981', desc: 'Quick to grasp new patterns.' },
-  { label: 'Retention',  score: 54, color: '#f59e0b', desc: 'Needs spaced repetition.' },
-  { label: 'Motivation', score: 91, color: '#ef4444', desc: 'High engagement level.' },
-  { label: 'Confidence', score: 72, color: '#8b5cf6', desc: 'Slight hesitation on hard sets.' },
-];
-
-const recommendations = [
-  { icon: '📚', title: 'Review Chapter 4 of Python',      reason: 'Scored 60% on last quiz. Weak area flagged.',       urgency: 'Today',     urgencyColor: '#ef4444' },
-  { icon: '🃏', title: 'Flashcard Session: DS',           reason: 'Memory score suggests spaced repetition is needed.', urgency: 'Today',     urgencyColor: '#ef4444' },
-  { icon: '🎯', title: 'Focus Training Exercise',         reason: 'Your focus dipped this week. Try a Pomodoro.',       urgency: 'This Week', urgencyColor: '#f59e0b' },
-  { icon: '🤖', title: 'Attempt ML Challenge Quiz',       reason: 'High confidence score — ready for harder problems.', urgency: 'This Week', urgencyColor: '#f59e0b' },
-];
+import { useQuery } from '@tanstack/react-query';
+import { cognitiveAPI } from '../../services/api.service';
+import Loader from '../../components/ui/Loader';
 
 function ScoreOrb({ domain }) {
   const r = 30;
@@ -52,6 +39,35 @@ function ScoreOrb({ domain }) {
 export default function StudentCognitiveHub() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('path');
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['cognitiveProfile'],
+    queryFn: async () => {
+      const res = await cognitiveAPI.getProfile();
+      return res.data;
+    }
+  });
+
+  if (isLoading) return <Loader />;
+  if (isError) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '3rem', color: 'var(--text-muted)' }}>
+      <AlertCircle size={48} style={{ marginBottom: '1rem', color: '#ef4444' }} />
+      <p style={{ fontSize: '1.125rem', fontWeight: 700 }}>Failed to load cognitive profile.</p>
+    </div>
+  );
+
+  const profile = data?.profile;
+  const recommendations = data?.recommendations || [];
+
+  const domains = [
+    { label: 'Focus',      score: Math.round(profile?.focus_score || 0), color: '#4f46e5', desc: 'Sustained attention.' },
+    { label: 'Speed',      score: Math.round(profile?.learning_speed || 0), color: '#10b981', desc: 'Grasping new patterns.' },
+    { label: 'Retention',  score: Math.round(profile?.retention_score || 0), color: '#f59e0b', desc: 'Memory over time.' },
+    { label: 'Motivation', score: Math.round(profile?.motivation_score || 0), color: '#ef4444', desc: 'Engagement level.' },
+    { label: 'Confidence', score: Math.round(profile?.confidence_score || 0), color: '#8b5cf6', desc: 'Hesitation vs Action.' },
+    { label: 'Consistency',score: Math.round(profile?.consistency_score || 0), color: '#0891b2', desc: 'Regularity in study.' },
+  ];
+
   const avgScore = Math.round(domains.reduce((s, d) => s + d.score, 0) / domains.length);
 
   return (
@@ -128,23 +144,26 @@ export default function StudentCognitiveHub() {
                   <div>
                     <h3 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>Your Adaptive Path</h3>
                     <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-                      You are an <strong>Advanced Learner</strong> in algorithmic thinking. Your path has been optimised with more spaced repetition to boost memory retention.
+                      You are assigned to the <strong style={{ textTransform: 'capitalize' }}>{profile?.learning_track || 'standard'}</strong> track. 
+                      Your recommended learning style is <strong>{profile?.recommended_style || 'Balanced'}</strong>.
                     </p>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
-                    {[
-                      { label: 'Difficulty',    value: 'Challenging Quizzes', color: '#4f46e5' },
-                      { label: 'Content',       value: 'Video + Flashcards',  color: '#0891b2' },
-                      { label: 'Session',       value: '25-min blocks',       color: '#10b981' },
-                    ].map((item, i) => (
-                      <div key={i} style={{ paddingBottom: '1rem', borderBottom: i < 2 ? '1px solid var(--surface-3)' : 'none' }}>
-                        <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>{item.label}</p>
-                        <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: item.color }}>{item.value}</p>
-                      </div>
-                    ))}
+                    <div style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--surface-3)' }}>
+                      <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Weak Areas (Needs Focus)</p>
+                      <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#ef4444' }}>
+                        {profile?.weak_areas?.length > 0 ? profile.weak_areas.join(', ') : 'None detected yet'}
+                      </p>
+                    </div>
+                    <div style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--surface-3)' }}>
+                      <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Strong Areas</p>
+                      <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#10b981' }}>
+                        {profile?.strength_areas?.length > 0 ? profile.strength_areas.join(', ') : 'None detected yet'}
+                      </p>
+                    </div>
                   </div>
                   <button onClick={() => navigate('/student/dashboard')} style={{ width: '100%', background: 'var(--text-primary)', color: 'white', border: 'none', padding: '11px 20px', borderRadius: 12, fontSize: '0.875rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                    Start Optimised Path <ArrowRight size={16} />
+                    Continue Learning <ArrowRight size={16} />
                   </button>
                 </div>
               )}

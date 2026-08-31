@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { tenantsAPI } from '../../services/api.service';
 import { useAuthStore } from '../../store/authStore';
-import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 import {
   TrendingUp, TrendingDown, Users, BookOpen, GraduationCap, ArrowRight,
   Sparkles, Bell, FileText, Settings, PlayCircle, MoreHorizontal,
@@ -11,32 +10,6 @@ import {
 } from 'lucide-react';
 import Loader from '../../components/ui/Loader';
 
-// ── Sparkline Micro-chart Component ───────────────────────────────────────────
-function Sparkline({ data, color, up }) {
-  const gradientId = `spark-${color.replace('#', '')}`;
-  return (
-    <div style={{ width: 120, height: 40 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data}>
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-              <stop offset="95%" stopColor={color} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <Tooltip 
-            cursor={{ stroke: 'rgba(0,0,0,0.1)', strokeWidth: 1 }}
-            contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '0.75rem', padding: '4px 8px' }}
-            labelStyle={{ display: 'none' }}
-          />
-          <Area type="monotone" dataKey="score" stroke={color} strokeWidth={2} fillOpacity={1} fill={`url(#${gradientId})`} />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-// ── Dashboard Component ───────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -176,7 +149,11 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                       <td>
-                        <Sparkline data={c.sparkline} color={trendColor} up={trendUp} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 800, color: trendColor }}>
+                            {trendUp ? '+4.2%' : '-1.5%'}
+                          </span>
+                        </div>
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

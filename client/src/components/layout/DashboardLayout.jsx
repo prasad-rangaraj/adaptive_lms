@@ -55,6 +55,11 @@ const navConfig = {
       { to: '/admin/dashboard',     icon: LayoutDashboard, label: 'Overview' },
       { to: '/admin/data-hub',      icon: BarChart3,       label: 'Data Hub' },
     ]},
+    { section: 'Operations', items: [
+      { to: '/admin/academic',      icon: GraduationCap,   label: 'Academic Monitor' },
+      { to: '/admin/assessment',    icon: ClipboardList,   label: 'Assessment Monitor' },
+      { to: '/admin/live',          icon: Video,           label: 'Live Monitor' },
+    ]},
     { section: 'Intelligence', items: [
       { to: '/admin/ai',            icon: BrainCircuit,    label: 'Org AI Hub' },
     ]},

@@ -266,8 +266,7 @@ export default function LandingPage() {
               borderRadius: 999, background: '#eef2ff', border: '1px solid #c7d2fe',
               color: '#4338ca', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '2rem',
             }}>
-              <Sparkles size={13} /> Powered by GPT-4o + pgvector RAG
-            </div>
+              <Sparkles size={13} /> Powered by GPT-4o</div>
 
             <h1 className="animate-fade-up delay-100" style={{
               fontSize: 'clamp(2.75rem, 6.5vw, 4.75rem)',

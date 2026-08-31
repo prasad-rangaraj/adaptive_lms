@@ -46,6 +46,9 @@ import OrgCommunicationHub from './pages/admin/OrgCommunicationHub';
 import OrgSecurityHub from './pages/admin/OrgSecurityHub';
 import OrgAiHub from './pages/admin/OrgAiHub';
 import OrgSettingsHub from './pages/admin/OrgSettingsHub';
+import OrgAcademicMonitor from './pages/admin/OrgAcademicMonitor';
+import OrgAssessmentMonitor from './pages/admin/OrgAssessmentMonitor';
+import OrgLiveMonitor from './pages/admin/OrgLiveMonitor';
 
 // Super Admin Pages
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
@@ -164,6 +167,9 @@ export default function App() {
             <Route path="communication" element={<OrgCommunicationHub />} />
             <Route path="security" element={<OrgSecurityHub />} />
             <Route path="settings" element={<OrgSettingsHub />} />
+            <Route path="academic" element={<OrgAcademicMonitor />} />
+            <Route path="assessment" element={<OrgAssessmentMonitor />} />
+            <Route path="live" element={<OrgLiveMonitor />} />
           </Route>
 
           {/* Super Admin Routes */}
