@@ -1,25 +1,32 @@
 import { useState, useRef, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { aiTutorAPI } from '../../services/api.service';
 import { Send, Sparkles, Lightbulb, Hash, FileText, Layers, BookOpen, Paperclip, MessageSquare, History, UserCheck, TerminalSquare, ChevronDown, X, Menu } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const COURSE_ID = 1;
+import { coursesAPI } from '../../services/api.service';
 
-const WELCOME_MESSAGES = {
-  tutor: {
-    role: 'ai',
-    content: "Hi! I'm your AI Tutor. I have full context of your course materials and can explain concepts, generate quizzes, build flashcards, or summarize any topic. What would you like to explore?",
-    type: 'explanation',
-  },
-  viva: {
-    role: 'ai',
-    content: "Welcome to the Viva Examiner mode! I will ask you challenging questions to test your deep understanding of the course materials. Shall we begin?",
-    type: 'explanation',
-  },
-  debug: {
-    role: 'ai',
-    content: "Code Debugger activated. Paste any failing code snippets or error logs, and we'll figure out what's wrong together.",
-    type: 'explanation',
+const getWelcomeMessage = (persona, courseTitle) => {
+  const courseContext = courseTitle ? ` for **${courseTitle}**` : '';
+  switch (persona) {
+    case 'viva':
+      return {
+        role: 'ai',
+        content: `Welcome to the Viva Examiner mode${courseContext}! I will ask you challenging questions to test your deep understanding of the course materials. Shall we begin?`,
+        type: 'explanation',
+      };
+    case 'debug':
+      return {
+        role: 'ai',
+        content: `Code Debugger activated${courseContext}. Paste any failing code snippets or error logs, and we'll figure out what's wrong together.`,
+        type: 'explanation',
+      };
+    default:
+      return {
+        role: 'ai',
+        content: `Hi! I'm your AI Tutor${courseContext}. I have full context of your course materials and can explain concepts, generate quizzes, build flashcards, or summarize any topic. What would you like to explore?`,
+        type: 'explanation',
+      };
   }
 };
 
@@ -30,11 +37,7 @@ const quickPrompts = [
   { label: 'Summarize', icon: FileText, prompt: 'Summarize the key points from the course materials.', color: '#0891b2' },
 ];
 
-const historySessions = [
-  { id: 1, title: 'Normalization Doubts', time: 'Yesterday', context: 'DBMS' },
-  { id: 2, title: 'OS Deadlock Prep', time: '2 days ago', context: 'OS Theory' },
-  { id: 3, title: 'Pointer Concepts', time: 'Last week', context: 'Data Structures' },
-];
+const historySessions = [];
 
 const personas = [
   { id: 'tutor', label: 'Tutor Mode', icon: Sparkles },
@@ -61,13 +64,48 @@ function AIAvatar({ size = 34 }) {
 
 export default function AiTutorPage() {
   const [activePersona, setActivePersona] = useState('tutor');
-  const [messages, setMessages] = useState([WELCOME_MESSAGES['tutor']]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const [loading, setLoading] = useState(false);
   const [attachedContext, setAttachedContext] = useState(null); 
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+
+  const [activeCourseId, setActiveCourseId] = useState('');
+
+  const { data } = useQuery({
+    queryKey: ['enrolledCoursesData'],
+    queryFn: async () => {
+      const res = await coursesAPI.getEnrolledCourses();
+      const enrolled = res.data;
+      const statusMap = {};
+      await Promise.all(
+        enrolled.map(async (c) => {
+          try {
+            const st = await coursesAPI.getEnrollmentStatus(c.id);
+            statusMap[c.id] = st.data;
+          } catch (e) {
+            console.error(e);
+          }
+        })
+      );
+      return { enrolled, statusMap };
+    }
+  });
+
+  const enrolledCourses = data?.enrolled || [];
+
+  useEffect(() => {
+    if (enrolledCourses.length > 0 && !activeCourseId) {
+      setActiveCourseId(enrolledCourses[0].id);
+    }
+  }, [enrolledCourses, activeCourseId]);
+
+  useEffect(() => {
+    const course = enrolledCourses.find(c => String(c.id) === String(activeCourseId));
+    setMessages([getWelcomeMessage(activePersona, course?.title)]);
+  }, [activeCourseId, activePersona, enrolledCourses]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -81,7 +119,12 @@ export default function AiTutorPage() {
     setLoading(true);
 
     try {
-      const res = await aiTutorAPI.ask(COURSE_ID, msg, activePersona);
+      if (!activeCourseId) {
+        toast.error('Please select an enrolled course first.');
+        setLoading(false);
+        return;
+      }
+      const res = await aiTutorAPI.ask(activeCourseId, msg, activePersona);
       const { answer, response_type, sources } = res.data;
       setMessages(prev => [...prev, { role: 'ai', content: answer, type: response_type, sources }]);
     } catch {
@@ -151,13 +194,27 @@ export default function AiTutorPage() {
 
           <div style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 999, padding: '0.375rem', display: 'flex', gap: '0.25rem', boxShadow: '0 8px 24px rgba(0,0,0,0.04)' }}>
             {personas.map(p => (
-              <button key={p.id} onClick={() => { setActivePersona(p.id); setMessages([WELCOME_MESSAGES[p.id]]); }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 999, border: 'none', background: activePersona === p.id ? 'var(--brand-50)' : 'transparent', color: activePersona === p.id ? 'var(--brand-700)' : 'var(--text-secondary)', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', transition: 'all 0.2s' }}>
+              <button key={p.id} onClick={() => setActivePersona(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 999, border: 'none', background: activePersona === p.id ? 'var(--brand-50)' : 'transparent', color: activePersona === p.id ? 'var(--brand-700)' : 'var(--text-secondary)', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', transition: 'all 0.2s' }}>
                 <p.icon size={14} /> {p.label}
               </button>
             ))}
           </div>
 
-          <div style={{ width: 100 }} /> {/* Spacer to center the personas */}
+          <div style={{ width: 220, display: 'flex', justifyContent: 'flex-end' }}>
+            {enrolledCourses.length > 0 ? (
+              <select 
+                value={activeCourseId} 
+                onChange={e => setActiveCourseId(e.target.value)}
+                style={{ maxWidth: '100%', padding: '8px 16px', borderRadius: 999, background: 'var(--surface-0)', border: '1px solid var(--surface-3)', boxShadow: '0 8px 24px rgba(0,0,0,0.04)', fontWeight: 700, fontSize: '0.8125rem', color: 'var(--text-secondary)', cursor: 'pointer', outline: 'none', appearance: 'none', backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%239ca3af%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem top 50%', backgroundSize: '0.65rem auto', paddingRight: '2.5rem' }}
+              >
+                {enrolledCourses.map(c => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
+                ))}
+              </select>
+            ) : (
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No courses enrolled</span>
+            )}
+          </div>
         </div>
 
         {/* ── Messages ── */}

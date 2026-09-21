@@ -8,51 +8,29 @@ import {
 // ─────────────────────────────────────────────────────────────
 // Data
 // ─────────────────────────────────────────────────────────────
-const bounties = [
-  { id: 1, author: 'Priya S.',   avatar: 'P', subject: 'Data Structures', title: 'Need help optimizing this graph traversal algorithm', body: 'My current DFS implementation is hitting O(V^2) for some reason. Can someone review the snippet?', replies: 2,  bounty: 150, time: '2h ago',  solved: false, tags: ['Graphs', 'Optimization'] },
-  { id: 2, author: 'Rahul M.',  avatar: 'R', subject: 'DBMS', title: 'Need handwritten notes for Unit 4 (Transactions)', body: 'I missed the entire week of classes. Offering a solid bounty for clean, readable PDF notes.', replies: 5, bounty: 300, time: '5h ago',  solved: true, tags: ['Notes Request', 'Transactions'] },
-  { id: 3, author: 'Arun K.',   avatar: 'A', subject: 'Mathematics III', title: 'Laplace transform edge case doubt', body: 'How do you handle the inverse transform when the denominator has repeated complex roots?', replies: 1,  bounty: 100, time: '1d ago',  solved: false,  tags: ['Laplace', 'Calculus'] },
-];
+const synapseMatches = [];
+const teamRequests = [];
+const clubs = [];
+const alumni = [];
 
-const leaderboard = [
-  { rank: 1, name: 'Karthik R.', rep: 4520, badge: 'Campus Legend', avatar: 'K', color: '#f59e0b' },
-  { rank: 2, name: 'Divya L.',   rep: 3890, badge: 'Expert Mentor', avatar: 'D', color: '#8b5cf6' },
-  { rank: 3, name: 'Sneha P.',   rep: 2100, badge: 'Rising Star',   avatar: 'S', color: '#10b981' },
-];
-
-const synapseMatches = [
-  { id: 1, name: 'Varun T.', score: 92, strong: ['DBMS', 'SQL'], weak: ['Data Structures'], reason: 'Skill Barter: You can teach him DS, he can teach you DBMS.' },
-  { id: 2, name: 'Ananya K.', score: 85, strong: ['React', 'Frontend'], weak: ['Backend'], reason: 'Hackathon Synergy: Matches your exact skill gaps for the upcoming Web3 Hackathon.' },
-  { id: 3, name: 'Siddharth M.', score: 78, strong: ['Mathematics III'], weak: ['OS Theory'], reason: 'Study Buddy: High alignment with your current OS Theory focus schedule.' },
-];
-
-const teamRequests = [
-  { id: 1, project: 'Smart India Hackathon 2026', role: 'Full Stack Dev', lookingFor: ['React', 'Node.js', 'PostgreSQL'], by: 'Team Innovators', deadline: 'Sep 10' },
-  { id: 2, project: 'Final Year Blockchain Project', role: 'Smart Contract Dev', lookingFor: ['Solidity', 'Web3.js'], by: 'Arjun & Co.', deadline: 'Oct 1' },
-];
-
-const events = [
-  { id: 1, title: 'CodeSprint 2026: 24Hr Hackathon', org: 'Coding Club', date: 'Sep 15, 2026', time: '10:00 AM', venue: 'Main Auditorium', type: 'Hackathon', rsvp: true },
-  { id: 2, title: 'Guest Lecture: AI in Fintech', org: 'Tech Council', date: 'Aug 28, 2026', time: '2:00 PM', venue: 'Seminar Hall 2', type: 'Lecture', rsvp: false },
-  { id: 3, title: 'Annual Cultural Fest - Auditions', org: 'Cultural Committee', date: 'Sep 2, 2026', time: '4:30 PM', venue: 'Open Air Theatre', type: 'Fest', rsvp: false },
-];
-
-const clubs = [
-  { name: 'GDSC (Google Developer Student Clubs)', members: 340, active: true },
-  { name: 'Robotics & IoT Society', members: 120, active: false },
-  { name: 'Debate & Literature Club', members: 85, active: false },
-];
-
-const alumni = [
-  { id: 1, name: 'Vikram S.', batch: '2022', company: 'Google', role: 'L3 Software Engineer', offers: ['Referrals', 'Resume Review'] },
-  { id: 2, name: 'Riya M.', batch: '2023', company: 'Microsoft', role: 'Product Manager', offers: ['Mock Interviews'] },
-  { id: 3, name: 'Akash J.', batch: '2021', company: 'Stripe', role: 'Backend Dev', offers: ['Mentorship', 'Referrals'] },
-];
 
 // ─────────────────────────────────────────────────────────────
 // Tab: Bounty Board & Exchange
 // ─────────────────────────────────────────────────────────────
+import { communityAPI } from '../../services/api.service';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+
 function BountyBoardTab() {
+  const { data: bounties = [] } = useQuery({
+    queryKey: ['communityBounties'],
+    queryFn: () => communityAPI.getBounties().then(res => res.data)
+  });
+
+  const { data: leaderboard = [] } = useQuery({
+    queryKey: ['communityLeaderboard'],
+    queryFn: () => communityAPI.getLeaderboard().then(res => res.data)
+  });
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '3rem', alignItems: 'start' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -250,6 +228,10 @@ function MatchmakingTab() {
 // Tab: Campus Live
 // ─────────────────────────────────────────────────────────────
 function CampusLiveTab() {
+  const { data: events = [] } = useQuery({
+    queryKey: ['communityEvents'],
+    queryFn: () => communityAPI.getEvents().then(res => res.data)
+  });
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '3rem', alignItems: 'start' }}>
       

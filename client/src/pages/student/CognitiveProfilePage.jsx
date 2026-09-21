@@ -1,15 +1,17 @@
 import { Brain, Target, TrendingUp, Zap, Star, Award, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
+import { cognitiveAPI } from '../../services/api.service';
+import { useQuery } from '@tanstack/react-query';
 
-const profile = {
-  focus_score: 78, learning_speed: 65, retention_score: 82,
-  confidence_score: 70, engagement_score: 85, consistency_score: 60,
-  motivation_score: 88, risk_score: 22,
-  weak_areas: ['Calculus', 'Thermodynamics', 'Graph Algorithms'],
-  strength_areas: ['Python', 'Statistics', 'Data Structures'],
-  learning_track: 'advanced', recommended_style: 'Visual',
-  last_assessed_at: '2026-07-28',
+const defaultProfile = {
+  focus_score: 0, learning_speed: 0, retention_score: 0,
+  confidence_score: 0, engagement_score: 0, consistency_score: 0,
+  motivation_score: 0, risk_score: 0,
+  weak_areas: [],
+  strength_areas: [],
+  learning_track: 'pending', recommended_style: 'N/A',
+  last_assessed_at: 'N/A',
 };
 
 const scores = [
@@ -68,14 +70,35 @@ function AnimatedScoreBar({ label, value, color, icon, delay = 0 }) {
 
 export default function CognitiveProfilePage() {
   const { user } = useAuthStore();
+  const { data: profile = defaultProfile, refetch, isFetching } = useQuery({
+    queryKey: ['cognitiveProfile'],
+    queryFn: () => cognitiveAPI.getProfile().then(res => res.data?.profile || defaultProfile),
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+
   const overall = Math.round(scores.reduce((sum, s) => sum + profile[s.key], 0) / scores.length);
+
+  const handleReAssess = async () => {
+    try {
+      await cognitiveAPI.evaluate({
+        event: 'Manual Re-Assessment',
+        score: overall,
+        topic: 'General Learning Activity',
+      });
+      await refetch();
+    } catch (err) {
+      console.warn('Re-assess failed:', err);
+    }
+  };
 
   const trackConfig = {
     advanced: { label: 'Advanced Track', badge: 'badge-brand', icon: '🚀', color: '#818cf8' },
     standard: { label: 'Standard Track', badge: 'badge-success', icon: '📘', color: '#6ee7b7' },
     basic: { label: 'Foundation Track', badge: 'badge-warning', icon: '📗', color: '#fcd34d' },
+    pending: { label: 'Pending Assessment', badge: 'badge-gray', icon: '⏳', color: '#9ca3af' },
   };
-  const track = trackConfig[profile.learning_track];
+  const track = trackConfig[profile.learning_track] || trackConfig.standard;
 
   return (
     <div style={{ maxWidth: 900, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -90,8 +113,8 @@ export default function CognitiveProfilePage() {
           <span className="badge badge-gray" style={{ fontSize: '0.75rem' }}>
             Last assessed: {profile.last_assessed_at}
           </span>
-          <button className="btn btn-secondary btn-sm" style={{ gap: 6 }}>
-            <RefreshCw size={13} /> Re-assess
+          <button className="btn btn-secondary btn-sm" style={{ gap: 6 }} onClick={handleReAssess} disabled={isFetching}>
+            <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} /> {isFetching ? 'Updating...' : 'Re-assess'}
           </button>
         </div>
       </div>

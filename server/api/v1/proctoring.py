@@ -273,14 +273,17 @@ async def vision_proctor_ws(
                         violation = "multiple_faces"
 
                     if violation:
-                        # Only encode annotated frame on violations (saves CPU on clean frames)
+                        # Annotated frame with bounding boxes on violation
                         annotated_frame = results[0].plot()
                         _, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
                         encoded_img = base64.b64encode(buffer).decode('utf-8')
                         await websocket.send_json({"status": "violation", "type": violation, "frame": encoded_img})
                     else:
-                        # Clean frame: just send status, no image encoding needed
-                        await websocket.send_json({"status": "ok"})
+                        # Always send back annotated frame so camera feed shows live CV detections
+                        annotated_frame = results[0].plot()
+                        _, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
+                        encoded_img = base64.b64encode(buffer).decode('utf-8')
+                        await websocket.send_json({"status": "ok", "frame": encoded_img})
             except Exception as e:
                 print(f"Error processing vision frame: {e}")
                 

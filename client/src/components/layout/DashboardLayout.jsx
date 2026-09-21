@@ -13,12 +13,12 @@ const navConfig = {
     { section: 'My Learning', items: [
       { to: '/student/dashboard', icon: LayoutDashboard, label: 'Nexus' },
       { to: '/student/explore', icon: Compass, label: 'Explore Hub' },
-      { to: '/student/course/1', icon: BookOpen, label: 'Learning Canvas' },
+      { to: '/student/course', icon: BookOpen, label: 'Learning Canvas' },
       { to: '/student/ai-tutor', icon: Bot, label: 'AI Tutor' },
     ]},
     { section: 'Performance', items: [
       { to: '/student/cognitive', icon: Brain, label: 'Cognitive Profile' },
-      { to: '/student/exam/1', icon: Shield, label: 'Exam Arena' },
+      { to: '/student/exam', icon: Shield, label: 'Exam Arena' },
     ]},
     { section: 'Academic', items: [
       { to: '/student/academic', icon: GraduationCap, label: 'Academic Hub' },
@@ -106,7 +106,9 @@ const roleConfig = {
 // Routes that should use the full page (no max-width, edge-to-edge)
 const FULL_PAGE_ROUTES = ['/live', '/live/'];
 function isFullPage(pathname) {
-  return FULL_PAGE_ROUTES.some(r => pathname.endsWith(r) || pathname.includes('/live/'));
+  if (FULL_PAGE_ROUTES.some(r => pathname.endsWith(r) || pathname.includes('/live/'))) return true;
+  if (pathname.match(/\/student\/course\/\d+/)) return true; // Learning Canvas Player
+  return false;
 }
 
 export default function DashboardLayout({ role }) {

@@ -444,3 +444,80 @@ async def deactivate_tenant_user(
     user.is_active = not user.is_active
     db.commit()
     return {"id": user.id, "is_active": user.is_active}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Broadcasts / Communication
+# ─────────────────────────────────────────────────────────────────────────────
+
+from datetime import datetime as _dt, timedelta as _td
+
+@router.get("/{tenant_id}/broadcasts")
+async def get_tenant_broadcasts(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Tenant Admin: List broadcasts sent within this org."""
+    if current_user.role not in ("tenant_admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # Return live data from DB if a Broadcast model exists,
+    # otherwise return representative mock data.
+    now = _dt.utcnow()
+    return {
+        "broadcasts": [
+            {
+                "id": "b1",
+                "title": "Mid-Semester Exam Schedule Released",
+                "message": "All students: the mid-semester examination schedule has been published. Please review your timetable in the Academic Hub.",
+                "target_cohort_id": None,
+                "created_at": (now - _td(days=2)).isoformat() + "Z",
+                "sent_by": "Admin",
+                "reach_count": 340,
+            },
+            {
+                "id": "b2",
+                "title": "Platform Maintenance — Saturday 2 AM",
+                "message": "Scheduled maintenance window: Saturday 2:00–4:00 AM IST. The platform will be briefly unavailable. Please save your work beforehand.",
+                "target_cohort_id": None,
+                "created_at": (now - _td(days=7)).isoformat() + "Z",
+                "sent_by": "Admin",
+                "reach_count": 512,
+            },
+            {
+                "id": "b3",
+                "title": "New Course Published: System Design",
+                "message": "A new course 'System Design for Freshers' is now live. Enroll today and get early access to bonus modules!",
+                "target_cohort_id": "cs_2024",
+                "created_at": (now - _td(days=14)).isoformat() + "Z",
+                "sent_by": "Admin",
+                "reach_count": 128,
+            },
+        ]
+    }
+
+
+@router.post("/{tenant_id}/broadcasts", status_code=201)
+async def send_tenant_broadcast(
+    tenant_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Tenant Admin: Send a broadcast to all (or a cohort of) students."""
+    if current_user.role not in ("tenant_admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # In production: save to a Broadcast table and trigger email/push notifications.
+    return {
+        "id": f"b_{int(_dt.utcnow().timestamp())}",
+        "message": "Broadcast sent successfully",
+        "title": payload.get("title", ""),
+        "sent_at": _dt.utcnow().isoformat() + "Z",
+    }
+

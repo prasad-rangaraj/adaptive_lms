@@ -2,23 +2,23 @@ import { useState } from 'react';
 import { Target, Brain, ArrowRight, CheckCircle2, ChevronRight, Activity, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+import { cognitiveAPI } from '../../services/api.service';
+
 const goals = [
-  { id: 'placement', title: 'Campus Placements', desc: 'Aiming for top product and service companies.' },
-  { id: 'gate', title: 'GATE / Higher Studies', desc: 'Focusing on core subjects for competitive exams.' },
-  { id: 'skills', title: 'Skill Development', desc: 'Building projects and learning new tech stacks.' },
-  { id: 'pass', title: 'University Exams', desc: 'Just want to clear subjects with good grades.' },
+  { id: 'placement', title: 'Campus Placements', icon: Target, desc: 'Focus on DSA, system design, and interview prep.' },
+  { id: 'research', title: 'Higher Studies & Research', icon: Brain, desc: 'Focus on core concepts, publications, and deep tech.' },
+  { id: 'entrepreneur', title: 'Startup / Entrepreneurship', icon: Zap, desc: 'Focus on product dev, full-stack, and agile.' }
 ];
 
 const styles = [
-  { id: 'visual', title: 'Visual Learner', desc: 'Prefers diagrams, videos, and flowcharts.' },
-  { id: 'reading', title: 'Text & Reading', desc: 'Prefers detailed notes, PDFs, and documentation.' },
-  { id: 'kinesthetic', title: 'Hands-on', desc: 'Prefers coding immediately and learning by doing.' },
+  { id: 'visual', title: 'Visual & Conceptual', desc: 'I learn best through diagrams, videos, and architectures.' },
+  { id: 'practical', title: 'Hands-on & Practical', desc: 'I learn best by coding, breaking things, and building projects.' },
+  { id: 'theoretical', title: 'Deep Theoretical', desc: 'I learn best by reading docs, proofs, and fundamentals.' }
 ];
 
 const baselineQuiz = [
-  { q: "If A is taller than B, and B is taller than C, who is the shortest?", options: ["A", "B", "C", "Cannot be determined"] },
-  { q: "What comes next in the sequence: 2, 6, 12, 20, __?", options: ["24", "30", "36", "42"] },
-  { q: "Which data structure uses LIFO?", options: ["Queue", "Stack", "Tree", "Graph"] },
+  { q: "When approaching a new framework, I usually:", options: ["Read the official docs end-to-end", "Watch a quick crash course", "Build a hello-world app immediately"] },
+  { q: "My biggest challenge in learning is:", options: ["Staying consistent", "Forgetting concepts after a week", "Getting stuck on complex bugs"] }
 ];
 
 export default function StudentOnboarding() {
@@ -31,10 +31,29 @@ export default function StudentOnboarding() {
 
   const handleFinish = () => {
     setAnalyzing(true);
-    setTimeout(() => {
-      // In a real app, this would save to the backend and redirect to the dashboard
-      navigate('/student/dashboard');
-    }, 2000);
+    
+    // Simulate mapping answers to cognitive metrics
+    const performanceData = {
+      course_id: 0,
+      score_percent: 85,
+      time_spent_seconds: 120,
+      completion_status: 'completed',
+      interactions: {
+        goal: selectedGoal,
+        style: selectedStyle,
+      }
+    };
+
+    cognitiveAPI.evaluate(performanceData)
+      .then(() => {
+        setTimeout(() => {
+          navigate('/student/dashboard');
+        }, 1500);
+      })
+      .catch(err => {
+        console.error(err);
+        navigate('/student/dashboard'); // proceed anyway
+      });
   };
 
   if (analyzing) {

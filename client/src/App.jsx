@@ -24,6 +24,7 @@ import AiTutorPage from './pages/student/AiTutorPage';
 import StudentAcademicHub from './pages/student/StudentAcademicHub';
 import StudentCommunityHub from './pages/student/StudentCommunityHub';
 import StudentExploreHub from './pages/student/StudentExploreHub';
+import StudentCoursesHub from './pages/student/StudentCoursesHub';
 import StudentLiveArena from './pages/student/StudentLiveArena';
 import StudentOnboarding from './pages/student/StudentOnboarding';
 
@@ -65,7 +66,7 @@ import GlobalMonetizationHub from './pages/superadmin/GlobalMonetizationHub';
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 30000 },
+    queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 300000 },
   },
 });
 
@@ -117,7 +118,9 @@ export default function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="ai-tutor" element={<AiTutorPage />} />
+            <Route path="course" element={<StudentCoursesHub />} />
             <Route path="course/:courseId" element={<StudentLearningCanvas />} />
+            <Route path="exam" element={<StudentExamArena />} />
             <Route path="exam/:examId" element={<StudentExamArena />} />
             <Route path="cognitive" element={<StudentCognitiveHub />} />
             <Route path="explore" element={<StudentExploreHub />} />

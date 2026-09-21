@@ -3,9 +3,17 @@ from sqlalchemy.orm import Session
 from db.database import get_db
 from core.security import get_current_user, require_role
 from models.course import Course, CourseMaterial, CourseModule
+from models.enrollment import Enrollment
 from models.assignment import Assignment
 from models.user import User
-from schemas.schemas import CourseCreateRequest, CourseResponse, CourseMaterialResponse, CourseModuleCreateRequest, CourseModuleResponse, AssignmentCreateRequest, AssignmentResponse
+from models.cognitive_profile import CognitiveProfile
+from schemas.schemas import (
+    CourseCreateRequest, CourseResponse, CourseMaterialResponse,
+    CourseModuleCreateRequest, CourseModuleResponse,
+    AssignmentCreateRequest, AssignmentResponse,
+    EnrollResponse, EnrollmentStatusResponse,
+    PlacementResultRequest, PlacementResultResponse,
+)
 from tasks.ai_tasks import process_material_embeddings
 from typing import List
 import boto3
@@ -40,6 +48,61 @@ async def create_course(
     db.commit()
     db.refresh(course)
     return course
+
+
+@router.get("/recommended-paths")
+async def get_recommended_paths(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Dynamically generates learning paths by grouping courses by category,
+    and calculating a match score based on the user's CognitiveProfile.
+    """
+    # 1. Get user's cognitive profile
+    profile = db.query(CognitiveProfile).filter(CognitiveProfile.user_id == current_user.id).first()
+    base_match = 75
+    if profile:
+        # Simple dynamic calculation based on focus and retention
+        base_match = int((profile.focus_score + profile.retention_score) / 2)
+        if base_match == 0:
+            base_match = 80 # default if empty
+
+    # 2. Get all published courses
+    courses = db.query(Course).filter(
+        Course.tenant_id == current_user.tenant_id,
+        Course.is_published == True
+    ).all()
+
+    # 3. Group by category
+    categories = {}
+    for c in courses:
+        cat = c.category or "General Core"
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(c)
+
+    # 4. Format paths
+    paths = []
+    idx = 1
+    for cat, cat_courses in categories.items():
+        # Introduce some variation based on category length
+        match_score = min(100, base_match + (len(cat_courses) * 2))
+        
+        paths.append({
+            "id": f"path-{idx}",
+            "title": f"{cat} Track",
+            "duration": f"{len(cat_courses) * 4} Weeks",
+            "courses": len(cat_courses),
+            "match": match_score,
+            "tags": [cat_courses[0].difficulty.capitalize() if cat_courses[0].difficulty else "All Levels", cat],
+            "description": f"Master {cat} with this curated series of {len(cat_courses)} interactive courses."
+        })
+        idx += 1
+
+    # Sort by match score descending
+    paths.sort(key=lambda x: x["match"], reverse=True)
+    return paths
 
 
 @router.get("/", response_model=List[CourseResponse])
@@ -267,3 +330,141 @@ async def publish_course(
     course.is_published = True
     db.commit()
     return {"message": "Course published successfully"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Adaptive Enrollment Flow
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/{course_id}/enroll", response_model=EnrollResponse)
+async def enroll_in_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("student")),
+):
+    """
+    Student enrolls in a course.
+    Creates an Enrollment record with learning_path='pending'.
+    The student must then complete the pre-assessment before the path is set.
+    """
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.tenant_id == current_user.tenant_id,
+        Course.is_published == True,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found or not published")
+
+    # Idempotent: don't double-enroll
+    existing = db.query(Enrollment).filter(
+        Enrollment.student_id == current_user.id,
+        Enrollment.course_id == course_id,
+    ).first()
+    if existing:
+        return EnrollResponse(
+            enrollment_id=existing.id,
+            course_id=course_id,
+            student_id=current_user.id,
+            learning_path=existing.learning_path,
+            message="Already enrolled",
+        )
+
+    enrollment = Enrollment(
+        student_id=current_user.id,
+        course_id=course_id,
+        learning_path="pending",
+    )
+    db.add(enrollment)
+    db.commit()
+    db.refresh(enrollment)
+
+    return EnrollResponse(
+        enrollment_id=enrollment.id,
+        course_id=course_id,
+        student_id=current_user.id,
+        learning_path="pending",
+        message="Enrolled successfully. Complete the placement assessment to unlock your path.",
+    )
+
+
+@router.get("/{course_id}/enrollment-status", response_model=EnrollmentStatusResponse)
+async def get_enrollment_status(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Returns whether the current student is enrolled and their learning path status."""
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.student_id == current_user.id,
+        Enrollment.course_id == course_id,
+    ).first()
+
+    if not enrollment:
+        return EnrollmentStatusResponse(is_enrolled=False)
+
+    return EnrollmentStatusResponse(
+        is_enrolled=True,
+        enrollment_id=enrollment.id,
+        learning_path=enrollment.learning_path,
+        placement_score=enrollment.placement_score,
+        path_override=enrollment.path_override,
+        progress_percentage=enrollment.progress_percentage,
+    )
+
+
+@router.post("/{course_id}/placement-result", response_model=PlacementResultResponse)
+async def submit_placement_result(
+    course_id: int,
+    payload: PlacementResultRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("student")),
+):
+    """
+    Student submits their pre-assessment score.
+    The system recommends a learning path based on score bands:
+      - 0–39  → basics
+      - 40–69 → intermediate
+      - 70+   → advanced
+
+    If `override_to_basics` is True, the student chose to start from the beginning
+    regardless of their assessed level.
+    """
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.student_id == current_user.id,
+        Enrollment.course_id == course_id,
+    ).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Not enrolled in this course")
+
+    score = max(0.0, min(100.0, payload.score))
+
+    # Determine recommended path from score
+    if score < 40:
+        recommended = "basics"
+    elif score < 70:
+        recommended = "intermediate"
+    else:
+        recommended = "advanced"
+
+    # Assigned path respects student's override choice
+    assigned = "basics" if payload.override_to_basics else recommended
+
+    # Path messages
+    path_messages = {
+        "basics": "Great start! We'll build your foundation step by step from the ground up.",
+        "intermediate": "Solid base! You'll skip the fundamentals and dive straight into core concepts.",
+        "advanced": "Impressive! You've unlocked the advanced track — challenge yourself with complex material.",
+    }
+
+    enrollment.placement_score = score
+    enrollment.learning_path = assigned
+    enrollment.path_override = payload.override_to_basics
+    db.commit()
+
+    return PlacementResultResponse(
+        recommended_path=recommended,
+        assigned_path=assigned,
+        score=score,
+        message=path_messages[assigned],
+    )
+

@@ -8,87 +8,13 @@ import {
 // ─────────────────────────────────────────────────────────────
 // Data
 // ─────────────────────────────────────────────────────────────
-const timetable = {
-  Monday: [
-    { time: '8:00 AM', subject: 'Data Structures', type: 'Theory', faculty: 'Dr. Alan Turing', venue: 'Block A, Room 402' },
-    { time: '9:00 AM', subject: 'Mathematics III', type: 'Theory', faculty: 'Dr. Ramanujan', venue: 'Block A, Room 402' },
-    { time: '10:00 AM', subject: 'OS Lab', type: 'Lab', faculty: 'Prof. Linus', venue: 'CS Lab 3' },
-    null,
-    { time: '2:00 PM', subject: 'DBMS', type: 'Theory', faculty: 'Dr. Codd', venue: 'Block B, Room 305' },
-    { time: '3:00 PM', subject: 'Networks', type: 'Theory', faculty: 'Prof. Cerf', venue: 'Block B, Room 305' },
-  ],
-  Tuesday: [
-    { time: '8:00 AM', subject: 'Networks', type: 'Theory', faculty: 'Prof. Cerf', venue: 'Block B, Room 305' },
-    { time: '9:00 AM', subject: 'Data Structures', type: 'Theory', faculty: 'Dr. Alan Turing', venue: 'Block A, Room 402' },
-    null,
-    { time: '11:00 AM', subject: 'OS Theory', type: 'Theory', faculty: 'Prof. Linus', venue: 'Block C, Room 101' },
-    { time: '2:00 PM', subject: 'Mathematics III', type: 'Theory', faculty: 'Dr. Ramanujan', venue: 'Block A, Room 402' },
-    null,
-  ],
-  Wednesday: [
-    { time: '8:00 AM', subject: 'DBMS', type: 'Theory', faculty: 'Dr. Codd', venue: 'Block B, Room 305' },
-    { time: '9:00 AM', subject: 'OS Theory', type: 'Theory', faculty: 'Prof. Linus', venue: 'Block C, Room 101' },
-    { time: '10:00 AM', subject: 'DS Lab', type: 'Lab', faculty: 'Dr. Alan Turing', venue: 'CS Lab 1' },
-    null,
-    { time: '2:00 PM', subject: 'Networks', type: 'Theory', faculty: 'Prof. Cerf', venue: 'Block B, Room 305' },
-    { time: '3:00 PM', subject: 'Mathematics III', type: 'Theory', faculty: 'Dr. Ramanujan', venue: 'Block A, Room 402' },
-  ],
-  Thursday: [
-    { time: '8:00 AM', subject: 'Mathematics III', type: 'Theory', faculty: 'Dr. Ramanujan', venue: 'Block A, Room 402' },
-    { time: '9:00 AM', subject: 'DBMS', type: 'Theory', faculty: 'Dr. Codd', venue: 'Block B, Room 305' },
-    null,
-    { time: '11:00 AM', subject: 'Data Structures', type: 'Theory', faculty: 'Dr. Alan Turing', venue: 'Block A, Room 402' },
-    null,
-    { time: '3:00 PM', subject: 'OS Theory', type: 'Theory', faculty: 'Prof. Linus', venue: 'Block C, Room 101' },
-  ],
-  Friday: [
-    { time: '8:00 AM', subject: 'OS Theory', type: 'Theory', faculty: 'Prof. Linus', venue: 'Block C, Room 101' },
-    { time: '9:00 AM', subject: 'Networks', type: 'Theory', faculty: 'Prof. Cerf', venue: 'Block B, Room 305' },
-    { time: '10:00 AM', subject: 'DBMS Lab', type: 'Lab', faculty: 'Dr. Codd', venue: 'DB Lab' },
-    null,
-    { time: '2:00 PM', subject: 'Data Structures', type: 'Theory', faculty: 'Dr. Alan Turing', venue: 'Block A, Room 402' },
-    null,
-  ],
-};
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const periods = ['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '2:00 PM', '3:00 PM'];
+const assignments = [];
+const pyqs = [];
+const marks = [];
 
-const attendance = [
-  { subject: 'Data Structures',  held: 42, attended: 38, color: '#4f46e5' },
-  { subject: 'Mathematics III',  held: 38, attended: 26, color: '#ef4444' }, // Danger!
-  { subject: 'OS Theory',        held: 36, attended: 34, color: '#10b981' },
-  { subject: 'DBMS',             held: 40, attended: 36, color: '#0891b2' },
-  { subject: 'Networks',         held: 35, attended: 30, color: '#f59e0b' },
-  { subject: 'DS Lab',           held: 20, attended: 19, color: '#8b5cf6' },
-];
 
-const leaveRequests = [
-  { type: 'On-Duty (Hackathon)', date: 'Aug 14 - Aug 15', status: 'Approved', days: 2 },
-  { type: 'Medical Leave', date: 'Aug 20', status: 'Pending', days: 1 },
-];
-
-const assignments = [
-  { id: 1, title: 'AVL Tree Implementation',       subject: 'Data Structures', due: 'Aug 25, 2026', submitted: false, priority: 'high' },
-  { id: 2, title: 'SQL Mini Project',               subject: 'DBMS',           due: 'Aug 28, 2026', submitted: false, priority: 'medium' },
-  { id: 3, title: 'Process Scheduling Simulation', subject: 'OS Theory',       due: 'Sep 2, 2026',  submitted: true,  priority: 'low' },
-  { id: 4, title: 'TCP/IP Protocol Report',        subject: 'Networks',        due: 'Sep 5, 2026',  submitted: false, priority: 'medium' },
-];
-
-const pyqs = [
-  { title: 'Data Structures — Sem 5 2025', type: 'PYQ', size: '1.2 MB' },
-  { title: 'Data Structures — Sem 5 2024', type: 'PYQ', size: '1.1 MB' },
-  { title: 'Mathematics III — Sem 5 2025', type: 'PYQ', size: '2.4 MB' },
-  { title: 'Sem 5 Official Syllabus & Blueprint', type: 'Syllabus', size: '450 KB' },
-];
-
-const marks = [
-  { subject: 'Data Structures', ca1: 28, ca2: 30, ca3: 27, model: 72, credits: 4 },
-  { subject: 'Mathematics III', ca1: 22, ca2: 25, ca3: 24, model: 58, credits: 4 },
-  { subject: 'OS Theory',       ca1: 29, ca2: 28, ca3: 30, model: 81, credits: 3 },
-  { subject: 'DBMS',            ca1: 26, ca2: 27, ca3: 25, model: 68, credits: 3 },
-  { subject: 'Networks',        ca1: 24, ca2: 26, ca3: 28, model: 74, credits: 3 },
-  { subject: 'DS Lab',          ca1: 30, ca2: 30, ca3: 30, model: 95, credits: 2 },
-];
 
 const priorityColors = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
 
@@ -97,9 +23,24 @@ const gradePoints = { 'O': 10, 'A+': 9, 'A': 8, 'B+': 7, 'B': 6, 'C': 5, 'U': 0 
 // ─────────────────────────────────────────────────────────────
 // Tab: Timetable
 // ─────────────────────────────────────────────────────────────
+import { academicAPI } from '../../services/api.service';
+import { useQuery } from '@tanstack/react-query';
+
 function TimetableTab() {
   const today = days[new Date().getDay() - 1] || 'Monday';
   const [selectedDay, setSelectedDay] = useState(today);
+  const { data: timetable = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] } } = useQuery({
+    queryKey: ['academicTimetable'],
+    queryFn: () => academicAPI.getTimetable().then(res => {
+      const grouped = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] };
+      res.data.forEach(ev => {
+        if (grouped[ev.day_of_week]) {
+          grouped[ev.day_of_week].push(ev);
+        }
+      });
+      return grouped;
+    })
+  });
 
   // Mocking live class (e.g., 9:45 AM on Monday)
   const isLiveDay = selectedDay === 'Monday';
@@ -184,6 +125,15 @@ function TimetableTab() {
 // Tab: Attendance
 // ─────────────────────────────────────────────────────────────
 function AttendanceTab() {
+  const { data: attendance = [] } = useQuery({
+    queryKey: ['academicAttendance'],
+    queryFn: () => academicAPI.getAttendance().then(res => res.data)
+  });
+
+  const { data: leaveRequests = [] } = useQuery({
+    queryKey: ['academicLeaveRequests'],
+    queryFn: () => academicAPI.getLeaveRequests().then(res => res.data)
+  });
   const [targetPct, setTargetPct] = useState(75);
 
   return (

@@ -163,7 +163,47 @@ class CourseResponse(BaseModel):
         from_attributes = True
 
 
-# --- AI Tutor Schemas ---
+# --- Enrollment & Adaptive Learning Path Schemas ---
+
+class EnrollResponse(BaseModel):
+    enrollment_id: int
+    course_id: int
+    student_id: int
+    learning_path: str  # "pending" right after enrollment
+    message: str
+
+    class Config:
+        from_attributes = True
+
+
+class EnrollmentStatusResponse(BaseModel):
+    is_enrolled: bool
+    enrollment_id: Optional[int] = None
+    learning_path: Optional[str] = None   # pending | basics | intermediate | advanced
+    placement_score: Optional[float] = None
+    path_override: Optional[bool] = None
+    progress_percentage: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PlacementResultRequest(BaseModel):
+    score: float        # 0–100, percentage correct
+    override_to_basics: bool = False  # True when student clicks "Start from Basics"
+
+
+class PlacementResultResponse(BaseModel):
+    recommended_path: str   # basics | intermediate | advanced
+    assigned_path: str      # what was actually assigned (after override)
+    score: float
+    message: str            # Human-friendly message
+
+    class Config:
+        from_attributes = True
+
+
+
 
 class AiTutorMessageRequest(BaseModel):
     course_id: int
@@ -290,5 +330,128 @@ class LiveSessionResponse(BaseModel):
     teacher_name: Optional[str] = None
     duration_minutes: Optional[int] = None
 
+    class Config:
+        from_attributes = True
+
+# --- Academic Schemas ---
+from datetime import date, time
+
+class TimetableEventResponse(BaseModel):
+    id: int
+    tenant_id: int
+    course_id: Optional[int]
+    title: Optional[str]
+    day_of_week: str
+    start_time: time
+    end_time: time
+    type: str
+    venue: str
+    faculty_id: Optional[int]
+    faculty_name: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+class AttendanceRecordResponse(BaseModel):
+    id: int
+    student_id: int
+    course_id: int
+    date: date
+    status: str
+    
+    class Config:
+        from_attributes = True
+
+class LeaveRequestResponse(BaseModel):
+    id: int
+    student_id: int
+    start_date: date
+    end_date: date
+    type: str
+    reason: str
+    status: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# --- Career Schemas ---
+class JobListingResponse(BaseModel):
+    id: int
+    tenant_id: int
+    title: str
+    company: str
+    location: str
+    type: str
+    stipend: str
+    match_score: int
+    skills_required: str
+    
+    class Config:
+        from_attributes = True
+
+class JobApplicationResponse(BaseModel):
+    id: int
+    job_id: int
+    student_id: int
+    status: str
+    applied_at: datetime
+    job: Optional[JobListingResponse] = None
+
+    class Config:
+        from_attributes = True
+
+class CertificateResponse(BaseModel):
+    id: int
+    student_id: int
+    title: str
+    issuer: str
+    issued_date: str
+    grade: Optional[str] = None
+    verified: bool
+    image_url: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+# --- Community Schemas ---
+class BountyResponse(BaseModel):
+    id: int
+    tenant_id: int
+    author_id: int
+    subject: str
+    title: str
+    body: str
+    reward_amount: int
+    tags: str
+    is_solved: bool
+    created_at: datetime
+    author_name: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class LeaderboardEntryResponse(BaseModel):
+    id: int
+    tenant_id: int
+    student_id: int
+    reputation: int
+    badge: str
+    student_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class EventResponse(BaseModel):
+    id: int
+    tenant_id: int
+    title: str
+    organization: str
+    date: str
+    time: str
+    venue: str
+    type: str
+    created_at: datetime
+    
     class Config:
         from_attributes = True

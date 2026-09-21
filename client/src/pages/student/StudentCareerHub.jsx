@@ -8,22 +8,6 @@ import {
 // ─────────────────────────────────────────────────────────────
 // Data
 // ─────────────────────────────────────────────────────────────
-const jobs = [
-  { id: 1, title: 'Junior Backend Engineer', company: 'Stripe', match: 92, type: 'Full-time', skills: ['Python', 'APIs', 'Data Structures'], aiReady: true },
-  { id: 2, title: 'ML Research Intern', company: 'DeepMind', match: 87, type: 'Internship', skills: ['Machine Learning', 'Python', 'Math'], aiReady: true },
-  { id: 3, title: 'Data Analyst', company: 'Airbnb', match: 78, type: 'Full-time', skills: ['SQL', 'Statistics', 'Python'], aiReady: false },
-];
-
-const applications = [
-  { id: 1, role: 'Software Engineer Intern', company: 'Google', status: 'Interviewing', date: 'Applied 2 weeks ago' },
-  { id: 2, role: 'Backend Developer', company: 'Zomato', status: 'Under Review', date: 'Applied 4 days ago' },
-];
-
-const certificates = [
-  { id: 1, title: 'Advanced Python Programming', issued: 'Jul 2026', grade: 'A+', img: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=600&q=80', verified: true },
-  { id: 2, title: 'Data Structures & Algorithms', issued: 'In Progress', grade: null, img: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600&q=80', verified: false },
-];
-
 const skillNodes = [
   { id: 'python', name: 'Python Core', status: 'mastered', score: 95 },
   { id: 'sql', name: 'Database & SQL', status: 'mastered', score: 88 },
@@ -32,11 +16,26 @@ const skillNodes = [
   { id: 'cloud', name: 'Cloud Deploy', status: 'locked', score: 0 },
 ];
 
+import { careerAPI } from '../../services/api.service';
+import { getTopicImage } from '../../utils/imageUtils';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+
 // ─────────────────────────────────────────────────────────────
 // Tab: Career Pipeline & Resume
 // ─────────────────────────────────────────────────────────────
 function PipelineTab() {
   const [selectedSkills, setSelectedSkills] = useState(['Python Core', 'Database & SQL']);
+  const { data: jobs = [] } = useQuery({
+    queryKey: ['careerJobs'],
+    queryFn: () => careerAPI.getJobs().then(res => res.data)
+  });
+
+  const { data: applications = [] } = useQuery({
+    queryKey: ['careerApplications'],
+    queryFn: () => careerAPI.getApplications().then(res => res.data)
+  });
+
   const resumeScore = 65 + (selectedSkills.length * 10);
 
   const toggleSkill = (skill) => {
@@ -228,6 +227,10 @@ function SkillTreeTab() {
 // Tab: Credentials Vault
 // ─────────────────────────────────────────────────────────────
 function VaultTab() {
+  const { data: certificates = [] } = useQuery({
+    queryKey: ['careerCertificates'],
+    queryFn: () => careerAPI.getCertificates().then(res => res.data)
+  });
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '3rem', alignItems: 'start' }}>
       
@@ -239,7 +242,9 @@ function VaultTab() {
             <div key={cert.id} style={{ display: 'flex', gap: '2rem', background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '1.5rem', opacity: cert.grade ? 1 : 0.6 }}>
               
               <div style={{ width: 220, height: 140, borderRadius: 12, overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
-                <img src={cert.img} alt={cert.title} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: cert.grade ? 'none' : 'grayscale(1)' }} />
+                <img src={getTopicImage(cert.title)} alt={cert.title} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: cert.grade ? 'none' : 'grayscale(1)' }} 
+                  onError={(e) => { e.target.onerror = null; e.target.src = getTopicImage(cert.title); }}
+                />
                 {cert.verified && (
                   <div style={{ position: 'absolute', top: 8, right: 8, background: 'white', padding: 4, borderRadius: '50%' }}>
                     <Award size={16} color="#10b981" />

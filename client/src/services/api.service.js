@@ -27,7 +27,9 @@ api.interceptors.response.use(
   }
 );
 
-// --- Auth ---
+// ─────────────────────────────────────────────────────────────────────────────
+// Auth
+// ─────────────────────────────────────────────────────────────────────────────
 export const authAPI = {
   login: (email, password) =>
     api.post('/api/auth/login', new URLSearchParams({ username: email, password }), {
@@ -39,41 +41,75 @@ export const authAPI = {
   impersonate: (userId) => api.post(`/api/auth/impersonate/${userId}`),
 };
 
-// --- Admin (user management) ---
+// ─────────────────────────────────────────────────────────────────────────────
+// Super Admin API  (global, cross-tenant)
+// ─────────────────────────────────────────────────────────────────────────────
 export const adminAPI = {
+  // Users
   listUsers: (tenantId) => api.get(`/api/tenants/${tenantId}/users`),
   createUser: (tenantId, data) => api.post(`/api/tenants/${tenantId}/users`, data),
   listGlobalUsers: () => api.get('/api/admin/users/global'),
+  suspendUser: (userId) => api.post(`/api/admin/users/${userId}/suspend`),
+
+  // Courses
   listGlobalCourses: () => api.get('/api/admin/courses/global'),
+
+  // Audit & Logs
   listAuditLogs: () => api.get('/api/admin/audit-logs'),
+
+  // Billing & Stats
   getBillingStats: () => api.get('/api/admin/billing'),
   getDashboardStats: () => api.get('/api/admin/stats'),
+
+  // System
   getSystemHealth: () => api.get('/api/admin/health'),
+
+  // Support
   getSupportTickets: () => api.get('/api/admin/tickets'),
-  suspendUser: (userId) => api.post(`/api/admin/users/${userId}/suspend`),
+  replyToTicket: (ticketId, message) => api.post(`/api/admin/tickets/${ticketId}/reply`, { message }),
 };
 
-// --- Tenants ---
+// ─────────────────────────────────────────────────────────────────────────────
+// Tenants  (org-level, scoped to one tenant)
+// ─────────────────────────────────────────────────────────────────────────────
 export const tenantsAPI = {
+  // CRUD
   list: () => api.get('/api/tenants'),
   create: (data) => api.post('/api/tenants', data),
   get: (id) => api.get(`/api/tenants/${id}`),
   update: (id, data) => api.put(`/api/tenants/${id}`, data),
   deactivate: (id) => api.delete(`/api/tenants/${id}`),
+
+  // Dashboard
   getDashboardNarrative: (id) => api.get(`/api/tenants/${id}/dashboard-narrative`),
   getCohortsPulse: (id) => api.get(`/api/tenants/${id}/cohorts-pulse`),
   getAnalytics: (id) => api.get(`/api/tenants/${id}/analytics`),
-  getCourses: (id) => api.get(`/api/tenants/${id}/courses`),
-  toggleCoursePublish: (tenantId, courseId) => api.patch(`/api/tenants/${tenantId}/courses/${courseId}/toggle-publish`),
-  getAuditLogs: (id) => api.get(`/api/tenants/${id}/audit-logs`),
+
+  // Users / Directory
   listUsers: (id) => api.get(`/api/tenants/${id}/users`),
+  getMembers: (id) => api.get(`/api/tenants/${id}/users`),   // alias – OrgDirectoryHub
   createUser: (id, data) => api.post(`/api/tenants/${id}/users`, data),
   deactivateUser: (tenantId, userId) => api.patch(`/api/tenants/${tenantId}/users/${userId}/deactivate`),
+
+  // Courses / Content
+  getCourses: (id) => api.get(`/api/tenants/${id}/courses`),
+  toggleCoursePublish: (tenantId, courseId) => api.patch(`/api/tenants/${tenantId}/courses/${courseId}/toggle-publish`),
+
+  // Audit / Security
+  getAuditLogs: (id) => api.get(`/api/tenants/${id}/audit-logs`),
+
+  // Communication / Broadcasts
+  getBroadcasts: (id) => api.get(`/api/tenants/${id}/broadcasts`),
+  sendBroadcast: (id, data) => api.post(`/api/tenants/${id}/broadcasts`, data),
+  getAnnouncements: (id) => api.get(`/api/tenants/${id}/broadcasts`), // alias
 };
 
-// --- Courses ---
+// ─────────────────────────────────────────────────────────────────────────────
+// Courses
+// ─────────────────────────────────────────────────────────────────────────────
 export const coursesAPI = {
   list: () => api.get('/api/courses'),
+  getRecommendedPaths: () => api.get('/api/courses/recommended-paths'),
   myCourses: () => api.get('/api/courses/my'),
   getEnrolledCourses: () => api.get('/api/courses/enrolled'),
   get: (id) => api.get(`/api/courses/${id}`),
@@ -90,11 +126,20 @@ export const coursesAPI = {
   createModule: (courseId, title) => api.post(`/api/courses/${courseId}/modules`, { title }),
   getAssignments: (courseId) => api.get(`/api/courses/${courseId}/assignments`),
   createAssignment: (courseId, data) => api.post(`/api/courses/${courseId}/assignments`, data),
+
+  // ── Adaptive Enrollment Flow ──────────────────────────────────────────────
+  enroll: (courseId) => api.post(`/api/courses/${courseId}/enroll`),
+  getEnrollmentStatus: (courseId) => api.get(`/api/courses/${courseId}/enrollment-status`),
+  submitPlacementResult: (courseId, score, overrideToBasics = false) =>
+    api.post(`/api/courses/${courseId}/placement-result`, { score, override_to_basics: overrideToBasics }),
 };
 
-// --- AI Tutor ---
+// ─────────────────────────────────────────────────────────────────────────────
+// AI Tutor
+// ─────────────────────────────────────────────────────────────────────────────
 export const aiTutorAPI = {
-  ask: (courseId, message, persona = 'tutor') => api.post('/api/ai-tutor/ask', { course_id: courseId, message, persona }),
+  ask: (courseId, message, persona = 'tutor') =>
+    api.post('/api/ai-tutor/ask', { course_id: courseId, message, persona }),
   generateQuiz: (courseId, topic, difficulty, numQuestions) =>
     api.post('/api/ai-tutor/generate-quiz', null, {
       params: { course_id: courseId, topic, difficulty, num_questions: numQuestions },
@@ -105,7 +150,9 @@ export const aiTutorAPI = {
     }),
 };
 
-// --- Assignments ---
+// ─────────────────────────────────────────────────────────────────────────────
+// Assignments
+// ─────────────────────────────────────────────────────────────────────────────
 export const assignmentsAPI = {
   submit: (assignmentId, file) => {
     const form = new FormData();
@@ -117,38 +164,73 @@ export const assignmentsAPI = {
   getResult: (assignmentId, submissionId) =>
     api.get(`/api/assignments/${assignmentId}/submissions/${submissionId}`),
   getSubmissions: (assignmentId) => api.get(`/api/assignments/${assignmentId}/submissions`),
-  gradeSubmission: (assignmentId, submissionId, data) => api.patch(`/api/assignments/${assignmentId}/submissions/${submissionId}/grade`, data),
+  gradeSubmission: (assignmentId, submissionId, data) =>
+    api.patch(`/api/assignments/${assignmentId}/submissions/${submissionId}/grade`, data),
 };
 
-// --- Proctoring ---
+// ─────────────────────────────────────────────────────────────────────────────
+// Proctoring
+// ─────────────────────────────────────────────────────────────────────────────
 export const proctoringAPI = {
   getReport: (examId) => api.get(`/api/proctoring/reports/${examId}`),
 };
 
-// --- Live Classes & Meetings ---
+// ─────────────────────────────────────────────────────────────────────────────
+// Live Classes & Meetings
+// ─────────────────────────────────────────────────────────────────────────────
 export const liveAPI = {
-  // Session CRUD
   createSession: (data) => api.post('/api/live/sessions', data),
   listSessions: (status) => api.get('/api/live/sessions', { params: status ? { status } : {} }),
   getSession: (id) => api.get(`/api/live/sessions/${id}`),
   deleteSession: (id) => api.delete(`/api/live/sessions/${id}`),
-
-  // Session Lifecycle
   startSession: (id) => api.post(`/api/live/sessions/${id}/start`),
   joinSession: (id) => api.post(`/api/live/sessions/${id}/join`),
   endSession: (id) => api.post(`/api/live/sessions/${id}/end`),
-
-  // Participants
   getParticipants: (id) => api.get(`/api/live/sessions/${id}/participants`),
-
-  // Legacy: ad-hoc room for office hours / MeetingArena
   createOrGetRoom: (roomName) => api.post(`/api/live/rooms?room_name=${roomName}`),
 };
 
-// --- Cognitive Analytics ---
+// ─────────────────────────────────────────────────────────────────────────────
+// Cognitive Analytics
+// ─────────────────────────────────────────────────────────────────────────────
 export const cognitiveAPI = {
   getProfile: () => api.get('/api/cognitive/me'),
   evaluate: (performanceData) => api.post('/api/cognitive/evaluate', performanceData),
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Academic
+// ─────────────────────────────────────────────────────────────────────────────
+export const academicAPI = {
+  getTimetable: () => api.get('/api/academic/timetable'),
+  getAttendance: () => api.get('/api/academic/attendance'),
+  getLeaveRequests: () => api.get('/api/academic/leave-requests'),
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard
+// ─────────────────────────────────────────────────────────────────────────────
+export const dashboardAPI = {
+  getSummary: () => api.get('/api/dashboard/summary'),
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Career
+// ─────────────────────────────────────────────────────────────────────────────
+export const careerAPI = {
+  getJobs: () => api.get('/api/career/jobs'),
+  getApplications: () => api.get('/api/career/applications'),
+  getCertificates: () => api.get('/api/career/certificates'),
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Community
+// ─────────────────────────────────────────────────────────────────────────────
+export const communityAPI = {
+  getBounties: () => api.get('/api/community/bounties'),
+  getLeaderboard: () => api.get('/api/community/leaderboard'),
+  getEvents: () => api.get('/api/community/events'),
+};
+
 export default api;
+

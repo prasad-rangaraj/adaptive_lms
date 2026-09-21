@@ -2,60 +2,241 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, AlertCircle, Camera, Mic, Eye, Clock, ChevronLeft, ChevronRight, 
   Activity, BrainCircuit, Trophy, ArrowRight, ShieldAlert, CheckCircle2, FileText, Lock, 
-  Flag, Cloud, CloudOff, RefreshCw, Calculator, Edit3, X, AlignLeft, Volume2, Wifi, Map, Sword
+  Flag, Cloud, CloudOff, RefreshCw, Calculator, Edit3, X, AlignLeft, Volume2, Wifi, Map, Sword,
+  BookOpen, Play, GraduationCap, Layers, Target, Sparkles, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useProctoring } from '../../hooks/useProctoring';
+import { coursesAPI, cognitiveAPI } from '../../services/api.service';
+import PlacementAssessmentModal from './PlacementAssessmentModal';
+import toast from 'react-hot-toast';
 
 // ── Mock Data ─────────────────────────────────────────────────────────────
-const questions = [
-  {
-    id: 1,
-    type: 'mcq',
-    q: 'What is the time complexity of searching in a balanced Binary Search Tree?',
-    options: ['O(1)', 'O(n)', 'O(log n)', 'O(n log n)'],
-    correct: 2,
-    topic: 'Algorithmic Complexity',
-  },
-  {
-    id: 2,
-    type: 'mcq',
-    q: 'Which traversal visits the root node first?',
-    options: ['In-order', 'Pre-order', 'Post-order', 'Level-order'],
-    correct: 1,
-    topic: 'Tree Traversal',
-  },
-  {
-    id: 3,
-    type: 'text',
-    q: 'Write a brief definition of a Hash Collision.',
-    correctTextKeywords: ['two keys', 'same index', 'same hash', 'bucket'],
-    topic: 'Hashing',
-  },
-  {
-    id: 4,
-    type: 'mcq',
-    q: 'A complete binary tree of height h has at most __ nodes.',
-    options: ['2^h', '2^h - 1', '2^(h+1) - 1', 'h^2'],
-    correct: 2,
-    topic: 'Binary Tree Properties',
-  },
-];
+const questions = [];
 
-const availableExams = [
-  { id: 3, title: 'Database Systems — CA1', course: 'Computer Science', date: 'Sep 2', duration: '30 mins', questions: 25, status: 'completed', score: '22/25' },
-  { id: 4, title: 'Algorithms — Quiz 1', course: 'Computer Science', date: 'Sep 20', duration: '20 mins', questions: 15, status: 'completed', score: '14/15' },
-  { id: 1, title: 'Data Structures — Midterm', course: 'Computer Science', date: 'Today', duration: '45 mins', questions: 4, status: 'active' },
-  { id: 2, title: 'Operating Systems — CA2', course: 'Computer Science', date: 'Oct 15', duration: '60 mins', questions: 50, status: 'upcoming' },
-  { id: 5, title: 'Computer Networks — Final', course: 'Computer Science', date: 'Nov 5', duration: '90 mins', questions: 80, status: 'upcoming' },
-  { id: 6, title: 'Software Engineering — Project Review', course: 'Computer Science', date: 'Nov 22', duration: '45 mins', questions: 30, status: 'upcoming' },
-];
+
+// ── Course Roadmap Modal ─────────────────────────────────────────────────────
+function CourseRoadmapModal({ course, enrollment, onClose, onStartLearn }) {
+  const navigate = useNavigate();
+  const [modules, setModules] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAssessment, setShowAssessment] = useState(false);
+  const [expandedMod, setExpandedMod] = useState(0);
+
+  useEffect(() => {
+    coursesAPI.getModules(course.id).then(res => {
+      setModules(res.data);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [course.id]);
+
+  const isPending = enrollment?.learning_path === 'pending';
+  const learningPath = enrollment?.learning_path || 'pending';
+  const progress = enrollment?.progress_percentage || 0;
+
+  const pathColors = { pending: '#f59e0b', basics: '#0891b2', intermediate: '#7c3aed', advanced: '#059669' };
+  const pathLabels = { pending: '⏳ Assessment Pending', basics: '🌱 Foundation Path', intermediate: '🚀 Core Path', advanced: '⚡ Expert Path' };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ width: '100%', maxWidth: 760, maxHeight: '90vh', background: 'var(--surface-0)', borderRadius: 24, border: '1px solid var(--surface-3)', boxShadow: '0 32px 80px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideUp 0.3s ease' }}>
+        
+        {/* Header */}
+        <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)', padding: '2rem', position: 'relative', flexShrink: 0 }}>
+          <button onClick={onClose} style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
+            <X size={18} />
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.75rem' }}>
+            <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Course Roadmap</span>
+          </div>
+          <h2 style={{ fontSize: '1.625rem', fontWeight: 900, color: 'white', letterSpacing: '-0.02em', marginBottom: '1rem', lineHeight: 1.2 }}>{course.title}</h2>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: pathColors[learningPath] + '33', border: `1px solid ${pathColors[learningPath]}66`, borderRadius: 999, padding: '4px 12px', fontSize: '0.8125rem', fontWeight: 800, color: 'white' }}>
+              {pathLabels[learningPath]}
+            </span>
+            <span style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>{modules.length} modules</span>
+          </div>
+        </div>
+
+        {/* Placement Assessment Banner */}
+        {isPending && (
+          <div style={{ background: 'linear-gradient(90deg, #fef3c7, #fffbeb)', borderBottom: '1px solid #fde68a', padding: '1rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#fde68a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, animation: 'breathe 2s ease-in-out infinite' }}>🎯</div>
+              <div>
+                <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#92400e', margin: 0 }}>Take Your Placement Assessment</p>
+                <p style={{ fontSize: '0.75rem', color: '#b45309', margin: 0 }}>Unlock your personalised learning path — only 5 questions</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowAssessment(true)}
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#d97706', color: 'white', border: 'none', borderRadius: 12, padding: '10px 20px', fontWeight: 800, fontSize: '0.875rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(217,119,6,0.3)' }}
+            >
+              <Target size={15} /> Start Assessment
+            </button>
+          </div>
+        )}
+
+        {/* Roadmap Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 2rem' }} className="hide-scrollbar">
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Loading roadmap...</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {modules.map((mod, modIdx) => {
+                const isExpanded = expandedMod === modIdx;
+                const isLocked = isPending && modIdx >= 2;
+                const materials = mod.materials || [];
+                return (
+                  <div key={mod.id} style={{ background: isLocked ? 'var(--surface-1)' : 'var(--surface-0)', border: `1px solid ${isLocked ? 'var(--surface-3)' : 'var(--surface-3)'}`, borderRadius: 16, overflow: 'hidden', opacity: isLocked ? 0.6 : 1, transition: 'all 0.3s' }}>
+                    {/* Module header */}
+                    <div
+                      onClick={() => !isLocked && setExpandedMod(isExpanded ? -1 : modIdx)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem', cursor: isLocked ? 'not-allowed' : 'pointer', userSelect: 'none' }}
+                    >
+                      <div style={{ width: 40, height: 40, borderRadius: 12, background: isLocked ? 'var(--surface-2)' : 'var(--brand-50)', border: `2px solid ${isLocked ? 'var(--surface-3)' : 'var(--brand-200)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 900, fontSize: '0.875rem', color: isLocked ? 'var(--text-muted)' : 'var(--brand-600)' }}>
+                        {isLocked ? <Lock size={16} /> : modIdx + 1}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>{mod.title}</p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, marginTop: 2 }}>{materials.length} materials{isLocked ? ' · 🔒 Complete assessment to unlock' : ''}</p>
+                      </div>
+                      {!isLocked && (
+                        <>
+                          <button
+                            onClick={e => { e.stopPropagation(); navigate(`/student/course/${course.id}?module=${mod.id}`); onClose(); }}
+                            style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, background: 'var(--brand-500)', color: 'white', border: 'none', borderRadius: 10, padding: '7px 14px', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer' }}
+                          >
+                            <Play size={13} /> Learn
+                          </button>
+                          {isExpanded ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Materials list */}
+                    {isExpanded && materials.length > 0 && (
+                      <div style={{ borderTop: '1px solid var(--surface-2)', background: 'var(--surface-1)' }}>
+                        {materials.map((mat, mi) => {
+                          const isYT = mat.material_type === 'youtube';
+                          const isPDF = mat.material_type === 'pdf';
+                          
+                          // Check local storage for completion
+                          let isDone = false;
+                          try {
+                            const stored = localStorage.getItem(`adaptive_completed_${course.id}`);
+                            if (stored) {
+                              isDone = JSON.parse(stored).includes(mat.id);
+                            }
+                          } catch (e) {}
+
+                          return (
+                            <div key={mat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.875rem 1.25rem 0.875rem 4.5rem', borderBottom: mi < materials.length - 1 ? '1px solid var(--surface-2)' : 'none' }}>
+                              <div style={{ width: 32, height: 32, borderRadius: 8, background: isDone ? '#10b981' : isYT ? '#fee2e2' : isPDF ? '#e0f2fe' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {isDone ? <CheckCircle2 size={16} color="white" /> : isYT ? <span style={{ fontSize: '0.875rem' }}>▶️</span> : isPDF ? <span style={{ fontSize: '0.875rem' }}>📄</span> : <Play size={14} color="var(--text-muted)" />}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: isDone ? 'line-through' : 'none' }}>{mat.title}</p>
+                                <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{mat.material_type}</p>
+                              </div>
+                              {isYT && (
+                                <a href={mat.s3_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#dc2626', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                                  YouTube ↗
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {isExpanded && materials.length === 0 && (
+                      <div style={{ padding: '1rem 1.25rem 1rem 4.5rem', color: 'var(--text-muted)', fontSize: '0.875rem', borderTop: '1px solid var(--surface-2)' }}>No materials yet</div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Assessment checkpoint node */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 0 0.5rem', gap: '0.75rem' }}>
+                <div style={{ width: 2, height: 40, background: 'linear-gradient(to bottom, var(--surface-3), #fbbf24)' }} />
+                <div style={{ background: isPending ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : 'linear-gradient(135deg, #d1fae5, #a7f3d0)', border: `2px solid ${isPending ? '#fbbf24' : '#10b981'}`, borderRadius: 16, padding: '1.25rem 1.5rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: '1.75rem' }}>{isPending ? '🎯' : '✅'}</span>
+                    <div>
+                      <p style={{ fontWeight: 900, fontSize: '0.9375rem', color: isPending ? '#92400e' : '#065f46', margin: 0 }}>Placement Assessment</p>
+                      <p style={{ fontSize: '0.75rem', color: isPending ? '#b45309' : '#059669', margin: 0 }}>{isPending ? 'Not yet taken — unlock your path' : `Completed · Path: ${pathLabels[learningPath]}`}</p>
+                    </div>
+                  </div>
+                  {isPending && (
+                    <button onClick={() => setShowAssessment(true)} style={{ background: '#d97706', color: 'white', border: 'none', borderRadius: 10, padding: '8px 16px', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', flexShrink: 0 }}>Take Now</button>
+                  )}
+                </div>
+              </div>
+
+              {/* Final Assessment node */}
+              {progress >= 100 && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 0 0.5rem', gap: '0.75rem' }}>
+                  <div style={{ width: 2, height: 40, background: 'linear-gradient(to bottom, var(--surface-3), #3b82f6)' }} />
+                  <div style={{ background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '2px solid #3b82f6', borderRadius: 16, padding: '1.25rem 1.5rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontSize: '1.75rem' }}>🏆</span>
+                      <div>
+                        <p style={{ fontWeight: 900, fontSize: '0.9375rem', color: '#1e40af', margin: 0 }}>Final Certification Exam</p>
+                        <p style={{ fontSize: '0.75rem', color: '#2563eb', margin: 0 }}>You've completed all modules! Take the final exam to get certified.</p>
+                      </div>
+                    </div>
+                    <button onClick={onStartLearn} style={{ background: '#2563eb', color: 'white', border: 'none', borderRadius: 10, padding: '8px 16px', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', flexShrink: 0 }}>Take Exam</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '1.25rem 2rem', borderTop: '1px solid var(--surface-3)', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexShrink: 0 }}>
+          <button onClick={onClose} style={{ padding: '10px 20px', background: 'var(--surface-1)', border: '1px solid var(--surface-3)', borderRadius: 12, fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>Close</button>
+          <button
+            onClick={() => { navigate(`/student/course/${course.id}`); onClose(); }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: 'var(--brand-500)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: '0.875rem', cursor: 'pointer' }}
+          >
+            <Play size={15} /> Open Learning Canvas
+          </button>
+        </div>
+      </div>
+
+      {showAssessment && (
+        <PlacementAssessmentModal
+          course={course}
+          startAtPhase={1}
+          onPlacementComplete={(path) => {
+            setShowAssessment(false);
+            toast.success(`Learning path set: ${path}!`);
+            onClose();
+          }}
+          onClose={() => setShowAssessment(false)}
+        />
+      )}
+
+      <style>{`
+        @keyframes slideUp { from { opacity: 0; transform: translateY(32px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+      `}</style>
+    </div>
+  );
+}
 
 export default function StudentExamArena() {
   const navigate = useNavigate();
   // State: 'list' -> 'lobby' -> 'active' -> 'submitted'
   const [examState, setExamState] = useState('list'); 
   const [selectedExam, setSelectedExam] = useState(null);
+
+  // Enrolled courses
+  const [enrolledCourses, setEnrolledCourses] = useState([]);
+  const [enrollments, setEnrollments] = useState({});
+  const [selectedCourse, setSelectedCourse] = useState(null); // for roadmap modal
   
   // Exam progress state
   const [current, setCurrent] = useState(0);
@@ -92,6 +273,19 @@ export default function StudentExamArena() {
   const [mediaStream, setMediaStream] = useState(null);
   
   const proctoring = useProctoring();
+
+  // Load enrolled courses + their enrollment status
+  useEffect(() => {
+    coursesAPI.getEnrolledCourses().then(res => {
+      setEnrolledCourses(res.data || []);
+      // For each, fetch enrollment status to get learning_path + progress
+      (res.data || []).forEach(course => {
+        coursesAPI.getEnrollmentStatus(course.id).then(er => {
+          setEnrollments(prev => ({ ...prev, [course.id]: er.data }));
+        }).catch(() => {});
+      });
+    }).catch(() => {});
+  }, []);
 
   // YOLO Violation: count, 5s countdown, auto-terminate at 5
   useEffect(() => {
@@ -369,161 +563,95 @@ export default function StudentExamArena() {
         {/* ── LIST STATE: Immersive Level Select ── */}
         {examState === 'list' && (
           <div style={{ flex: 1, overflowY: 'auto', background: 'var(--surface-1)', position: 'relative' }} className="hide-scrollbar">
-            
-            {/* Subtle grid overlay */}
-            <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, var(--surface-3) 1px, transparent 1px)', backgroundSize: '32px 32px', pointerEvents: 'none', zIndex: 0 }} />
 
-            {/* Top glow blobs */}
-            <div style={{ position: 'absolute', top: -100, left: '20%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
-            <div style={{ position: 'absolute', top: 200, right: '10%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
-
-            {/* ── Header ── */}
-            <div style={{ position: 'relative', zIndex: 1, padding: '3.5rem 3rem 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '2rem', background: 'transparent' }}>
-              <div>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', border: '1px solid var(--brand-200)', borderRadius: 999, marginBottom: '1rem', background: 'transparent' }}>
-                  <Trophy size={13} color="var(--brand-600)" />
-                  <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--brand-600)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Your Academic Journey</span>
-                </div>
-                <h1 style={{ fontSize: '3.5rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, marginBottom: '0.75rem', color: 'var(--text-primary)' }}>
-                  Exam Quest
-                </h1>
-                <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', fontWeight: 500, maxWidth: 460, margin: 0 }}>
-                  Defeat each challenge to level up. Your mastery grows with every battle.
-                </p>
+            {/* ── My Courses Section ── */}
+            <div style={{ position: 'relative', zIndex: 1, padding: '2.5rem 3rem 1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1.25rem' }}>
+                <BookOpen size={18} color="var(--brand-500)" />
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Available Exams</h2>
               </div>
 
-              {/* Progress Summary */}
-              <div style={{ minWidth: 320 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                  <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{availableExams.filter(e=>e.status==='completed').length}/{availableExams.length} Completed</span>
-                  <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{Math.round((availableExams.filter(e=>e.status==='completed').length / availableExams.length) * 100)}% Mastery</span>
-                </div>
-                <div style={{ background: 'var(--surface-2)', borderRadius: 999, height: 8, border: '1px solid var(--surface-3)' }}>
-                  <div style={{ height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, var(--brand-500), #10b981)', width: `${Math.round((availableExams.filter(e=>e.status==='completed').length / availableExams.length) * 100)}%`, boxShadow: '0 0 12px rgba(99,102,241,0.3)', transition: 'width 1s ease' }} />
-                </div>
-                
-                <div style={{ display: 'flex', gap: '2rem', marginTop: '1.5rem' }}>
-                  {[{ val: availableExams.filter(e=>e.status==='completed').length, label: 'Cleared', color: '#10b981' }, { val: availableExams.filter(e=>e.status==='active').length, label: 'Live', color: 'var(--brand-500)' }, { val: availableExams.filter(e=>e.status==='upcoming').length, label: 'Locked', color: 'var(--text-muted)' }].map(({ val, label, color }) => (
-                    <div key={label} style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 900, color, lineHeight: 1 }}>{val}</div>
-                      <div style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 4 }}>{label}</div>
+              {(() => {
+                const examCourses = enrolledCourses.filter(c => {
+                  const enr = enrollments[c.id];
+                  if (!enr) return false;
+                  return enr.learning_path === 'pending' || (enr.progress_percentage && enr.progress_percentage >= 100);
+                });
+
+                if (examCourses.length === 0) {
+                  return (
+                    <div style={{ background: 'var(--surface-0)', border: '1px dashed var(--surface-3)', borderRadius: 20, padding: '3rem', textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
+                      <Trophy size={48} color="var(--text-muted)" style={{ marginBottom: '1rem' }} />
+                      <p style={{ color: 'var(--text-muted)', fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>No exams available right now</p>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.5rem' }}>Complete your course modules to unlock final certification exams!</p>
+                      <button onClick={() => navigate('/student')} style={{ marginTop: '1.5rem', background: 'var(--brand-500)', color: 'white', border: 'none', borderRadius: 12, padding: '10px 24px', fontWeight: 800, fontSize: '1rem', cursor: 'pointer' }}>Go to Dashboard</button>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* ── Level Nodes ── */}
-            <div style={{ position: 'relative', zIndex: 1, maxWidth: 860, margin: '0 auto', padding: '3rem 2rem 6rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
-              {availableExams.map((exam, i) => {
-                const isLeft = i % 2 === 0;
-                const isActive = exam.status === 'active';
-                const isDone = exam.status === 'completed';
-                const isLocked = exam.status === 'upcoming';
-
-                const nodeColor = isDone ? '#10b981' : isActive ? 'var(--brand-500)' : 'var(--surface-2)';
-                const nodeBorder = isDone ? '#10b981' : isActive ? 'var(--brand-400)' : 'var(--surface-3)';
-                const cardBg = isDone ? 'rgba(16,185,129,0.03)' : isActive ? 'rgba(99,102,241,0.03)' : 'var(--surface-0)';
-                const cardBorder = isDone ? 'rgba(16,185,129,0.3)' : isActive ? 'rgba(99,102,241,0.3)' : 'var(--surface-3)';
-
-                const emojis = ['📚', '🧮', '⚡', '🖥️', '🌐', '🏗️'];
+                  );
+                }
 
                 return (
-                  <div key={exam.id} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    
-                    {/* Connector from previous */}
-                    {i > 0 && (
-                      <div style={{ width: 3, height: 56, background: i <= availableExams.findIndex(e=>e.status==='active') ? 'linear-gradient(to bottom, var(--brand-500), rgba(99,102,241,0.15))' : 'var(--surface-3)', borderRadius: 999, margin: '0 auto', flexShrink: 0 }} />
-                    )}
-
-                    {/* Level Row */}
-                    <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '1.5rem', flexDirection: isLeft ? 'row' : 'row-reverse', padding: '0.5rem 0' }}>
-                      
-                      {/* ── Big Circular Node ── */}
-                      <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                        <div
-                          onClick={() => { if (isActive) startLobby(exam); }}
-                          style={{
-                            width: 88, height: 88, borderRadius: '50%',
-                            background: nodeColor,
-                            border: `3px solid ${nodeBorder}`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '2rem',
-                            cursor: isActive ? 'pointer' : 'default',
-                            boxShadow: isActive ? '0 0 0 8px rgba(99,102,241,0.15), 0 0 40px rgba(99,102,241,0.3)' : isDone ? '0 0 20px rgba(16,185,129,0.2)' : 'none',
-                            transition: 'all 0.3s',
-                            filter: isLocked ? 'grayscale(0.8)' : 'none',
-                            animation: isActive ? 'breathe 3s ease-in-out infinite' : 'none',
-                            color: 'white',
-                          }}
-                          className={isActive ? 'level-node-active' : ''}
-                        >
-                          {isLocked ? '🔒' : emojis[i] || '📖'}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '2rem' }}>
+                    {examCourses.map(course => {
+                    const enr = enrollments[course.id];
+                    const path = enr?.learning_path || 'pending';
+                    const progress = enr?.progress_percentage || 0;
+                    const pathColor = { pending: '#f59e0b', basics: '#0891b2', intermediate: '#7c3aed', advanced: '#059669' }[path] || '#6b7280';
+                    const courseImages = {
+                      101: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=600&q=80',
+                      102: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600&q=80',
+                      103: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=600&q=80',
+                      104: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=600&q=80',
+                      105: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&q=80',
+                    };
+                    return (
+                      <div
+                        key={course.id}
+                        onClick={() => setSelectedCourse(course)}
+                        style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 24, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.3s', boxShadow: '0 8px 24px rgba(0,0,0,0.04)' }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.1)'; e.currentTarget.style.borderColor = 'var(--brand-300)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.04)'; e.currentTarget.style.borderColor = 'var(--surface-3)'; }}
+                      >
+                        <div style={{ height: 180, background: `linear-gradient(to bottom right, rgba(0,0,0,0.5), rgba(0,0,0,0.2)), url('${courseImages[course.id] || ''}')`, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', alignItems: 'flex-end', padding: '1.25rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, background: pathColor, color: 'white', padding: '4px 12px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {path === 'pending' ? '⏳ Pending' : path === 'basics' ? '🌱 Foundation' : path === 'intermediate' ? '🚀 Core' : '⚡ Expert'}
+                          </span>
                         </div>
-                        <div style={{ fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: isDone ? '#10b981' : isActive ? 'var(--brand-600)' : 'var(--text-muted)' }}>
-                          Level {i + 1}
-                        </div>
-                      </div>
-
-                      {/* ── Info Card ── */}
-                      <div style={{
-                        flex: 1, maxWidth: 520, padding: '1.25rem 1.5rem', borderRadius: 20,
-                        background: cardBg, border: `1px solid ${cardBorder}`,
-                        backdropFilter: 'blur(12px)',
-                        boxShadow: isActive ? '0 8px 40px rgba(99,102,241,0.08)' : '0 4px 16px rgba(0,0,0,0.03)',
-                        transition: 'all 0.3s',
-                      }}>
-                        {/* Top row */}
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                          <div>
-                            {isActive && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.625rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--brand-700)', marginBottom: '0.375rem', padding: '2px 8px', background: 'var(--brand-100)', borderRadius: 999 }}>⚡ Live Now</span>}
-                            {isDone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.625rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#059669', marginBottom: '0.375rem', padding: '2px 8px', background: 'rgba(16,185,129,0.15)', borderRadius: 999 }}>✓ Cleared</span>}
-                            {isLocked && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.625rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: '0.375rem', padding: '2px 8px', background: 'var(--surface-2)', borderRadius: 999 }}>Locked</span>}
-                            <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: isLocked ? 'var(--text-secondary)' : 'var(--text-primary)', letterSpacing: '-0.01em', lineHeight: 1.25, margin: 0 }}>
-                              {exam.title}
-                            </h3>
-                          </div>
-                          {isDone && (
-                            <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '1rem' }}>
-                              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#10b981', lineHeight: 1 }}>{exam.score}</div>
-                              <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 700 }}>Score</div>
+                        <div style={{ padding: '1.5rem' }}>
+                          <p style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1rem', lineHeight: 1.3 }}>{course.title}</p>
+                          <div style={{ marginBottom: '1.25rem', padding: '0.75rem', background: 'var(--surface-1)', borderRadius: 12, border: '1px solid var(--surface-2)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {path === 'pending' ? (
+                                <>
+                                  <AlertCircle size={16} color="#f59e0b" />
+                                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 700 }}>Placement Assessment Required</span>
+                                </>
+                              ) : progress >= 100 ? (
+                                <>
+                                  <CheckCircle2 size={16} color="#10b981" />
+                                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 700 }}>All Modules Completed</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Activity size={16} color="var(--brand-500)" />
+                                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 700 }}>Learning in Progress</span>
+                                </>
+                              )}
                             </div>
-                          )}
-                        </div>
-
-                        {/* Meta */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '1rem' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><FileText size={11} /> {exam.questions} Questions</span>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={11} /> {exam.duration}</span>
-                          {!isDone && <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>{isActive ? '📅 Today' : `📅 ${exam.date}`}</span>}
-                        </div>
-
-                        {/* CTA */}
-                        {isActive && (
-                          <button onClick={() => startLobby(exam)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: 'linear-gradient(135deg, var(--brand-500), var(--brand-600))', color: 'white', border: 'none', borderRadius: 12, fontSize: '0.9375rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 20px rgba(99,102,241,0.3)', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(99,102,241,0.4)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(99,102,241,0.3)'; }}>
-                            <Sword size={16} /> Enter Battle
-                          </button>
-                        )}
-                        {isLocked && (
-                          <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 700 }}>
-                            Unlocks {exam.date}
                           </div>
-                        )}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid var(--surface-2)' }}>
+                            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}><Layers size={16} color="var(--brand-500)" /> {path === 'pending' ? 'Take Assessment' : 'View Roadmap'}</span>
+                            <div style={{ background: 'var(--brand-50)', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <ArrowRight size={16} color="var(--brand-600)" />
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* End Star */}
-              <div style={{ width: 3, height: 56, background: 'var(--surface-3)', borderRadius: 999 }} />
-              <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--surface-2)', border: '2px dashed var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem' }}>
-                🏆
-              </div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 8 }}>
-                Mastery Unlocked
-              </div>
-            </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
           </div>
         )}
 
@@ -863,6 +991,23 @@ export default function StudentExamArena() {
                 <button onClick={async () => {
                     setExamState('submitted');
                     try { if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); } catch (err) {}
+                    // Compute exam score and trigger cognitive profile update
+                    const totalQ = questions.length || 1;
+                    const correct = Object.entries(answers).filter(([qi, ans]) => questions[parseInt(qi)]?.answer === ans).length;
+                    const pct = Math.round((correct / totalQ) * 100);
+                    try {
+                      await cognitiveAPI.evaluate({
+                        event: 'Exam Completed',
+                        score: pct,
+                        topic: selectedExam?.title || 'Exam',
+                        total_questions: totalQ,
+                        correct_answers: correct,
+                        flagged_questions: flagged.size,
+                        time_taken_seconds: (selectedExam?.duration_minutes || 45) * 60 - timeLeft,
+                      });
+                    } catch (err) {
+                      console.warn('Could not update cognitive profile after exam:', err);
+                    }
                   }} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#10b981', color: 'white', border: 'none', padding: '14px', borderRadius: 12, fontWeight: 900, fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(16,185,129,0.35)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
                   <ShieldCheck size={18} /> Finish Quest
                 </button>
@@ -991,6 +1136,15 @@ export default function StudentExamArena() {
           50% { box-shadow: 0 0 0 16px rgba(99,102,241,0.1), 0 0 60px rgba(99,102,241,0.6); }
         }
       `}</style>
+
+      {/* Course Roadmap Modal */}
+      {selectedCourse && (
+        <CourseRoadmapModal
+          course={selectedCourse}
+          enrollment={enrollments[selectedCourse.id]}
+          onClose={() => setSelectedCourse(null)}
+        />
+      )}
     </div>
   );
 }

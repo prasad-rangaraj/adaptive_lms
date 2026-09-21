@@ -150,6 +150,7 @@ export function useProctoring() {
         
         wsRef.current.onmessage = (event) => {
             const data = JSON.parse(event.data);
+            // Always show annotated frame from OpenCV/YOLO (both ok and violation)
             if (data.frame) {
                 setAnnotatedFrame(`data:image/jpeg;base64,${data.frame}`);
             }

@@ -1,12 +1,7 @@
 import { BookOpen, Play, FileText } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 
-const MOCK_MATERIALS = [
-  { id: 1, title: 'Introduction to Python', type: 'video', duration: '12:34', completed: true },
-  { id: 2, title: 'Variables & Data Types', type: 'video', duration: '18:02', completed: true },
-  { id: 3, title: 'Course Notes PDF', type: 'pdf', duration: null, completed: false },
-  { id: 4, title: 'Control Flow & Loops', type: 'video', duration: '21:15', completed: false },
-];
+const MOCK_MATERIALS = [];
 
 export default function CoursePlayerPage() {
   const { courseId } = useParams();
