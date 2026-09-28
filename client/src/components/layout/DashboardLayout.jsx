@@ -37,6 +37,7 @@ const navConfig = {
     ]},
     { section: 'Creator Studio', items: [
       { to: '/teacher/studio', icon: BookOpen, label: 'Course Studio' },
+      { to: '/teacher/courses', icon: GraduationCap, label: 'All Courses' },
       { to: '/teacher/inbox', icon: MessageSquare, label: 'Faculty Inbox' },
     ]},
     { section: 'Evaluation & Operations', items: [

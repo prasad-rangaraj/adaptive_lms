@@ -9,7 +9,7 @@ from db.database import Base, engine, create_extensions
 import models  # noqa: F401
 
 # Import all routers
-from api.v1 import auth, tenants, courses, ai_tutor, proctoring, assignments, admin, live, cognitive, academic, dashboard, career, community
+from api.v1 import auth, tenants, courses, ai_tutor, proctoring, assignments, admin, live, cognitive, academic, dashboard, career, community, org_ai
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,7 +55,7 @@ app.include_router(academic.router, prefix="/api/academic", tags=["Academic"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(career.router, prefix="/api/career", tags=["Career"])
 app.include_router(community.router, prefix="/api/community", tags=["Community"])
-
+app.include_router(org_ai.router, prefix="/api", tags=["Tenant AI Settings"])
 
 
 

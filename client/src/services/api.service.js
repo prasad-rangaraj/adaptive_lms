@@ -104,6 +104,11 @@ export const tenantsAPI = {
   getAnnouncements: (id) => api.get(`/api/tenants/${id}/broadcasts`), // alias
 };
 
+export const orgAIAPI = {
+  getSettings: (tenantId) => api.get(`/api/tenants/${tenantId}/ai-settings`),
+  updateSettings: (tenantId, data) => api.patch(`/api/tenants/${tenantId}/ai-settings`, data),
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Courses
 // ─────────────────────────────────────────────────────────────────────────────
@@ -113,6 +118,7 @@ export const coursesAPI = {
   myCourses: () => api.get('/api/courses/my'),
   getEnrolledCourses: () => api.get('/api/courses/enrolled'),
   get: (id) => api.get(`/api/courses/${id}`),
+  getTranscript: (courseId, materialId) => api.get(`/api/courses/${courseId}/materials/${materialId}/transcript`),
   create: (data) => api.post('/api/courses', data),
   publish: (id) => api.patch(`/api/courses/${id}/publish`),
   uploadMaterial: (courseId, moduleId, file) => {
@@ -123,7 +129,9 @@ export const coursesAPI = {
     });
   },
   getModules: (courseId) => api.get(`/api/courses/${courseId}/modules`),
-  createModule: (courseId, title) => api.post(`/api/courses/${courseId}/modules`, { title }),
+  createModule: (courseId, title, level = "fundamentals") => api.post(`/api/courses/${courseId}/modules`, { title, level }),
+  updateCourse: (courseId, data) => api.patch(`/api/courses/${courseId}`, data),
+  updateModule: (courseId, moduleId, data) => api.patch(`/api/courses/${courseId}/modules/${moduleId}`, data),
   getAssignments: (courseId) => api.get(`/api/courses/${courseId}/assignments`),
   createAssignment: (courseId, data) => api.post(`/api/courses/${courseId}/assignments`, data),
 
@@ -132,12 +140,15 @@ export const coursesAPI = {
   getEnrollmentStatus: (courseId) => api.get(`/api/courses/${courseId}/enrollment-status`),
   submitPlacementResult: (courseId, score, overrideToBasics = false) =>
     api.post(`/api/courses/${courseId}/placement-result`, { score, override_to_basics: overrideToBasics }),
+  getStudents: (courseId) => api.get(`/api/courses/${courseId}/students`),
+  getCourseDetail: (courseId) => api.get(`/api/courses/${courseId}/course-detail`),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AI Tutor
 // ─────────────────────────────────────────────────────────────────────────────
 export const aiTutorAPI = {
+  getHistory: () => api.get('/api/ai-tutor/history'),
   ask: (courseId, message, persona = 'tutor') =>
     api.post('/api/ai-tutor/ask', { course_id: courseId, message, persona }),
   generateQuiz: (courseId, topic, difficulty, numQuestions) =>
@@ -173,6 +184,7 @@ export const assignmentsAPI = {
 // ─────────────────────────────────────────────────────────────────────────────
 export const proctoringAPI = {
   getReport: (examId) => api.get(`/api/proctoring/reports/${examId}`),
+  getRecentFlags: () => api.get(`/api/proctoring/flags/recent`),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,6 +208,7 @@ export const liveAPI = {
 export const cognitiveAPI = {
   getProfile: () => api.get('/api/cognitive/me'),
   evaluate: (performanceData) => api.post('/api/cognitive/evaluate', performanceData),
+  getDailyTrivia: () => api.get('/api/cognitive/daily-trivia'),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -205,6 +218,12 @@ export const academicAPI = {
   getTimetable: () => api.get('/api/academic/timetable'),
   getAttendance: () => api.get('/api/academic/attendance'),
   getLeaveRequests: () => api.get('/api/academic/leave-requests'),
+  getAssignments: () => api.get('/api/academic/assignments'),
+  getPYQs: () => api.get('/api/academic/pyqs'),
+  getMarks: () => api.get('/api/academic/marks'),
+  getTeacherAttendance: () => api.get('/api/academic/teacher/attendance'),
+  getTeacherLeaveRequests: () => api.get('/api/academic/teacher/leave-requests'),
+  getTeacherQuestions: () => api.get('/api/academic/teacher/questions'),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -212,12 +231,16 @@ export const academicAPI = {
 // ─────────────────────────────────────────────────────────────────────────────
 export const dashboardAPI = {
   getSummary: () => api.get('/api/dashboard/summary'),
+  getStudyBuddies: () => api.get('/api/dashboard/study-buddies'),
+  getTeacherSummary: () => api.get('/api/dashboard/teacher-summary'),
+  getTeacherStudents: () => api.get('/api/dashboard/teacher-students'),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Career
 // ─────────────────────────────────────────────────────────────────────────────
 export const careerAPI = {
+  getSkills: () => api.get('/api/career/skills'),
   getJobs: () => api.get('/api/career/jobs'),
   getApplications: () => api.get('/api/career/applications'),
   getCertificates: () => api.get('/api/career/certificates'),
@@ -229,8 +252,21 @@ export const careerAPI = {
 export const communityAPI = {
   getBounties: () => api.get('/api/community/bounties'),
   getLeaderboard: () => api.get('/api/community/leaderboard'),
+  getSynapseMatches: () => api.get('/api/community/synapse-matches'),
   getEvents: () => api.get('/api/community/events'),
+  getTeamRequests: () => api.get('/api/community/team-requests'),
+  getClubs: () => api.get('/api/community/clubs'),
+  getAlumni: () => api.get('/api/community/alumni'),
+  getTeacherInbox: () => api.get('/api/community/teacher/inbox'),
+  getTeacherOfficeHours: () => api.get('/api/community/teacher/office-hours'),
+  getTeacherBounties: () => api.get('/api/community/teacher/bounties'),
+  getTeacherMentees: () => api.get('/api/community/teacher/mentees'),
+  
+  sendMessage: (data) => api.post('/api/community/messages', data),
+  bookOfficeHour: (data) => api.post('/api/community/office-hours/book', data),
+  requestMentorship: (data) => api.post('/api/community/mentorships/request', data),
+  createBounty: (data) => api.post('/api/community/bounties', data),
+  endorseBounty: (bountyId) => api.post(`/api/community/bounties/${bountyId}/endorse`)
 };
 
 export default api;
-

@@ -1,17 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   CheckCircle2, XCircle, Clock, Calendar, Search, Filter, UserCheck, ShieldAlert
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { academicAPI } from '../../services/api.service';
 
 // ── Tab: Attendance Operations ─────────────────────────────────────────────
-function AttendanceTab() {
-  const students = [
-    { id: 1, name: 'Alex Chen', roll: '26CS01', status: 'present', attendance: 92 },
-    { id: 2, name: 'Sarah Jenkins', roll: '26CS02', status: 'absent', attendance: 71 },
-    { id: 3, name: 'Michael Chang', roll: '26CS03', status: 'on_duty', attendance: 85 },
-    { id: 4, name: 'Priya Sharma', roll: '26CS04', status: 'present', attendance: 98 },
-  ];
+function AttendanceTab({ students = [], loading = false }) {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '4rem', alignItems: 'start' }}>
@@ -41,7 +36,11 @@ function AttendanceTab() {
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Today's Status</span>
           </div>
 
-          {students.map(student => (
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
+          ) : students.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No students found.</div>
+          ) : students.map(student => (
             <div key={student.id} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 200px', gap: '1rem', alignItems: 'center', padding: '1rem 0', borderBottom: '1px solid var(--surface-2)' }}>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -98,11 +97,7 @@ function AttendanceTab() {
 }
 
 // ── Tab: Approvals ───────────────────────────────────────────────────────
-function ApprovalsTab() {
-  const requests = [
-    { id: 1, student: 'Sarah Jenkins', type: 'On-Duty (Hackathon)', dates: 'Aug 24 - Aug 25', reason: 'Representing the university at TechCrunch Disrupt', docs: 1, status: 'pending' },
-    { id: 2, student: 'Michael Chang', type: 'Medical Leave', dates: 'Aug 20 - Aug 22', reason: 'Viral Fever', docs: 1, status: 'pending' },
-  ];
+function ApprovalsTab({ requests = [], loading = false }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -113,7 +108,11 @@ function ApprovalsTab() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {requests.map(req => (
+        {loading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
+        ) : requests.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No pending requests.</div>
+        ) : requests.map(req => (
           <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem', background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 12 }}>
             
             <div style={{ flex: 1 }}>
@@ -149,6 +148,23 @@ function ApprovalsTab() {
 // ── Main Hub ──────────────────────────────────────────────────────────────
 export default function TeacherAcademicDesk() {
   const [activeTab, setActiveTab] = useState('attendance');
+  const [students, setStudents] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [loadingAtt, setLoadingAtt] = useState(true);
+  const [loadingReq, setLoadingReq] = useState(true);
+
+
+  useEffect(() => {
+    academicAPI.getTeacherAttendance()
+      .then(res => setStudents(res.data))
+      .catch(() => {})
+      .finally(() => setLoadingAtt(false));
+
+    academicAPI.getTeacherLeaveRequests()
+      .then(res => setRequests(res.data))
+      .catch(() => {})
+      .finally(() => setLoadingReq(false));
+  }, []);
 
   return (
     <div style={{ position: 'relative', minHeight: '100%', paddingBottom: '4rem', overflow: 'hidden' }}>
@@ -188,8 +204,8 @@ export default function TeacherAcademicDesk() {
 
         {/* ── Tab Content ── */}
         <div style={{ minHeight: '600px', paddingTop: '1rem' }}>
-          {activeTab === 'attendance' && <AttendanceTab />}
-          {activeTab === 'approvals' && <ApprovalsTab />}
+          {activeTab === 'attendance' && <AttendanceTab students={students} loading={loadingAtt} />}
+          {activeTab === 'approvals' && <ApprovalsTab requests={requests} loading={loadingReq} />}
         </div>
 
       </div>

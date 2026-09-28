@@ -1,6 +1,15 @@
 const imageMap = {
-  react: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&q=80&w=800',
-  node: 'https://images.unsplash.com/photo-1627398242454-45a1465c2479?auto=format&fit=crop&q=80&w=800',
+  // --- High-Quality Local Thumbnails ---
+  'system design': '/thumbnails/course_system_design.jpg',
+  'react': '/thumbnails/course_react_node.jpg',
+  'node': '/thumbnails/course_react_node.jpg',
+  'quantitative aptitude': '/thumbnails/course_quant.jpg',
+  'operating systems': '/thumbnails/course_os.jpg',
+  'data structures': '/thumbnails/course_dsa.jpg',
+  'c++': '/thumbnails/course_dsa.jpg',
+  'computer networks': '/thumbnails/course_networks.jpg',
+  
+  // --- Fallback Unsplash Images ---
   javascript: 'https://images.unsplash.com/photo-1627398242454-45a1465c2479?auto=format&fit=crop&q=80&w=800',
   python: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?auto=format&fit=crop&q=80&w=800',
   data: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=800',

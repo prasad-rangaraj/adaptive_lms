@@ -12,7 +12,11 @@ import PlacementAssessmentModal from './PlacementAssessmentModal';
 
 // Modules state handled internally now
 
-const aiActions = [];
+const aiActions = [
+  { icon: HelpCircle, label: 'Explain this concept', color: '#10b981' },
+  { icon: FileText, label: 'Summarize transcript', color: '#f59e0b' },
+  { icon: Lightbulb, label: 'Generate practice quiz', color: '#8b5cf6' }
+];
 
 export default function StudentLearningCanvas() {
   const { courseId } = useParams();
@@ -52,24 +56,20 @@ export default function StudentLearningCanvas() {
   const [activeItem, setActiveItem] = useState(null); // currently playing material
   const navigate = useNavigate();
 
-  // Dynamically generate mock resources based on the active item
-  const resources = activeItem && !activeItem.isCheckpoint ? [
-    { id: 1, title: `${activeItem.title} - Presentation Slides`, type: 'PDF', size: '2.4 MB' },
-    { id: 2, title: 'Cheat Sheet & Key Terms', type: 'PDF', size: '1.1 MB' },
-    { id: 3, title: 'Practice Exercises & Solutions', type: 'ZIP', size: '5.6 MB' },
-  ] : [
-    { id: 1, title: 'Full Course Syllabus', type: 'PDF', size: '1.2 MB' },
-    { id: 2, title: 'Prerequisites & Setup Guide', type: 'ZIP', size: '14.5 MB' },
-  ];
-
-  // Dynamically generate mock transcript based on the active item
-  const transcript = activeItem && activeItem.type === 'video' ? [
-    { time: '0:00', text: `Welcome to ${activeItem.title}. In this lesson, we're going to dive deep into the core concepts.` },
-    { time: '0:45', text: `Let's start by looking at the fundamental architecture and why it's designed this way.` },
-    { time: '1:30', text: `As you can see on the screen, the data flows from the client to the server through this API layer.` },
-    { time: '2:15', text: `This is a critical pattern that you'll use constantly in your day-to-day development.` },
-    { time: '3:00', text: `Make sure to check the resources tab for the cheat sheet on this specific topic!` },
-  ] : [];
+  const [transcript, setTranscript] = useState([]);
+  
+  useEffect(() => {
+    if (activeItem && !activeItem.isCheckpoint) {
+      coursesAPI.getTranscript(courseId, activeItem.id)
+        .then(res => setTranscript(res.data || []))
+        .catch(err => {
+           console.error(err);
+           setTranscript([]);
+        });
+    } else {
+      setTranscript([]);
+    }
+  }, [activeItem, courseId]);
 
   const [course, setCourse] = useState(null);
   const [modules, setModules] = useState([]);
@@ -390,7 +390,6 @@ export default function StudentLearningCanvas() {
             <div style={{ display: 'flex', borderBottom: '1px solid var(--surface-3)' }}>
               {[
                 { id: 'playlist', label: 'Playlist' },
-                { id: 'resources', label: 'Resources' },
                 { id: 'transcript', label: 'Transcript' }
               ].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, padding: '1.25rem 0 1rem', background: 'transparent', border: 'none', borderBottom: activeTab === t.id ? '2px solid var(--text-primary)' : '2px solid transparent', color: activeTab === t.id ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }}>
@@ -437,23 +436,7 @@ export default function StudentLearningCanvas() {
                 </>
               )}
 
-              {/* RESOURCES */}
-              {activeTab === 'resources' && (
-                <div style={{ padding: '0 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {resources.length > 0 ? resources.map(r => (
-                    <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.875rem 1rem', background: 'var(--surface-1)', border: '1px solid var(--surface-3)', borderRadius: 12 }}>
-                      <BookOpen size={16} color="var(--brand-500)" style={{ flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <h4 style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</h4>
-                        <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{r.type} · {r.size}</p>
-                      </div>
-                      <button style={{ background: 'transparent', border: 'none', color: 'var(--brand-500)', cursor: 'pointer', display: 'flex' }}><Download size={14} /></button>
-                    </div>
-                  )) : (
-                    <p style={{textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem', padding: '2rem'}}>No resources available.</p>
-                  )}
-                </div>
-              )}
+
 
               {/* TRANSCRIPT */}
               {activeTab === 'transcript' && (
@@ -465,7 +448,6 @@ export default function StudentLearningCanvas() {
                   <div style={{ flex: 1, overflowY: 'auto', padding: '0 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }} className="hide-scrollbar">
                     {transcript.length > 0 ? transcript.map((t, i) => (
                       <div key={i} style={{ display: 'flex', gap: '1rem', cursor: 'pointer' }} onMouseEnter={e => e.currentTarget.style.opacity = 0.7} onMouseLeave={e => e.currentTarget.style.opacity = 1}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-500)', flexShrink: 0 }}>{t.time}</span>
                         <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{t.text}</p>
                       </div>
                     )) : (

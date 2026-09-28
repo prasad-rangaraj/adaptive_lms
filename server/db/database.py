@@ -4,10 +4,9 @@ from core.config import settings
 
 
 engine = create_engine(
-    settings.DATABASE_URL,
+    "sqlite:///./lms.db",
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    # SQLite does not support pool_size and max_overflow natively like postgres without configuring poolclass
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -28,6 +27,4 @@ def get_db():
 
 def create_extensions():
     """Enable pgvector extension in PostgreSQL on startup."""
-    with engine.connect() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        conn.commit()
+    pass

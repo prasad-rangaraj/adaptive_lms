@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
-import { coursesAPI, assignmentsAPI } from '../../services/api.service';
+import { coursesAPI, assignmentsAPI, proctoringAPI } from '../../services/api.service';
 
 // ── Tab: Grading (Editorial Reading Style) ────────────────────────────────
 function GradingTab({ courses }) {
@@ -155,10 +155,15 @@ function GradingTab({ courses }) {
 
 // ── Tab: Proctoring (Organic Risk Profile) ────────────────────────────────
 function ProctoringTab() {
-  const flags = [
-    { id: 1, student: 'Michael Chang', course: 'Machine Learning Midterm', risk: 'High', type: 'Multiple Faces Detected', time: '10:42 AM', duration: '45s', color: '#ef4444' },
-    { id: 2, student: 'Alex Chen', course: 'Data Structures Final', risk: 'Medium', type: 'Audio Anomaly (Talking)', time: '11:15 AM', duration: '12s', color: '#f59e0b' },
-  ];
+  const [flags, setFlags] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    proctoringAPI.getRecentFlags()
+      .then(res => setFlags(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4rem' }}>
@@ -183,7 +188,11 @@ function ProctoringTab() {
         
         {/* Organic List (No Table) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {flags.map((flag) => (
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
+          ) : flags.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No recent flags detected.</div>
+          ) : flags.map((flag) => (
             <div key={flag.id} style={{ display: 'flex', alignItems: 'center', gap: '2rem', paddingBottom: '2rem', borderBottom: '1px solid var(--surface-3)' }}>
               
               {/* Organic Risk Indicator */}

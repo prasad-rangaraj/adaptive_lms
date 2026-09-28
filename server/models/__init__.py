@@ -14,5 +14,7 @@ from models.audit_log import AuditLog  # noqa: F401
 from models.live_session import LiveSession  # noqa: F401
 from models.academic import TimetableEvent, AttendanceRecord, LeaveRequest  # noqa: F401
 from models.career import JobListing, JobApplication, Certificate  # noqa: F401
-from models.community import Bounty, LeaderboardEntry, Event  # noqa: F401
-
+from models.community import Bounty, LeaderboardEntry, Event, TeamRequest, Club, Alumni  # noqa: F401
+from models.ai_tutor_session import AITutorSession  # noqa: F401
+from models.organization import TenantAISettings, BroadcastMessage  # noqa: F401
+from models.system import SupportTicket  # noqa: F401

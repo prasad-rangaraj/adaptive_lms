@@ -8,11 +8,11 @@ import {
 // ─────────────────────────────────────────────────────────────
 // Data
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Data is now fetched dynamically
+// ─────────────────────────────────────────────────────────────
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const periods = ['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '2:00 PM', '3:00 PM'];
-const assignments = [];
-const pyqs = [];
-const marks = [];
 
 
 
@@ -234,8 +234,18 @@ function AttendanceTab() {
 // Tab: Coursework & PYQs
 // ─────────────────────────────────────────────────────────────
 function CourseworkTab() {
+  const { data: assignments = [] } = useQuery({
+    queryKey: ['academicAssignments'],
+    queryFn: () => academicAPI.getAssignments().then(res => res.data)
+  });
+  
+  const { data: pyqs = [] } = useQuery({
+    queryKey: ['academicPyqs'],
+    queryFn: () => academicAPI.getPyqs().then(res => res.data)
+  });
+
   const pending = assignments.filter(a => !a.submitted);
-  const done    = assignments.filter(a =>  a.submitted);
+  const done = assignments.filter(a => a.submitted);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '3rem', alignItems: 'start' }}>
@@ -326,12 +336,22 @@ function CourseworkTab() {
 // Tab: Marks & CGPA
 // ─────────────────────────────────────────────────────────────
 function MarksTab() {
+  const { data: marks = [] } = useQuery({
+    queryKey: ['academicMarks'],
+    queryFn: () => academicAPI.getMarks().then(res => res.data)
+  });
+
   const [targetMarks, setTargetMarks] = useState(60);
   
   // CGPA Forecaster State
-  const [expectedGrades, setExpectedGrades] = useState(
-    marks.reduce((acc, m) => ({ ...acc, [m.subject]: 'A' }), {})
-  );
+  const [expectedGrades, setExpectedGrades] = useState({});
+
+  // Sync expected grades when marks fetch
+  useEffect(() => {
+    if (marks.length && Object.keys(expectedGrades).length === 0) {
+      setExpectedGrades(marks.reduce((acc, m) => ({ ...acc, [m.subject]: 'A' }), {}));
+    }
+  }, [marks, expectedGrades]);
 
   const calculatePredictedSGPA = () => {
     let totalCredits = 0;

@@ -37,7 +37,6 @@ const quickPrompts = [
   { label: 'Summarize', icon: FileText, prompt: 'Summarize the key points from the course materials.', color: '#0891b2' },
 ];
 
-const historySessions = [];
 
 const personas = [
   { id: 'tutor', label: 'Tutor Mode', icon: Sparkles },
@@ -94,6 +93,15 @@ export default function AiTutorPage() {
     }
   });
 
+  const { data: historyData } = useQuery({
+    queryKey: ['aiTutorHistory'],
+    queryFn: async () => {
+      const res = await aiTutorAPI.getHistory();
+      return res.data;
+    }
+  });
+
+  const historySessions = historyData || [];
   const enrolledCourses = data?.enrolled || [];
 
   useEffect(() => {

@@ -1,15 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Sparkles, FileText, Upload, Plus, GripVertical, Settings, PlayCircle, ShieldCheck
 } from 'lucide-react';
 
+import { academicAPI } from '../../services/api.service';
+
 // ── Tab: Question Bank ────────────────────────────────────────────────────
 function QuestionBankTab() {
-  const [questions, setQuestions] = useState([
-    { id: 1, text: 'What is the primary function of a Convolutional Layer?', type: 'Multiple Choice', difficulty: 'Easy', tags: ['CNN', 'Basics'] },
-    { id: 2, text: 'Explain the vanishing gradient problem and how LSTMs solve it.', type: 'Subjective', difficulty: 'Hard', tags: ['RNN', 'LSTM'] },
-    { id: 3, text: 'Which activation function is most commonly used in hidden layers?', type: 'Multiple Choice', difficulty: 'Medium', tags: ['Activation'] },
-  ]);
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    academicAPI.getTeacherQuestions()
+      .then(res => setQuestions(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '4rem', alignItems: 'start' }}>
@@ -27,7 +33,11 @@ function QuestionBankTab() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {questions.map(q => (
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading questions...</div>
+          ) : questions.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No questions available. Generate or add some.</div>
+          ) : questions.map(q => (
             <div key={q.id} style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 16, padding: '1.5rem', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
               <div style={{ padding: '0.5rem', cursor: 'grab' }}>
                 <GripVertical size={16} color="var(--surface-4)" />
@@ -37,7 +47,7 @@ function QuestionBankTab() {
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-700)', background: 'var(--brand-50)', padding: '4px 10px', borderRadius: 8 }}>{q.type}</span>
                   <span style={{ fontSize: '0.75rem', fontWeight: 800, color: q.difficulty === 'Easy' ? '#10b981' : q.difficulty === 'Medium' ? '#f59e0b' : '#ef4444' }}>{q.difficulty}</span>
-                  {q.tags.map(t => (
+                  {q.tags?.map(t => (
                     <span key={t} style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--surface-2)', padding: '4px 8px', borderRadius: 6 }}>{t}</span>
                   ))}
                 </div>

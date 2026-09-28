@@ -32,15 +32,18 @@ export default function StudentOnboarding() {
   const handleFinish = () => {
     setAnalyzing(true);
     
-    // Simulate mapping answers to cognitive metrics
+    const answersText = baselineQuiz.map((q, idx) => ({
+      question: q.q,
+      answer: q.options[quizAnswers[idx]]
+    }));
+
     const performanceData = {
-      course_id: 0,
-      score_percent: 85,
-      time_spent_seconds: 120,
+      event: "Initial Baseline Onboarding",
       completion_status: 'completed',
       interactions: {
-        goal: selectedGoal,
-        style: selectedStyle,
+        goal: goals.find(g => g.id === selectedGoal)?.title,
+        style: styles.find(s => s.id === selectedStyle)?.title,
+        quiz_answers: answersText
       }
     };
 
@@ -186,7 +189,7 @@ export default function StudentOnboarding() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <button onClick={() => setStep(2)} style={{ background: 'transparent', color: 'var(--text-secondary)', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Back</button>
-                <button disabled={Object.keys(quizAnswers).length < 3} onClick={handleFinish} style={{ background: '#10b981', color: 'white', border: 'none', padding: '12px 28px', borderRadius: 999, fontSize: '0.9375rem', fontWeight: 800, cursor: Object.keys(quizAnswers).length === 3 ? 'pointer' : 'not-allowed', opacity: Object.keys(quizAnswers).length === 3 ? 1 : 0.5, display: 'flex', alignItems: 'center', gap: 8, boxShadow: Object.keys(quizAnswers).length === 3 ? '0 4px 14px rgba(16,185,129,0.35)' : 'none' }}>
+                <button disabled={Object.keys(quizAnswers).length < baselineQuiz.length} onClick={handleFinish} style={{ background: '#10b981', color: 'white', border: 'none', padding: '12px 28px', borderRadius: 999, fontSize: '0.9375rem', fontWeight: 800, cursor: Object.keys(quizAnswers).length === baselineQuiz.length ? 'pointer' : 'not-allowed', opacity: Object.keys(quizAnswers).length === baselineQuiz.length ? 1 : 0.5, display: 'flex', alignItems: 'center', gap: 8, boxShadow: Object.keys(quizAnswers).length === baselineQuiz.length ? '0 4px 14px rgba(16,185,129,0.35)' : 'none' }}>
                   Generate Profile <ChevronRight size={16} />
                 </button>
               </div>

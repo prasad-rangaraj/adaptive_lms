@@ -8,14 +8,9 @@ import {
 // ─────────────────────────────────────────────────────────────
 // Data
 // ─────────────────────────────────────────────────────────────
-const skillNodes = [
-  { id: 'python', name: 'Python Core', status: 'mastered', score: 95 },
-  { id: 'sql', name: 'Database & SQL', status: 'mastered', score: 88 },
-  { id: 'api', name: 'REST APIs', status: 'in-progress', score: 45 },
-  { id: 'sysdesign', name: 'System Design', status: 'locked', score: 0 },
-  { id: 'cloud', name: 'Cloud Deploy', status: 'locked', score: 0 },
-];
-
+// ─────────────────────────────────────────────────────────────
+// Data is fetched dynamically from the backend
+// ─────────────────────────────────────────────────────────────
 import { careerAPI } from '../../services/api.service';
 import { getTopicImage } from '../../utils/imageUtils';
 import { useEffect } from 'react';
@@ -169,6 +164,11 @@ function PipelineTab() {
 // Tab: Adaptive Skill Tree
 // ─────────────────────────────────────────────────────────────
 function SkillTreeTab() {
+  const { data: skillNodes = [] } = useQuery({
+    queryKey: ['careerSkills'],
+    queryFn: () => careerAPI.getSkills().then(res => res.data)
+  });
+  
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       

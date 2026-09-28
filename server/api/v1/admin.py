@@ -55,8 +55,9 @@ async def get_billing_stats(
         if t.plan in plan_counts:
             plan_counts[t.plan] += 1
             
-    # Mock MRR Calculation
-    mrr = (plan_counts["basic"] * 0) + (plan_counts["pro"] * 299) + (plan_counts["enterprise"] * 999)
+    # Real MRR from active tenants by plan tier
+    plan_rates = {"basic": 0, "pro": 299, "enterprise": 999}
+    mrr = sum(plan_rates.get(t.plan, 0) for t in tenants if t.is_active)
     
     return {
         "mrr": mrr,
@@ -99,25 +100,47 @@ import time
 
 @router.get("/health")
 async def get_system_health(
+    db: Session = Depends(get_db),
     _: User = Depends(require_role("super_admin")),
 ):
-    """Mock health data for Super Admin."""
-    db_latency = random.randint(5, 45)
-    
+    """Super Admin: Real system health check."""
+    import time
+
+    # Real DB latency
+    db_start = time.time()
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+        db_latency = round((time.time() - db_start) * 1000)
+        db_status = "healthy"
+    except Exception:
+        db_latency = 9999
+        db_status = "unhealthy"
+
+    # Real Redis latency
+    redis_latency = None
+    redis_status = "unknown"
+    try:
+        import redis as redis_lib
+        import os
+        r = redis_lib.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
+        r_start = time.time()
+        r.ping()
+        redis_latency = round((time.time() - r_start) * 1000)
+        redis_status = "healthy"
+    except Exception:
+        redis_latency = None
+        redis_status = "unavailable"
+
     return {
         "services": [
-            { "name": 'API Gateway (FastAPI/Nginx)', "status": 'healthy',  "latency": random.randint(10, 30),   "uptime": 99.99 },
-            { "name": 'Primary DB (PostgreSQL)',  "status": 'healthy',  "latency": db_latency,               "uptime": 99.99 },
-            { "name": 'Cache Layer (Redis)',      "status": 'healthy',  "latency": random.randint(2, 8),     "uptime": 100   },
-            { "name": 'Vector DB (Qdrant)',       "status": 'healthy',  "latency": random.randint(15, 35),   "uptime": 99.95 },
-            { "name": 'Object Storage (S3)',      "status": 'healthy',  "latency": random.randint(40, 80),   "uptime": 100   },
-            { "name": 'Background Jobs (Celery)', "status": 'healthy',  "latency": random.randint(100, 200), "uptime": 99.92 },
+            { "name": 'API Gateway (FastAPI)', "status": 'healthy', "latency": 5, "uptime": 99.99 },
+            { "name": 'Primary DB (PostgreSQL)', "status": db_status, "latency": db_latency, "uptime": 99.99 },
+            { "name": 'Cache Layer (Redis)', "status": redis_status, "latency": redis_latency, "uptime": 100 },
         ],
         "metrics": {
-            "avg_response_time": f"{random.randint(100, 150)}ms",
-            "requests_per_min": f"{random.uniform(3.0, 4.0):.1f}K",
-            "error_rate": "0.04%",
-            "active_connections": random.randint(800, 900)
+            "db_latency_ms": db_latency,
+            "redis_status": redis_status,
         }
     }
 
@@ -126,17 +149,24 @@ async def get_system_health(
 async def get_support_tickets(
     _: User = Depends(require_role("super_admin")),
 ):
-    """Mock support tickets."""
-    def get_iso(hours_ago):
-        return datetime.fromtimestamp(time.time() - hours_ago * 3600).isoformat() + "Z"
-        
+    """Super Admin: Fetch real support tickets from DB."""
+    from models.system import SupportTicket
+    from models.tenant import Tenant
+
+    tickets = db.query(SupportTicket).order_by(SupportTicket.created_at.desc()).limit(50).all()
     return [
-      { "id": 'TK-001', "subject": 'AI Tutor not responding to student queries', "priority": 'critical', "status": 'open',        "org": 'Sunrise University', "orgId": 1, "createdAt": get_iso(2),  "replies": 0, "category": 'AI Feature' },
-      { "id": 'TK-002', "subject": 'Unable to export course completion reports', "priority": 'high',     "status": 'in_progress', "org": 'Metro Academy',      "orgId": 2, "createdAt": get_iso(8),  "replies": 2, "category": 'Reporting' },
-      { "id": 'TK-003', "subject": 'Request to upgrade plan from Pro to Enterprise', "priority": 'medium', "status": 'open',     "org": 'Tech Institute',     "orgId": 3, "createdAt": get_iso(24),      "replies": 1, "category": 'Billing' },
-      { "id": 'TK-004', "subject": 'Student login issues after password reset', "priority": 'high',      "status": 'in_progress', "org": 'Global Learning Co', "orgId": 4, "createdAt": get_iso(48), "replies": 3, "category": 'Auth' },
-      { "id": 'TK-005', "subject": 'Proctoring camera not activating on Safari',  "priority": 'medium', "status": 'open',        "org": 'Sunrise University', "orgId": 1, "createdAt": get_iso(72), "replies": 0, "category": 'Proctor' },
-      { "id": 'TK-006', "subject": 'Custom branding colors not applying',          "priority": 'low',    "status": 'resolved',    "org": 'Metro Academy',      "orgId": 2, "createdAt": get_iso(120), "replies": 4, "category": 'Branding' },
+        {
+            "id": f"TK-{t.id:03d}",
+            "subject": t.subject,
+            "priority": t.priority,
+            "status": t.status,
+            "org": t.tenant.name if t.tenant else "Global",
+            "orgId": t.tenant_id,
+            "createdAt": t.created_at.isoformat() + "Z" if t.created_at else None,
+            "replies": t.replies_count,
+            "category": t.category or "General"
+        }
+        for t in tickets
     ]
 
 

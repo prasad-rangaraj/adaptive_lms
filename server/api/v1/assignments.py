@@ -35,9 +35,11 @@ async def submit_assignment(
     Uploads to S3 and dispatches a Celery task for AI evaluation
     (OCR → Grammar → Plagiarism → AI Detection → Rubric Grading).
     """
-    assignment = db.query(Assignment).filter(
+    from models.course import Course
+    assignment = db.query(Assignment).join(Course, Course.id == Assignment.course_id).filter(
         Assignment.id == assignment_id,
         Assignment.is_published == True,
+        Course.tenant_id == current_user.tenant_id
     ).first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -77,9 +79,15 @@ async def get_submission_result(
     current_user: User = Depends(get_current_user),
 ):
     """Retrieve AI evaluation results for a submission."""
-    submission = db.query(AssignmentSubmission).filter(
+    from models.course import Course
+    submission = db.query(AssignmentSubmission).join(
+        Assignment, Assignment.id == AssignmentSubmission.assignment_id
+    ).join(
+        Course, Course.id == Assignment.course_id
+    ).filter(
         AssignmentSubmission.id == submission_id,
         AssignmentSubmission.student_id == current_user.id,
+        Course.tenant_id == current_user.tenant_id
     ).first()
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
@@ -102,9 +110,24 @@ async def get_all_submissions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user), # should require teacher role
 ):
-    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    from models.course import Course
+    from core.security import require_role
+    
+    # Check if user is a teacher or tenant admin
+    if current_user.role not in ["teacher", "tenant_admin"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    assignment = db.query(Assignment).join(Course, Course.id == Assignment.course_id).filter(
+        Assignment.id == assignment_id,
+        Course.tenant_id == current_user.tenant_id,
+    ).first()
+    
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+        
+    # Teachers can only view submissions for their own courses
+    if current_user.role == "teacher" and assignment.course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized for this course")
         
     return db.query(AssignmentSubmission).filter(AssignmentSubmission.assignment_id == assignment_id).all()
 
@@ -121,12 +144,26 @@ async def grade_submission(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    submission = db.query(AssignmentSubmission).filter(
+    from models.course import Course
+    
+    if current_user.role not in ["teacher", "tenant_admin"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    submission = db.query(AssignmentSubmission).join(
+        Assignment, Assignment.id == AssignmentSubmission.assignment_id
+    ).join(
+        Course, Course.id == Assignment.course_id
+    ).filter(
         AssignmentSubmission.id == submission_id,
-        AssignmentSubmission.assignment_id == assignment_id
+        AssignmentSubmission.assignment_id == assignment_id,
+        Course.tenant_id == current_user.tenant_id
     ).first()
+    
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
+        
+    if current_user.role == "teacher" and submission.assignment.course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to grade this course")
         
     submission.final_score = payload.final_score
     submission.teacher_feedback = payload.teacher_feedback

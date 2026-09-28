@@ -117,3 +117,37 @@ Please generate the updated cognitive profile JSON."""
     except Exception as e:
         print(f"Error parsing AI response for cognitive profile: {e}")
         return profile, []
+
+def generate_daily_trivia(profile: CognitiveProfile) -> dict:
+    system_prompt = """You are an AI generating a daily trivia question for a computer science / software engineering student.
+Output a JSON object exactly like this:
+{
+  "question": "The question text",
+  "options": ["Opt1", "Opt2", "Opt3", "Opt4"],
+  "correctIdx": 1
+}
+Make it moderately challenging and ensure there are exactly 4 options. correctIdx is 0-indexed."""
+
+    user_prompt = f"Generate a trivia question for a student on the '{profile.learning_track}' track."
+    if profile.weak_areas:
+        user_prompt += f" Focus on one of their weak areas: {', '.join(profile.weak_areas)}."
+        
+    response = openai_client.chat.completions.create(
+        model=settings.CHAT_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.7,
+    )
+    
+    try:
+        return json.loads(response.choices[0].message.content)
+    except Exception as e:
+        print(f"Trivia error: {e}")
+        return {
+            "question": "Which HTTP method is typically used to update an existing resource entirely?",
+            "options": ["POST", "PUT", "PATCH", "GET"],
+            "correctIdx": 1
+        }

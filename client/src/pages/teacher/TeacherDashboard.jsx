@@ -6,7 +6,8 @@ import {
   Brain, Activity, Radio, BookOpen, FileText, Users, Clock,
   Loader2, Plus, Zap, TrendingUp, ShieldAlert
 } from 'lucide-react';
-import { coursesAPI, liveAPI, assignmentsAPI } from '../../services/api.service';
+import { coursesAPI, liveAPI, dashboardAPI } from '../../services/api.service';
+import { getTopicImage } from '../../utils/imageUtils';
 
 /* ── Time-aware greeting ──────────────────────────────────────────────────── */
 function greeting() {
@@ -34,12 +35,6 @@ const COURSE_IMGS = [
   'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=800&q=80',
 ];
 
-const batchSkills = [
-  { topic: 'Database Normalization', mastery: 35, recommendation: 'Schedule Remedial Class' },
-  { topic: 'REST APIs',              mastery: 85, recommendation: 'Proceed to Next Unit' },
-  { topic: 'Graph Algorithms',       mastery: 55, recommendation: 'Assign Additional Practice' },
-  { topic: 'System Design',          mastery: 20, recommendation: 'Urgent Review Required' },
-];
 
 export default function TeacherDashboard() {
   const { user } = useAuthStore();
@@ -49,8 +44,11 @@ export default function TeacherDashboard() {
   /* ── Real data ── */
   const [courses, setCourses]         = useState([]);
   const [liveSessions, setLiveSessions] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [studentsData, setStudentsData] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [loadingLive, setLoadingLive]   = useState(true);
+  const [loadingSummary, setLoadingSummary] = useState(true);
 
   /* ── Derived stats ── */
   const totalStudents  = courses.reduce((s, c) => s + (c.student_count || 0), 0);
@@ -69,10 +67,19 @@ export default function TeacherDashboard() {
       .then(r => setLiveSessions(r.data))
       .catch(() => {})
       .finally(() => setLoadingLive(false));
+
+    dashboardAPI.getTeacherSummary()
+      .then(r => setSummary(r.data))
+      .catch(() => {})
+      .finally(() => setLoadingSummary(false));
+
+    dashboardAPI.getTeacherStudents()
+      .then(r => setStudentsData(r.data))
+      .catch(() => {});
   }, []);
 
-  /* ── Quick Action Feed items (static but navigable) ── */
-  const feedItems = [
+  /* ── Quick Action Feed items (fallback if no dynamic items) ── */
+  const fallbackFeedItems = [
     liveNow > 0 && {
       dot: '#dc2626',
       tag: 'LIVE NOW',
@@ -124,6 +131,8 @@ export default function TeacherDashboard() {
       route: '/teacher/assessment',
     },
   ].filter(Boolean);
+
+  const finalFeedItems = (summary?.feedItems || []).length > 0 ? summary.feedItems : fallbackFeedItems;
 
   return (
     <div style={{ position: 'relative', minHeight: '100%', paddingBottom: '4rem', overflow: 'hidden' }}>
@@ -241,7 +250,7 @@ export default function TeacherDashboard() {
                 <div style={{ display: 'flex', gap: '2rem', overflowX: 'auto', paddingBottom: '1rem', marginLeft: '-2.5rem', marginRight: '-2.5rem', paddingLeft: '2.5rem', paddingRight: '2.5rem' }} className="hide-scrollbar">
                   {courses.map((course, i) => {
                     const palette = COURSE_COLORS[i % COURSE_COLORS.length];
-                    const img = COURSE_IMGS[i % COURSE_IMGS.length];
+                    const img = getTopicImage(course.title);
                     return (
                       <div key={course.id} style={{ minWidth: '380px', flexShrink: 0, cursor: 'pointer' }} onClick={() => navigate('/teacher/studio')}>
                         <div style={{ width: '100%', height: '260px', borderRadius: '28px 28px 8px 28px', overflow: 'hidden', position: 'relative' }}>
@@ -313,20 +322,23 @@ export default function TeacherDashboard() {
                 <div style={{ position: 'absolute', top: 0, bottom: 0, left: '7px', width: '2px', background: 'linear-gradient(to bottom, var(--surface-3) 0%, transparent 100%)' }} />
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-                  {feedItems.map((item, i) => (
+                  {finalFeedItems.map((item, i) => (
                     <div key={i} style={{ position: 'relative' }}>
-                      <div style={{ position: 'absolute', left: '-2rem', width: 16, height: 16, borderRadius: '50%', background: item.dot, border: '3px solid var(--surface-1)' }} />
+                      <div style={{ position: 'absolute', left: '-2rem', width: 16, height: 16, borderRadius: '50%', background: item.dot || (item.type === 'alert' ? '#ef4444' : item.type === 'success' ? '#10b981' : '#f59e0b'), border: '3px solid var(--surface-1)' }} />
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                        <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: item.tagColor, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{item.tag}</span>
+                        <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: item.tagColor || (item.type === 'alert' ? '#ef4444' : item.type === 'success' ? '#10b981' : '#f59e0b'), textTransform: 'uppercase', letterSpacing: '0.07em' }}>{item.tag || item.type}</span>
+                        {item.time && <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{item.time}</span>}
                       </div>
                       <h4 style={{ fontSize: '1.0625rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>{item.title}</h4>
-                      <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '0.75rem' }}>{item.body}</p>
-                      <button
-                        style={{ background: 'transparent', border: 'none', color: item.ctaColor, fontSize: '0.8125rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', padding: 0 }}
-                        onClick={() => navigate(item.route)}
-                      >
-                        {item.cta} <ArrowUpRight size={14} />
-                      </button>
+                      <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '0.75rem' }}>{item.body || item.desc}</p>
+                      {item.cta && (
+                        <button
+                          style={{ background: 'transparent', border: 'none', color: item.ctaColor || 'var(--brand-500)', fontSize: '0.8125rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', padding: 0 }}
+                          onClick={() => item.route ? navigate(item.route) : null}
+                        >
+                          {item.cta} <ArrowUpRight size={14} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -366,22 +378,23 @@ export default function TeacherDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {batchSkills.map(skill => {
-                      const color = skill.mastery < 40 ? '#ef4444' : skill.mastery < 70 ? '#f59e0b' : '#10b981';
+                    {(summary?.batchSkills || []).map(skill => {
+                      const color = skill.level < 40 ? '#ef4444' : skill.level < 70 ? '#f59e0b' : '#10b981';
+                      const recommendation = skill.level < 40 ? 'Urgent Review' : skill.level < 70 ? 'Assign Practice' : 'Proceed';
                       return (
-                        <tr key={skill.topic} style={{ borderBottom: '1px solid var(--surface-2)' }}>
-                          <td style={{ padding: '1rem', fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)' }}>{skill.topic}</td>
+                        <tr key={skill.name} style={{ borderBottom: '1px solid var(--surface-2)' }}>
+                          <td style={{ padding: '1rem', fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)' }}>{skill.name}</td>
                           <td style={{ padding: '1rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              <span style={{ fontSize: '0.875rem', fontWeight: 900, color, width: 36 }}>{skill.mastery}%</span>
+                              <span style={{ fontSize: '0.875rem', fontWeight: 900, color, width: 36 }}>{skill.level}%</span>
                               <div style={{ width: 100, height: 6, background: 'var(--surface-2)', borderRadius: 999 }}>
-                                <div style={{ width: `${skill.mastery}%`, height: '100%', background: color, borderRadius: 999, transition: 'width 0.8s ease' }} />
+                                <div style={{ width: `${skill.level}%`, height: '100%', background: color, borderRadius: 999, transition: 'width 0.8s ease' }} />
                               </div>
                             </div>
                           </td>
                           <td style={{ padding: '1rem' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: skill.mastery < 40 ? '#ef4444' : 'var(--text-secondary)', background: skill.mastery < 40 ? '#fef2f2' : 'var(--surface-1)', padding: '4px 10px', borderRadius: 8 }}>
-                              {skill.recommendation}
+                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: skill.level < 40 ? '#ef4444' : 'var(--text-secondary)', background: skill.level < 40 ? '#fef2f2' : 'var(--surface-1)', padding: '4px 10px', borderRadius: 8 }}>
+                              {recommendation}
                             </span>
                           </td>
                         </tr>
@@ -394,9 +407,9 @@ export default function TeacherDashboard() {
               {/* Trend Summary Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginTop: '2rem' }}>
                 {[
-                  { label: 'Avg Mastery', value: `${Math.round(batchSkills.reduce((s, k) => s + k.mastery, 0) / batchSkills.length)}%`, icon: TrendingUp, color: '#0891b2' },
-                  { label: 'Struggling Topics', value: batchSkills.filter(k => k.mastery < 40).length, icon: ShieldAlert, color: '#ef4444' },
-                  { label: 'Ready to Advance', value: batchSkills.filter(k => k.mastery >= 80).length, icon: CheckCircle2, color: '#10b981' },
+                  { label: 'Avg Mastery', value: summary?.batchSkills?.length ? `${Math.round(summary.batchSkills.reduce((s, k) => s + k.level, 0) / summary.batchSkills.length)}%` : '0%', icon: TrendingUp, color: '#0891b2' },
+                  { label: 'Struggling Topics', value: summary?.batchSkills?.filter(k => k.level < 40).length || 0, icon: ShieldAlert, color: '#ef4444' },
+                  { label: 'Ready to Advance', value: summary?.batchSkills?.filter(k => k.level >= 80).length || 0, icon: CheckCircle2, color: '#10b981' },
                 ].map(stat => (
                   <div key={stat.label} style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 16, padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <stat.icon size={20} color={stat.color} />
@@ -418,13 +431,13 @@ export default function TeacherDashboard() {
                   AI identified students whose performance dropped significantly in the last 2 weeks.
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {['Rahul M.', 'Priya S.', 'Arun K.', 'Meena T.'].map(student => (
-                    <div key={student} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '0.75rem 1rem', borderRadius: 12, border: '1px solid #fca5a5' }}>
+                  {studentsData.map(student => (
+                    <div key={student.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '0.75rem 1rem', borderRadius: 12, border: '1px solid #fca5a5' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#fecaca', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.875rem', color: '#991b1b' }}>
-                          {student.charAt(0)}
+                          {student.name.charAt(0)}
                         </div>
-                        <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#7f1d1d' }}>{student}</span>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#7f1d1d' }}>{student.name}</span>
                       </div>
                       <button
                         onClick={() => navigate('/teacher/inbox')}

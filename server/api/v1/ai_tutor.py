@@ -6,6 +6,7 @@ from core.security import get_current_user
 from core.config import settings
 from models.user import User
 from models.vector_embedding import VectorEmbedding
+from models.ai_tutor_session import AITutorSession
 from schemas.schemas import AiTutorMessageRequest, AiTutorMessageResponse
 import json
 
@@ -71,6 +72,23 @@ def retrieve_context(
         .all()
     )
     return [r.text_chunk for r in results]
+
+@router.get("/history")
+async def get_chat_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    sessions = db.query(AITutorSession).filter(AITutorSession.user_id == current_user.id).order_by(AITutorSession.created_at.desc()).limit(20).all()
+    
+    return [
+        {
+            "id": s.id,
+            "title": s.title,
+            "context": s.context or "General Topic",
+            "time": s.created_at.strftime("%I:%M %p") if s.created_at else "",
+            "persona": s.persona
+        } for s in sessions
+    ]
 
 
 @router.post("/ask", response_model=AiTutorMessageResponse)
@@ -156,7 +174,7 @@ async def generate_quiz(
     """Auto-generate quiz questions using GPT-4o on a given topic."""
     prompt = f"""Generate {num_questions} multiple choice quiz questions about "{topic}".
 Difficulty: {difficulty}.
-Return as JSON array: [{{"question": "...", "options": ["A", "B", "C", "D"], "answer": "A", "explanation": "..."}}]"""
+Return as JSON object: {{"quiz": [{{"question": "...", "options": ["A", "B", "C", "D"], "answer": "A", "explanation": "..."}}]}}"""
 
     response = openai_client.chat.completions.create(
         model=settings.CHAT_MODEL,

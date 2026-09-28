@@ -1,14 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   CheckCircle2, Target, HeartHandshake, Users, ArrowUpRight, MessageSquare, ShieldCheck
 } from 'lucide-react';
+import { communityAPI } from '../../services/api.service';
 
 // ── Tab: Bounty Board Moderation ──────────────────────────────────────────
 function BountyTab() {
-  const bounties = [
-    { id: 1, title: 'How does Backpropagation actually update weights in a CNN?', student: 'Alex Chen', bounty: 50, tags: ['Machine Learning', 'CNN'], answers: 3, status: 'Needs Endorsement' },
-    { id: 2, title: 'I am getting O(N^2) instead of O(N log N) on Merge Sort', student: 'Sarah Jenkins', bounty: 20, tags: ['Algorithms', 'Python'], answers: 1, status: 'Needs Endorsement' },
-  ];
+  const [bounties, setBounties] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    communityAPI.getTeacherBounties()
+      .then(res => setBounties(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '4rem', alignItems: 'start' }}>
@@ -21,7 +27,11 @@ function BountyTab() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {bounties.map(bounty => (
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
+          ) : bounties.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No bounties available.</div>
+          ) : bounties.map(bounty => (
             <div key={bounty.id} style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 16, padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -84,10 +94,15 @@ function BountyTab() {
 
 // ── Tab: Mentorship ───────────────────────────────────────────────────────
 function MentorshipTab() {
-  const mentees = [
-    { id: 1, name: 'David Kim', goal: 'Backend Engineering', progress: 65, nextMeeting: 'Tomorrow, 2 PM' },
-    { id: 2, name: 'Sarah Jenkins', goal: 'Data Science', progress: 40, nextMeeting: 'Aug 25, 10 AM' },
-  ];
+  const [mentees, setMentees] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    communityAPI.getTeacherMentees()
+      .then(res => setMentees(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '3rem', alignItems: 'start' }}>
@@ -99,8 +114,12 @@ function MentorshipTab() {
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Track their career goals and schedule 1-on-1 sessions.</p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {mentees.map(mentee => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
+          ) : mentees.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No assigned mentees.</div>
+          ) : mentees.map(mentee => (
             <div key={mentee.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 12, padding: '1.25rem' }}>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

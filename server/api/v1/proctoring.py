@@ -4,7 +4,8 @@ from db.database import get_db
 from core.security import decode_token, require_role
 from models.user import User
 from models.proctor_log import ProctorLog
-from models.exam import ExamAttempt
+from models.exam import ExamAttempt, Exam
+from models.course import Course
 from schemas.schemas import ProctoringViolationEvent
 import json
 import base64
@@ -112,6 +113,21 @@ async def student_proctor_ws(
     payload = decode_token(token)
     user_id = int(payload["sub"])
 
+    # Verify exam belongs to student's tenant
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        await websocket.close(code=4001)
+        return
+        
+    exam = db.query(Exam).join(Course, Course.id == Exam.course_id).filter(
+        Exam.id == exam_id,
+        Course.tenant_id == user.tenant_id
+    ).first()
+    
+    if not exam:
+        await websocket.close(code=4003)
+        return
+
     await manager.connect_student(exam_id, user_id, websocket)
 
     # Get or create exam attempt
@@ -185,6 +201,16 @@ async def get_proctor_report(
     current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
 ):
     """Generate a full proctoring violation report for a given exam."""
+    from models.course import Course
+    
+    exam = db.query(Exam).join(Course, Course.id == Exam.course_id).filter(
+        Exam.id == exam_id,
+        Course.tenant_id == current_user.tenant_id
+    ).first()
+    
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+        
     logs = db.query(ProctorLog).filter(ProctorLog.exam_id == exam_id).all()
 
     # Group by student
@@ -202,6 +228,49 @@ async def get_proctor_report(
         report[sid]["max_risk_score"] = max(report[sid]["max_risk_score"], log.cumulative_risk_score)
 
     return {"exam_id": exam_id, "student_reports": list(report.values())}
+
+
+@router.get("/flags/recent")
+async def get_recent_flags(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
+):
+    from models.course import Course
+    from models.exam import Exam
+
+    # Get exams for courses taught by this teacher
+    teacher_courses = db.query(Course.id).filter(Course.teacher_id == current_user.id).subquery()
+    teacher_exams = db.query(Exam.id).filter(Exam.course_id.in_(teacher_courses)).subquery()
+
+    # Get the latest proctor logs with violations
+    logs = db.query(ProctorLog).filter(
+        ProctorLog.exam_id.in_(teacher_exams),
+        ProctorLog.violation_type != None
+    ).order_by(ProctorLog.timestamp.desc()).limit(20).all()
+
+    res = []
+    for log in logs:
+        # Resolve risk level based on cumulative score
+        risk = 'Low'
+        color = '#3b82f6'
+        if log.cumulative_risk_score > 70:
+            risk = 'High'
+            color = '#ef4444'
+        elif log.cumulative_risk_score > 30:
+            risk = 'Medium'
+            color = '#f59e0b'
+
+        res.append({
+            "id": log.id,
+            "student": log.user.full_name if log.user else "Unknown",
+            "course": log.exam.title if log.exam else "Exam",
+            "risk": risk,
+            "type": log.violation_type.replace('_', ' ').title(),
+            "time": log.timestamp.strftime("%H:%M %p"),
+            "duration": "Snapshot",
+            "color": color
+        })
+    return res
 
 
 @router.websocket("/ws/vision/{exam_id}")

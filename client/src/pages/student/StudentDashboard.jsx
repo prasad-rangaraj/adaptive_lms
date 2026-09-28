@@ -2,7 +2,7 @@ import { useAuthStore } from '../../store/authStore';
 import { Flame, Sparkles, ArrowRight, ChevronRight, PlayCircle, AlertCircle, Clock, CheckCircle2, FileText, Calendar, Users, HelpCircle, Trophy, Play, Pause, RotateCcw } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { dashboardAPI } from '../../services/api.service';
+import { dashboardAPI, cognitiveAPI } from '../../services/api.service';
 
 import { getTopicImage } from '../../utils/imageUtils';
 
@@ -23,6 +23,14 @@ function FocusTimer() {
       setIsActive(false);
       setFocusPoints(p => p + 50);
       setTimeLeft(25 * 60); // Auto reset
+      
+      // Sync with backend
+      cognitiveAPI.evaluate({
+        event: "Focus Timer Completed",
+        points_earned: 50,
+        time_spent_seconds: 25 * 60,
+        completion_status: 'completed'
+      }).catch(err => console.error("Failed to sync focus points", err));
     }
     return () => clearInterval(interval);
   }, [isActive, timeLeft]);
@@ -61,15 +69,42 @@ function FocusTimer() {
 
 function DailyTrivia() {
   const [answered, setAnswered] = useState(false);
-  const [correct, setCorrect] = useState(false);
-  const question = "Which HTTP method is typically used to update an existing resource entirely?";
-  const options = ["POST", "PUT", "PATCH", "GET"];
-  const correctIdx = 1; // PUT
+  const [selectedIdx, setSelectedIdx] = useState(null);
+  
+  const { data, isLoading } = useQuery({
+    queryKey: ['dailyTrivia'],
+    queryFn: () => cognitiveAPI.getDailyTrivia().then(res => res.data),
+    staleTime: 24 * 60 * 60 * 1000 // 24 hours
+  });
+
+  if (isLoading) {
+    return (
+      <div style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '1.5rem' }}>
+        <h3 style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-primary)' }}>AI Daily Trivia</h3>
+        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>Generating today's challenge...</p>
+      </div>
+    );
+  }
+
+  const { question, options, correctIdx } = data || { 
+    question: "Failed to load.", 
+    options: [], 
+    correctIdx: -1 
+  };
+  const correct = selectedIdx === correctIdx;
 
   const handleSelect = (idx) => {
     if (answered) return;
     setAnswered(true);
-    setCorrect(idx === correctIdx);
+    setSelectedIdx(idx);
+    
+    if (idx === correctIdx) {
+      cognitiveAPI.evaluate({
+        event: "Daily Trivia Correct",
+        points_earned: 10,
+        completion_status: 'completed'
+      }).catch(err => console.error(err));
+    }
   };
 
   return (
@@ -86,7 +121,7 @@ function DailyTrivia() {
           let textColor = 'var(--text-secondary)';
           if (answered) {
             if (idx === correctIdx) { bg = '#ecfdf5'; border = '1px solid #10b981'; textColor = '#065f46'; }
-            else if (!correct) { bg = '#fef2f2'; border = '1px solid #ef4444'; textColor = '#991b1b'; } // Highlight all wrong if missed? No, just keep standard if not selected. Wait, simplified: if answered, highlight correct.
+            else if (idx === selectedIdx && !correct) { bg = '#fef2f2'; border = '1px solid #ef4444'; textColor = '#991b1b'; }
           }
           return (
             <button key={opt} onClick={() => handleSelect(idx)} disabled={answered}
@@ -98,7 +133,7 @@ function DailyTrivia() {
       </div>
       {answered && (
         <div style={{ marginTop: '1rem', fontSize: '0.8125rem', fontWeight: 800, color: correct ? '#10b981' : '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}>
-          {correct ? <><Sparkles size={16} /> Correct! +10 XP</> : <><AlertCircle size={16} /> Incorrect. PUT replaces the entire resource.</>}
+          {correct ? <><Sparkles size={16} /> Correct! +10 XP</> : <><AlertCircle size={16} /> Incorrect.</>}
         </div>
       )}
     </div>
@@ -106,11 +141,10 @@ function DailyTrivia() {
 }
 
 function StudyBuddies() {
-  const buddies = [
-    { name: 'Alex M.', action: 'taking the DBMS Quiz', time: 'Just now' },
-    { name: 'Sarah K.', action: 'studying OS Theory', time: '5m ago' },
-    { name: 'David L.', action: 'completed Advanced Python', time: '12m ago' },
-  ];
+  const { data: buddies = [] } = useQuery({
+    queryKey: ['dashboardStudyBuddies'],
+    queryFn: () => dashboardAPI.getStudyBuddies().then(res => res.data)
+  });
 
   return (
     <div style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '1.5rem' }}>

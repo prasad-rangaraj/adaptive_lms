@@ -39,6 +39,8 @@ class CourseModule(Base):
     
     title = Column(String(255), nullable=False)
     order_index = Column(Integer, default=0)
+    # Learning level this module belongs to
+    level = Column(String(30), default="fundamentals")  # fundamentals | beginner | intermediate | advanced
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

@@ -197,19 +197,25 @@ async def get_dashboard_narrative(
 
     student_count = db.query(User).filter(User.tenant_id == tenant_id, User.role == "student").count()
     teacher_count = db.query(User).filter(User.tenant_id == tenant_id, User.role == "teacher").count()
+    # Calculate falling behind using real enrollment progress
+    from models.enrollment import Enrollment
+    from models.course import Course
     
-    # In a real app, this would dynamically calculate engagement from audit logs or enrollments.
-    # We simulate a dynamic insight string.
-    import random
-    trend = random.choice(["up by 12%", "up by 5%", "holding steady"])
-    falling_behind = random.randint(2, 40)
-    pending_approvals = random.randint(0, 5)
+    falling_behind = db.query(Enrollment).join(Course).filter(
+        Course.tenant_id == tenant_id,
+        Enrollment.status == "active",
+        Enrollment.progress_percentage < 30
+    ).count()
+
+    pending_approvals = db.query(Course).filter(
+        Course.tenant_id == tenant_id,
+        Course.is_published == False
+    ).count()
 
     narrative = (
         f"Good morning. **{tenant.name}** is highly active today. "
-        f"Overall engagement is **{trend}** this week. "
         f"You have **{student_count}** students and **{teacher_count}** teachers onboarded. "
-        f"However, **{falling_behind} students** are falling behind in compliance training, "
+        f"Currently, **{falling_behind} students** are falling behind in their courses (<30% progress), "
         f"and you have **{pending_approvals} pending course approvals**."
     )
 
@@ -225,28 +231,47 @@ async def get_cohorts_pulse(
     """Return 'Table-First' sparkline data for active cohorts/courses."""
     if current_user.role not in ("tenant_admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Forbidden")
-
-    import random
+    from models.course import Course
+    from models.enrollment import Enrollment
+    from models.user import User
+    from sqlalchemy.sql import func
     from datetime import datetime, timedelta
 
-    # Mocking cohorts and 7-day sparkline data for the new UI
-    cohorts = [
-        {"id": "c1", "name": "Fall Intake - CS101", "instructor": "Dr. Sarah Chen", "students": 142, "status": "active"},
-        {"id": "c2", "name": "Annual Security Compliance", "instructor": "HR Dept", "students": 850, "status": "warning"},
-        {"id": "c3", "name": "Advanced Data Structures", "instructor": "Prof. Alan Turing", "students": 38, "status": "active"},
-        {"id": "c4", "name": "Leadership Training Q3", "instructor": "Jane Doe", "students": 15, "status": "active"},
-        {"id": "c5", "name": "Onboarding Cohort 24A", "instructor": "HR Dept", "students": 64, "status": "inactive"},
-    ]
+    # Treat published courses as cohorts
+    courses = db.query(Course).filter(Course.tenant_id == tenant_id, Course.is_published == True).all()
+    
+    cohorts = []
+    for c in courses:
+        student_count = db.query(Enrollment).filter(Enrollment.course_id == c.id).count()
+        teacher_name = c.teacher.full_name if c.teacher else "Unknown Instructor"
+        
+        # Calculate real completion using average progress
+        avg_prog = db.query(func.avg(Enrollment.progress_percentage)).filter(Enrollment.course_id == c.id).scalar() or 0
+        
+        status = "active"
+        if avg_prog < 30 and student_count > 0:
+            status = "warning"
+        elif student_count == 0:
+            status = "inactive"
 
-    for cohort in cohorts:
-        # Generate 7 data points for the sparkline (last 7 days of engagement)
-        base = random.randint(20, 80)
-        cohort["sparkline"] = [
+        # Generate mock sparkline for time-series since we don't have daily granular tracking
+        import random
+        base = random.randint(20, 80) if status != "inactive" else 0
+        sparkline = [
             {"day": (datetime.now() - timedelta(days=6-i)).strftime("%a"), "score": max(0, min(100, base + random.randint(-15, 15)))}
             for i in range(7)
         ]
-        cohort["avg_score"] = sum(p["score"] for p in cohort["sparkline"]) // 7
-        cohort["completion"] = random.randint(10, 95)
+
+        cohorts.append({
+            "id": f"c_{c.id}",
+            "name": c.title,
+            "instructor": teacher_name,
+            "students": student_count,
+            "status": status,
+            "sparkline": sparkline,
+            "avg_score": sum(p["score"] for p in sparkline) // 7 if sparkline else 0,
+            "completion": int(avg_prog)
+        })
 
     return cohorts
 
@@ -337,11 +362,14 @@ async def list_tenant_courses(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Tenant Admin: List all courses and their status."""
-    if current_user.role not in ("tenant_admin", "super_admin"):
+    """Admin/Teacher: List all courses in a tenant. Teachers can only see their own tenant."""
+    if current_user.role not in ("tenant_admin", "super_admin", "teacher"):
         raise HTTPException(status_code=403, detail="Forbidden")
+    # Teachers can only see their own tenant
+    if current_user.role == "teacher" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="You can only view courses from your own organization")
 
-    from models.course import Course
+    from models.course import Course, CourseModule
     from models.enrollment import Enrollment
     from sqlalchemy import func as sqlfunc
 
@@ -350,6 +378,8 @@ async def list_tenant_courses(
     result = []
     for c in courses:
         enrollment_count = db.query(Enrollment).filter(Enrollment.course_id == c.id).count()
+        avg_completion = db.query(sqlfunc.avg(Enrollment.progress_percentage)).filter(Enrollment.course_id == c.id).scalar() or 0
+        modules_count = db.query(CourseModule).filter(CourseModule.course_id == c.id).count()
         teacher = db.query(User).filter(User.id == c.teacher_id).first()
         result.append({
             "id": c.id,
@@ -360,6 +390,8 @@ async def list_tenant_courses(
             "is_published": c.is_published,
             "price": c.price,
             "enrollments": enrollment_count,
+            "modules_count": modules_count,
+            "avg_completion": round(avg_completion, 1),
             "teacher_name": teacher.full_name if teacher else "Unassigned",
             "teacher_email": teacher.email if teacher else "",
             "created_at": c.created_at.isoformat() if c.created_at else None,
@@ -464,38 +496,21 @@ async def get_tenant_broadcasts(
     if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    # Return live data from DB if a Broadcast model exists,
-    # otherwise return representative mock data.
-    now = _dt.utcnow()
+    from models.organization import BroadcastMessage
+    broadcasts = db.query(BroadcastMessage).filter(BroadcastMessage.tenant_id == tenant_id).order_by(BroadcastMessage.created_at.desc()).all()
+    
     return {
         "broadcasts": [
             {
-                "id": "b1",
-                "title": "Mid-Semester Exam Schedule Released",
-                "message": "All students: the mid-semester examination schedule has been published. Please review your timetable in the Academic Hub.",
-                "target_cohort_id": None,
-                "created_at": (now - _td(days=2)).isoformat() + "Z",
-                "sent_by": "Admin",
-                "reach_count": 340,
-            },
-            {
-                "id": "b2",
-                "title": "Platform Maintenance — Saturday 2 AM",
-                "message": "Scheduled maintenance window: Saturday 2:00–4:00 AM IST. The platform will be briefly unavailable. Please save your work beforehand.",
-                "target_cohort_id": None,
-                "created_at": (now - _td(days=7)).isoformat() + "Z",
-                "sent_by": "Admin",
-                "reach_count": 512,
-            },
-            {
-                "id": "b3",
-                "title": "New Course Published: System Design",
-                "message": "A new course 'System Design for Freshers' is now live. Enroll today and get early access to bonus modules!",
-                "target_cohort_id": "cs_2024",
-                "created_at": (now - _td(days=14)).isoformat() + "Z",
-                "sent_by": "Admin",
-                "reach_count": 128,
-            },
+                "id": str(b.id),
+                "title": b.title,
+                "message": b.message,
+                "target_cohort_id": b.target_cohort_id,
+                "created_at": b.created_at.isoformat() + "Z" if b.created_at else None,
+                "sent_by": b.sent_by,
+                "reach_count": b.reach_count,
+            }
+            for b in broadcasts
         ]
     }
 
@@ -513,11 +528,28 @@ async def send_tenant_broadcast(
     if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    # In production: save to a Broadcast table and trigger email/push notifications.
+    from models.organization import BroadcastMessage
+    from models.user import User
+
+    # calculate reach
+    reach = db.query(User).filter(User.tenant_id == tenant_id, User.role == "student").count()
+
+    broadcast = BroadcastMessage(
+        tenant_id=tenant_id,
+        title=payload.get("title", "Untitled"),
+        message=payload.get("message", ""),
+        target_cohort_id=payload.get("target_cohort_id"),
+        sent_by=current_user.full_name,
+        reach_count=reach
+    )
+    db.add(broadcast)
+    db.commit()
+    db.refresh(broadcast)
+
     return {
-        "id": f"b_{int(_dt.utcnow().timestamp())}",
+        "id": str(broadcast.id),
         "message": "Broadcast sent successfully",
-        "title": payload.get("title", ""),
-        "sent_at": _dt.utcnow().isoformat() + "Z",
+        "title": broadcast.title,
+        "sent_at": broadcast.created_at.isoformat() + "Z" if broadcast.created_at else None,
     }
 

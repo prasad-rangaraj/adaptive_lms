@@ -7,13 +7,9 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useProctoring } from '../../hooks/useProctoring';
-import { coursesAPI, cognitiveAPI } from '../../services/api.service';
+import { coursesAPI, cognitiveAPI, aiTutorAPI } from '../../services/api.service';
 import PlacementAssessmentModal from './PlacementAssessmentModal';
 import toast from 'react-hot-toast';
-
-// ── Mock Data ─────────────────────────────────────────────────────────────
-const questions = [];
-
 
 // ── Course Roadmap Modal ─────────────────────────────────────────────────────
 function CourseRoadmapModal({ course, enrollment, onClose, onStartLearn }) {
@@ -239,6 +235,7 @@ export default function StudentExamArena() {
   const [selectedCourse, setSelectedCourse] = useState(null); // for roadmap modal
   
   // Exam progress state
+  const [questions, setQuestions] = useState([]);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState({});
   const [flagged, setFlagged] = useState(new Set());
@@ -439,6 +436,13 @@ export default function StudentExamArena() {
     setSelectedExam(exam);
     setTimeLeft(45 * 60);
     setExamState('lobby');
+    setQuestions([]); // Clear previous
+    aiTutorAPI.generateQuiz(exam.id, exam.title + " comprehensive concepts", "medium", 5)
+      .then(res => setQuestions(res.data.quiz || []))
+      .catch(err => {
+        console.error(err);
+        toast.error("Failed to generate exam questions.");
+      });
   };
 
   const exitToList = async () => {

@@ -4,7 +4,7 @@ from db.database import get_db
 from core.security import get_current_user
 from models.user import User
 from models.cognitive_profile import CognitiveProfile
-from services.ai_cognitive import evaluate_performance
+from services.ai_cognitive import evaluate_performance, generate_daily_trivia
 
 router = APIRouter(prefix="/api/cognitive", tags=["Cognitive Analytics"])
 
@@ -70,3 +70,14 @@ async def trigger_evaluation(
         "profile": updated_profile,
         "recommendations": recommendations
     }
+
+@router.get("/daily-trivia")
+async def get_daily_trivia(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    profile = db.query(CognitiveProfile).filter(CognitiveProfile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Cognitive profile not found.")
+    
+    return generate_daily_trivia(profile)

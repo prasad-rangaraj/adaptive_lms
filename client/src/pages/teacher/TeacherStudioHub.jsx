@@ -12,6 +12,7 @@ function BuilderTab({ courseId }) {
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newModuleName, setNewModuleName] = useState('');
+  const [newModuleLevel, setNewModuleLevel] = useState('fundamentals');
   const [isAddingModule, setIsAddingModule] = useState(false);
 
   const loadModules = async () => {
@@ -45,8 +46,9 @@ function BuilderTab({ courseId }) {
   const handleAddModule = async () => {
     if (!newModuleName.trim()) return;
     try {
-      await coursesAPI.createModule(courseId, newModuleName);
+      await coursesAPI.createModule(courseId, newModuleName, newModuleLevel);
       setNewModuleName('');
+      setNewModuleLevel('fundamentals');
       setIsAddingModule(false);
       loadModules();
     } catch (e) {
@@ -93,6 +95,12 @@ function BuilderTab({ courseId }) {
         {isAddingModule && (
           <div style={{ display: 'flex', gap: 10 }}>
             <input value={newModuleName} onChange={e => setNewModuleName(e.target.value)} placeholder="Module Title..." style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'transparent', color: 'var(--text-primary)' }} />
+            <select value={newModuleLevel} onChange={e => setNewModuleLevel(e.target.value)} style={{ padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-0)', color: 'var(--text-primary)', outline: 'none' }}>
+              <option value="fundamentals">🌱 Fundamentals</option>
+              <option value="beginner">🚀 Beginner</option>
+              <option value="intermediate">⚡ Intermediate</option>
+              <option value="advanced">🏆 Advanced</option>
+            </select>
             <button onClick={handleAddModule} style={{ background: 'var(--brand-500)', color: 'white', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>Save</button>
           </div>
         )}
@@ -199,12 +207,17 @@ function BuilderTab({ courseId }) {
 }
 
 // ── Tab: Cohort Management ────────────────────────────────────────────────
-function CohortTab() {
-  const students = [
-    { id: 1, name: 'Alex Chen', email: 'alex@example.com', progress: 92, status: 'On Track', lastActive: '2 hrs ago' },
-    { id: 2, name: 'Sarah Jenkins', email: 'sarah@example.com', progress: 45, status: 'Falling Behind', lastActive: '3 days ago' },
-    { id: 3, name: 'Michael Chang', email: 'mike@example.com', progress: 78, status: 'On Track', lastActive: '1 hr ago' },
-  ];
+function CohortTab({ courseId }) {
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!courseId) return;
+    coursesAPI.getStudents(courseId)
+      .then(res => setStudents(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [courseId]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
@@ -212,36 +225,53 @@ function CohortTab() {
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
         <div>
           <h2 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.1 }}>Active Roster</h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: 8 }}>124 students currently enrolled.</p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: 8 }}>{students.length} students currently enrolled.</p>
         </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {/* Table Header (Minimal) */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: '2rem', paddingBottom: '1rem', borderBottom: '2px solid var(--surface-4)', marginBottom: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr auto', gap: '1rem', paddingBottom: '1rem', borderBottom: '2px solid var(--surface-4)', marginBottom: '1rem' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Student</span>
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Level</span>
           <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Progress</span>
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Assessment</span>
           <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</span>
-          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Last Active</span>
           <span style={{ width: 80 }}></span>
         </div>
 
         {/* Student Rows */}
-        {students.map((student) => (
-          <div key={student.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: '2rem', alignItems: 'center', padding: '1.5rem 0', borderBottom: '1px solid var(--surface-3)', transition: 'background 0.3s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+        {loading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}><Loader2 size={16} className="animate-spin" /> Loading students...</div>
+        ) : students.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No students enrolled in this course yet.</div>
+        ) : students.map((student) => (
+          <div key={student.id} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr auto', gap: '1rem', alignItems: 'center', padding: '1.5rem 0', borderBottom: '1px solid var(--surface-3)', transition: 'background 0.3s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
-                {student.name.charAt(0)}
+                {student.name ? student.name.charAt(0) : 'U'}
               </div>
-              <div>
-                <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>{student.name}</h4>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>{student.email}</p>
+              <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                <h4 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{student.name}</h4>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{student.email}</p>
               </div>
             </div>
 
             <div>
-              <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>{student.progress}%</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand-500)' }}>
+                {student.learning_path === 'pending' ? 'Pending' : student.learning_path}
+              </span>
+            </div>
+
+            <div>
+              <span style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)' }}>{student.progress}%</span>
+            </div>
+
+            <div>
+              <span style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
+                {student.placement_score !== null ? `${student.placement_score}/100` : 'N/A'}
+              </span>
             </div>
 
             <div>
@@ -250,13 +280,8 @@ function CohortTab() {
               </span>
             </div>
 
-            <div>
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{student.lastActive}</span>
-            </div>
-
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
               <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 8 }}><MessageSquare size={18} /></button>
-              <button style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 8 }}><UserX size={18} /></button>
             </div>
             
           </div>
@@ -332,15 +357,14 @@ export default function TeacherStudioHub() {
 
   const loadCourses = async () => {
     try {
-      const res = await coursesAPI.myCourses();
+      let res = await coursesAPI.myCourses();
+      if (res.data.length === 0) {
+        res = await coursesAPI.list();
+      }
       setCourses(res.data);
       if (res.data.length > 0 && !selectedCourseId) setSelectedCourseId(res.data[0].id);
     } catch (e) {
-      try {
-        const res2 = await coursesAPI.list();
-        setCourses(res2.data);
-        if (res2.data.length > 0 && !selectedCourseId) setSelectedCourseId(res2.data[0].id);
-      } catch { console.error(e); }
+      console.error(e);
     }
   };
 

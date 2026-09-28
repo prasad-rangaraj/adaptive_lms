@@ -131,16 +131,27 @@ class CourseMaterialResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class CourseUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+class CourseModuleUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    level: Optional[str] = None
+
 
 class CourseModuleCreateRequest(BaseModel):
     title: str
+    level: str = "fundamentals"  # fundamentals | beginner | intermediate | advanced
 
 class CourseModuleResponse(BaseModel):
     id: int
     course_id: int
     title: str
     order_index: int
+    level: Optional[str] = "fundamentals"
     materials: list[CourseMaterialResponse] = []
+    materials_count: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -158,6 +169,8 @@ class CourseResponse(BaseModel):
     price: float
     created_at: datetime
     modules: list[CourseModuleResponse] = []
+    enrollment_count: Optional[int] = None
+    modules_count: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -415,6 +428,27 @@ class CertificateResponse(BaseModel):
         from_attributes = True
 
 # --- Community Schemas ---
+class MessageCreateRequest(BaseModel):
+    receiver_id: int
+    content: str
+
+class OfficeHourBookingRequest(BaseModel):
+    teacher_id: int
+    topic: str
+    date: str
+    time: str
+
+class MentorshipRequest(BaseModel):
+    mentor_id: int
+    focus_area: str
+
+class BountyCreateRequest(BaseModel):
+    subject: str
+    title: str
+    body: str
+    reward_amount: int
+    tags: str
+
 class BountyResponse(BaseModel):
     id: int
     tenant_id: int

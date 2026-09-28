@@ -7,9 +7,10 @@ from models.enrollment import Enrollment
 from models.assignment import Assignment
 from models.user import User
 from models.cognitive_profile import CognitiveProfile
+from models.vector_embedding import VectorEmbedding
 from schemas.schemas import (
-    CourseCreateRequest, CourseResponse, CourseMaterialResponse,
-    CourseModuleCreateRequest, CourseModuleResponse,
+    CourseCreateRequest, CourseResponse, CourseMaterialResponse, CourseUpdateRequest,
+    CourseModuleCreateRequest, CourseModuleResponse, CourseModuleUpdateRequest,
     AssignmentCreateRequest, AssignmentResponse,
     EnrollResponse, EnrollmentStatusResponse,
     PlacementResultRequest, PlacementResultResponse,
@@ -125,16 +126,40 @@ async def list_courses(
     return q.order_by(Course.id.desc()).all()
 
 
-@router.get("/my", response_model=List[CourseResponse])
+@router.get("/my")
 async def list_my_courses(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("teacher", "tenant_admin")),
 ):
-    """Teacher: list only their own courses (including drafts)."""
-    return db.query(Course).filter(
+    """Teacher: list only their own courses (including drafts) with student and module counts."""
+    from models.enrollment import Enrollment
+    from sqlalchemy import func as sqlfunc
+
+    courses = db.query(Course).filter(
         Course.tenant_id == current_user.tenant_id,
         Course.teacher_id == current_user.id,
     ).order_by(Course.id.desc()).all()
+
+    result = []
+    for c in courses:
+        enr_count = db.query(Enrollment).filter(Enrollment.course_id == c.id).count()
+        mod_count = db.query(CourseModule).filter(CourseModule.course_id == c.id).count() if hasattr(Course, 'modules') else 0
+        result.append({
+            "id": c.id,
+            "tenant_id": c.tenant_id,
+            "title": c.title,
+            "description": c.description,
+            "thumbnail_url": c.thumbnail_url,
+            "category": c.category,
+            "difficulty": c.difficulty,
+            "is_published": c.is_published,
+            "price": c.price,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+            "modules": [],
+            "enrollment_count": enr_count,
+            "modules_count": mod_count,
+        })
+    return result
 
 
 @router.get("/enrolled", response_model=List[CourseResponse])
@@ -170,6 +195,28 @@ async def get_course(
         raise HTTPException(status_code=404, detail="Course not found")
     return course
 
+@router.patch("/{course_id}", response_model=CourseResponse)
+async def update_course(
+    course_id: int,
+    payload: CourseUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
+):
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.tenant_id == current_user.tenant_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+        
+    if payload.title is not None:
+        course.title = payload.title
+    if payload.description is not None:
+        course.description = payload.description
+        
+    db.commit()
+    db.refresh(course)
+    return course
 
 @router.get("/{course_id}/modules", response_model=List[CourseModuleResponse])
 async def list_course_modules(
@@ -177,7 +224,7 @@ async def list_course_modules(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List all modules (and their materials) for a course."""
+    """List all modules (and their materials) for a course, including level."""
     course = db.query(Course).filter(
         Course.id == course_id,
         Course.tenant_id == current_user.tenant_id,
@@ -185,7 +232,146 @@ async def list_course_modules(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    return db.query(CourseModule).filter(CourseModule.course_id == course_id).order_by(CourseModule.order_index.asc()).all()
+    modules = db.query(CourseModule).filter(CourseModule.course_id == course_id).order_by(CourseModule.order_index.asc()).all()
+    
+    result = []
+    for m in modules:
+        result.append({
+            "id": m.id,
+            "course_id": m.course_id,
+            "title": m.title,
+            "order_index": m.order_index,
+            "level": m.level or "fundamentals",
+            "materials": m.materials,
+            "materials_count": len(m.materials),
+        })
+    return result
+
+
+@router.get("/{course_id}/course-detail")
+async def get_course_detail(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Teacher: Get course modules grouped by level + enrolled students in one request."""
+    from models.enrollment import Enrollment
+
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.tenant_id == current_user.tenant_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Modules grouped by level
+    levels = ["fundamentals", "beginner", "intermediate", "advanced"]
+    modules_raw = db.query(CourseModule).filter(CourseModule.course_id == course_id).order_by(CourseModule.order_index.asc()).all()
+
+    grouped = {lv: [] for lv in levels}
+    for m in modules_raw:
+        lv = m.level if m.level in levels else "fundamentals"
+        grouped[lv].append({
+            "id": m.id,
+            "title": m.title,
+            "order_index": m.order_index,
+            "materials_count": len(m.materials),
+            "materials": [{
+                "id": mat.id,
+                "title": mat.title,
+                "type": mat.material_type,
+                "url": mat.s3_url,
+                "duration": f"{int(mat.duration_seconds // 60)}m" if mat.duration_seconds else None
+            } for mat in m.materials]
+        })
+
+    # Students with adaptive path info
+    enrollments = db.query(Enrollment).filter(Enrollment.course_id == course_id).all()
+    students = []
+    for en in enrollments:
+        if en.student:
+            students.append({
+                "id": en.student.id,
+                "name": en.student.full_name,
+                "email": en.student.email,
+                "learning_path": en.learning_path or "pending",
+                "progress": round(en.progress_percentage or 0, 1),
+                "placement_score": en.placement_score,
+                "status": "On Track" if (en.progress_percentage or 0) >= 50 else "Falling Behind",
+            })
+
+    # Group students by path
+    students_by_path = {lv: [] for lv in ["pending", "fundamentals", "basics", "intermediate", "advanced"]}
+    for s in students:
+        p = s["learning_path"]
+        if p not in students_by_path:
+            students_by_path[p] = []
+        students_by_path[p].append(s)
+
+    return {
+        "course": {
+            "id": course.id,
+            "title": course.title,
+            "description": course.description,
+            "difficulty": course.difficulty,
+            "is_published": course.is_published,
+            "category": course.category,
+        },
+        "modules_by_level": grouped,
+        "students_by_path": students_by_path,
+        "total_students": len(students),
+        "level_counts": {lv: len(grouped[lv]) for lv in levels},
+    }
+
+@router.get("/{course_id}/students")
+async def list_course_students(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all students enrolled in a specific course."""
+    course = db.query(Course).filter(Course.id == course_id, Course.tenant_id == current_user.tenant_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+        
+    from models.enrollment import Enrollment
+    enrollments = db.query(Enrollment).filter(Enrollment.course_id == course_id).all()
+    
+    students = []
+    for en in enrollments:
+        if en.student:
+            students.append({
+                "id": en.student.id,
+                "name": en.student.full_name,
+                "email": en.student.email,
+                "progress": en.progress_percentage,
+                "status": "On Track" if en.progress_percentage >= 50 else "Falling Behind",
+                "learning_path": en.learning_path,
+                "placement_score": en.placement_score,
+                "lastActive": "Recently" # Stubbed since we don't have last_login
+            })
+    return students
+
+@router.get("/{course_id}/materials/{material_id}/transcript")
+async def get_material_transcript(
+    course_id: int,
+    material_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.tenant_id == current_user.tenant_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    embeddings = db.query(VectorEmbedding).filter(
+        VectorEmbedding.course_id == course_id,
+        VectorEmbedding.material_id == material_id
+    ).order_by(VectorEmbedding.chunk_index.asc()).all()
+
+    return [{"text": e.text_chunk} for e in embeddings]
 
 
 @router.post("/{course_id}/modules", response_model=CourseModuleResponse)
@@ -208,9 +394,39 @@ async def create_course_module(
     module = CourseModule(
         course_id=course_id,
         title=payload.title,
-        order_index=max_order
+        order_index=max_order,
+        level=payload.level
     )
     db.add(module)
+    db.commit()
+    db.refresh(module)
+    return module
+
+
+@router.patch("/{course_id}/modules/{module_id}", response_model=CourseModuleResponse)
+async def update_course_module(
+    course_id: int,
+    module_id: int,
+    payload: CourseModuleUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
+):
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.tenant_id == current_user.tenant_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    module = db.query(CourseModule).filter(CourseModule.id == module_id, CourseModule.course_id == course_id).first()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+        
+    if payload.title is not None:
+        module.title = payload.title
+    if payload.level is not None:
+        module.level = payload.level
+        
     db.commit()
     db.refresh(module)
     return module

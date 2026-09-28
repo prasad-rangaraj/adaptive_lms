@@ -25,6 +25,7 @@ import StudentAcademicHub from './pages/student/StudentAcademicHub';
 import StudentCommunityHub from './pages/student/StudentCommunityHub';
 import StudentExploreHub from './pages/student/StudentExploreHub';
 import StudentCoursesHub from './pages/student/StudentCoursesHub';
+import CoursesHub from './pages/shared/CoursesHub';
 import StudentLiveArena from './pages/student/StudentLiveArena';
 import StudentOnboarding from './pages/student/StudentOnboarding';
 
@@ -43,6 +44,7 @@ import OrgDashboard from './pages/admin/AdminDashboard'; // Assuming AdminDashbo
 import OrgDataHub from './pages/admin/OrgDataHub';
 import OrgDirectoryHub from './pages/admin/OrgDirectoryHub';
 import OrgContentHub from './pages/admin/OrgContentHub';
+import CoursesHubAdmin from './pages/shared/CoursesHub';
 import OrgCommunicationHub from './pages/admin/OrgCommunicationHub';
 import OrgSecurityHub from './pages/admin/OrgSecurityHub';
 import OrgAiHub from './pages/admin/OrgAiHub';
@@ -118,7 +120,7 @@ export default function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="ai-tutor" element={<AiTutorPage />} />
-            <Route path="course" element={<StudentCoursesHub />} />
+            <Route path="course" element={<CoursesHub />} />
             <Route path="course/:courseId" element={<StudentLearningCanvas />} />
             <Route path="exam" element={<StudentExamArena />} />
             <Route path="exam/:examId" element={<StudentExamArena />} />
@@ -153,6 +155,7 @@ export default function App() {
             <Route path="mentorship" element={<TeacherMentorshipHub />} />
             <Route path="forge" element={<TeacherExamForge />} />
             <Route path="inbox" element={<TeacherCommunicationHub />} />
+            <Route path="courses" element={<CoursesHub />} />
           </Route>
 
           {/* Admin Routes (Tenant Admin) */}
@@ -166,7 +169,7 @@ export default function App() {
             <Route path="data-hub" element={<OrgDataHub />} />
             <Route path="ai" element={<OrgAiHub />} />
             <Route path="directory" element={<OrgDirectoryHub />} />
-            <Route path="content" element={<OrgContentHub />} />
+            <Route path="content" element={<CoursesHubAdmin />} />
             <Route path="communication" element={<OrgCommunicationHub />} />
             <Route path="security" element={<OrgSecurityHub />} />
             <Route path="settings" element={<OrgSettingsHub />} />

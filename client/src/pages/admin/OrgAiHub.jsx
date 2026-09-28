@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Bot, BrainCircuit, Activity, ShieldAlert, Cpu, 
   Settings, Sparkles, CheckCircle2, LayoutDashboard, EyeOff, FileText, MessageSquare,
   Database, Server, Shield, Coins, AlertOctagon, ChevronDown, Network
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { orgAIAPI } from '../../services/api.service';
+import toast from 'react-hot-toast';
 
 // ── Custom UI Components ──────────────────────────────────────────────────
 function Switch({ checked, onChange, color = 'var(--brand-500)' }) {
@@ -29,23 +32,54 @@ function SelectMenu({ value, options, onChange }) {
 // ── Main Hub ──────────────────────────────────────────────────────────────
 export default function OrgAiHub() {
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   
-  // State
-  const [strictness, setStrictness] = useState(70);
-  const [systemPrompt, setSystemPrompt] = useState("Maintain a highly academic, encouraging tone. Never provide direct answers to quiz questions; guide the student using Socratic questioning.");
+  const [localPrompt, setLocalPrompt] = useState("");
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['orgAISettings', user.tenant_id],
+    queryFn: () => orgAIAPI.getSettings(user.tenant_id).then(res => res.data)
+  });
+
+  // Sync local prompt when settings load
+  useEffect(() => {
+    if (settings?.system_prompt) {
+      setLocalPrompt(settings.system_prompt);
+    }
+  }, [settings?.system_prompt]);
+
+  const mutation = useMutation({
+    mutationFn: (data) => orgAIAPI.updateSettings(user.tenant_id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['orgAISettings', user.tenant_id]);
+      toast.success('AI Settings updated');
+    },
+    onError: () => toast.error('Failed to update settings')
+  });
+
+  if (isLoading || !settings) return <div style={{ padding: '2rem' }}>Loading AI settings...</div>;
+
+  const strictness = settings.strictness_threshold ?? 70;
+  const systemPrompt = settings.system_prompt ?? "";
   
-  const [features, setFeatures] = useState([
-    { id: 'tutor', name: 'AI Tutor Assistant', active: true, model: 'gpt-4o', icon: Bot },
-    { id: 'evaluator', name: 'AI Assignment Grading', active: true, model: 'claude-3-5', icon: CheckCircle2 },
-    { id: 'generator', name: 'Course Content Generation', active: false, model: 'gpt-4o', icon: FileText },
-    { id: 'community', name: 'Forum Moderation', active: true, model: 'gemini-1-5', icon: MessageSquare },
-  ]);
+  const features = [
+    { id: 'tutor', name: 'AI Tutor Assistant', active: settings.tutor_active, model: settings.tutor_model, icon: Bot },
+    { id: 'evaluator', name: 'AI Assignment Grading', active: settings.evaluator_active, model: settings.evaluator_model, icon: CheckCircle2 },
+    { id: 'generator', name: 'Course Content Generation', active: settings.generator_active, model: settings.generator_model, icon: FileText },
+    { id: 'community', name: 'Forum Moderation', active: settings.community_active, model: settings.community_model, icon: MessageSquare },
+  ];
 
-  const toggleFeature = (id) => setFeatures(features.map(f => f.id === id ? { ...f, active: !f.active } : f));
-  const changeModel = (id, model) => setFeatures(features.map(f => f.id === id ? { ...f, model } : f));
+  const toggleFeature = (id) => mutation.mutate({ [`${id}_active`]: !settings[`${id}_active`] });
+  const changeModel = (id, model) => mutation.mutate({ [`${id}_model`]: model });
 
-  const [privacy, setPrivacy] = useState({ piiMasking: true, zeroRetention: true, shadowMode: false });
-  const togglePrivacy = (key) => setPrivacy(p => ({ ...p, [key]: !p[key] }));
+  const privacy = { 
+    piiMasking: settings.pii_masking, 
+    zeroRetention: settings.zero_retention 
+  };
+  const togglePrivacy = (key) => mutation.mutate({ 
+    pii_masking: key === 'piiMasking' ? !privacy.piiMasking : privacy.piiMasking,
+    zero_retention: key === 'zeroRetention' ? !privacy.zeroRetention : privacy.zeroRetention,
+  });
 
   const models = [
     { id: 'gpt-4o', label: 'GPT-4o (Fast)' },
@@ -121,8 +155,9 @@ export default function OrgAiHub() {
              </h2>
              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Define universal instructions injected into every AI request made by users within your organization.</p>
              <textarea 
-               value={systemPrompt} 
-               onChange={e => setSystemPrompt(e.target.value)}
+               value={localPrompt} 
+               onChange={e => setLocalPrompt(e.target.value)}
+               onBlur={() => mutation.mutate({ system_prompt: localPrompt })}
                style={{ width: '100%', minHeight: 100, padding: '1rem', background: 'var(--surface-0)', border: '1px solid var(--glass-border)', borderRadius: 12, color: 'var(--text-primary)', fontSize: '0.875rem', lineHeight: 1.5, resize: 'vertical', outline: 'none' }}
              />
           </div>
@@ -171,7 +206,7 @@ export default function OrgAiHub() {
                 <span style={{ fontSize: '2.5rem', fontWeight: 900, color: riskColor, lineHeight: 1 }}>{strictness}%</span>
                 <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Strict</span>
               </div>
-              <input type="range" min="30" max="85" value={strictness} onChange={e => setStrictness(e.target.value)} style={{ width: '100%', accentColor: riskColor }} />
+              <input type="range" min="30" max="85" value={strictness} onChange={e => mutation.mutate({ strictness_threshold: parseInt(e.target.value) })} style={{ width: '100%', accentColor: riskColor }} />
             </div>
 
             <div style={{ marginTop: '2rem' }}>

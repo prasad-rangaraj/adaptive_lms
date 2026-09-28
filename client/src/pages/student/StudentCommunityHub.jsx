@@ -8,18 +8,134 @@ import {
 // ─────────────────────────────────────────────────────────────
 // Data
 // ─────────────────────────────────────────────────────────────
-const synapseMatches = [];
-const teamRequests = [];
-const clubs = [];
-const alumni = [];
-
-
+// ─────────────────────────────────────────────────────────────
+// Data is now fetched from the backend.
+// ─────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────
 // Tab: Bounty Board & Exchange
 // ─────────────────────────────────────────────────────────────
 import { communityAPI } from '../../services/api.service';
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+
+function MessageFacultyModal({ onClose }) {
+  const [msg, setMsg] = useState('');
+  const [sending, setSending] = useState(false);
+  const handleSend = async () => {
+    if(!msg.trim()) return;
+    setSending(true);
+    try {
+      // Mocking receiver_id to 1 (usually a teacher/admin in the seed data)
+      await communityAPI.sendMessage({ receiver_id: 1, content: msg });
+      onClose();
+    } catch (e) {
+      console.error(e);
+      setSending(false);
+    }
+  };
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 500, background: 'var(--surface-0)', borderRadius: 24, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', boxShadow: 'var(--shadow-xl)' }}>
+        <div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>Message Faculty</h2>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Send a direct message to your instructors.</p>
+        </div>
+        <textarea 
+          autoFocus
+          value={msg}
+          onChange={e => setMsg(e.target.value)}
+          placeholder="Type your message here..."
+          style={{ width: '100%', minHeight: 120, padding: '1rem', background: 'var(--surface-1)', border: '1px solid var(--surface-3)', borderRadius: 12, resize: 'vertical', outline: 'none' }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+          <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--surface-2)', cursor: 'pointer', fontWeight: 800 }}>Cancel</button>
+          <button disabled={sending || !msg.trim()} onClick={handleSend} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--brand-500)', color: 'white', cursor: 'pointer', fontWeight: 800 }}>{sending ? 'Sending...' : 'Send Message'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BookOfficeHoursModal({ onClose }) {
+  const [topic, setTopic] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const handleBook = async () => {
+    if(!topic.trim() || !date || !time) return;
+    setSending(true);
+    try {
+      await communityAPI.bookOfficeHour({ teacher_id: 1, topic, date, time });
+      onClose();
+    } catch (e) {
+      console.error(e);
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 500, background: 'var(--surface-0)', borderRadius: 24, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', boxShadow: 'var(--shadow-xl)' }}>
+        <div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>Book Office Hours</h2>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Schedule a 1-on-1 session with your teacher.</p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Topic (e.g., Assignment 2 Help)" style={{ padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-1)', outline: 'none' }} />
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-1)', outline: 'none' }} />
+            <input type="time" value={time} onChange={e => setTime(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-1)', outline: 'none' }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+          <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--surface-2)', cursor: 'pointer', fontWeight: 800 }}>Cancel</button>
+          <button disabled={sending || !topic.trim() || !date || !time} onClick={handleBook} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--brand-500)', color: 'white', cursor: 'pointer', fontWeight: 800 }}>{sending ? 'Booking...' : 'Book Slot'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RequestMentorshipModal({ alumni, onClose }) {
+  const [topic, setTopic] = React.useState('');
+  const [message, setMessage] = React.useState('');
+  const [sending, setSending] = React.useState(false);
+
+  const handleSend = async () => {
+    if(!topic.trim() || !message.trim()) return;
+    setSending(true);
+    try {
+      await communityAPI.requestMentorship({ alumni_id: alumni.id || 1, topic, message });
+      onClose();
+    } catch (e) {
+      console.error(e);
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 500, background: 'var(--surface-0)', borderRadius: 24, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', boxShadow: 'var(--shadow-xl)' }}>
+        <div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>Request Mentorship</h2>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Connect with {alumni.name} from {alumni.company}.</p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Topic (e.g., Mock Interview, Referral)" style={{ padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-1)', outline: 'none' }} />
+          <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Why do you want to connect?" style={{ width: '100%', minHeight: 120, padding: '1rem', background: 'var(--surface-1)', border: '1px solid var(--surface-3)', borderRadius: 12, resize: 'vertical', outline: 'none' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+          <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--surface-2)', cursor: 'pointer', fontWeight: 800 }}>Cancel</button>
+          <button disabled={sending || !topic.trim() || !message.trim()} onClick={handleSend} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--brand-500)', color: 'white', cursor: 'pointer', fontWeight: 800 }}>{sending ? 'Sending...' : 'Send Request'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function BountyBoardTab() {
   const { data: bounties = [] } = useQuery({
@@ -116,6 +232,16 @@ function BountyBoardTab() {
 // Tab: Synapse Matchmaking
 // ─────────────────────────────────────────────────────────────
 function MatchmakingTab() {
+  const { data: synapseMatches = [] } = useQuery({
+    queryKey: ['synapseMatches'],
+    queryFn: () => communityAPI.getSynapseMatches().then(res => res.data)
+  });
+  
+  const { data: teamRequests = [] } = useQuery({
+    queryKey: ['communityTeamRequests'],
+    queryFn: () => communityAPI.getTeamRequests().then(res => res.data)
+  });
+  
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '3rem', alignItems: 'start' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
@@ -232,6 +358,17 @@ function CampusLiveTab() {
     queryKey: ['communityEvents'],
     queryFn: () => communityAPI.getEvents().then(res => res.data)
   });
+  
+  const { data: clubs = [] } = useQuery({
+    queryKey: ['communityClubs'],
+    queryFn: () => communityAPI.getClubs().then(res => res.data)
+  });
+  
+  const { data: alumni = [] } = useQuery({
+    queryKey: ['communityAlumni'],
+    queryFn: () => communityAPI.getAlumni().then(res => res.data)
+  });
+  
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '3rem', alignItems: 'start' }}>
       
@@ -312,6 +449,7 @@ function CampusLiveTab() {
         </div>
       </div>
 
+      {mentorshipModal && <RequestMentorshipModal alumni={mentorshipModal} onClose={() => setMentorshipModal(null)} />}
     </div>
   );
 }
@@ -320,6 +458,7 @@ function CampusLiveTab() {
 // Tab: Alumni Network
 // ─────────────────────────────────────────────────────────────
 function AlumniTab() {
+  const [mentorshipModal, setMentorshipModal] = React.useState(null);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', maxWidth: 900 }}>
       
@@ -370,13 +509,14 @@ function AlumniTab() {
               ))}
             </div>
 
-            <button style={{ width: '100%', background: 'var(--surface-1)', color: 'var(--text-primary)', border: '1px solid var(--surface-3)', padding: '10px 0', borderRadius: 10, fontSize: '0.875rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--text-primary)'; e.currentTarget.style.color = 'white'; }} onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-1)'; e.currentTarget.style.color = 'var(--text-primary)'; }}>
+            <button onClick={() => setMentorshipModal(a)} style={{ width: '100%', background: 'var(--surface-1)', color: 'var(--text-primary)', border: '1px solid var(--surface-3)', padding: '10px 0', borderRadius: 10, fontSize: '0.875rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--text-primary)'; e.currentTarget.style.color = 'white'; }} onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-1)'; e.currentTarget.style.color = 'var(--text-primary)'; }}>
               Request Connect
             </button>
           </div>
         ))}
       </div>
 
+      {mentorshipModal && <RequestMentorshipModal alumni={mentorshipModal} onClose={() => setMentorshipModal(null)} />}
     </div>
   );
 }
@@ -386,6 +526,8 @@ function AlumniTab() {
 // ─────────────────────────────────────────────────────────────
 export default function StudentCommunityHub() {
   const [activeTab, setActiveTab] = useState('bounty');
+  const [showMsgModal, setShowMsgModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
 
   const tabs = [
     { id: 'bounty',  label: 'Bounty Board',       icon: Award },
@@ -400,8 +542,20 @@ export default function StudentCommunityHub() {
 
       <div style={{ position: 'relative', zIndex: 10 }}>
         <div style={{ marginBottom: '2rem' }}>
-          <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-500)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Peers · Seniors · Alumni</p>
-          <h1 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>Community Hub</h1>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+              <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-500)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Peers · Seniors · Alumni</p>
+              <h1 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>Community Hub</h1>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button onClick={() => setShowBookingModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 999, border: '2px solid var(--brand-500)', background: 'transparent', color: 'var(--brand-600)', fontWeight: 900, cursor: 'pointer' }}>
+                <Calendar size={16} /> Book Office Hours
+              </button>
+              <button onClick={() => setShowMsgModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 999, border: 'none', background: 'var(--brand-500)', color: 'white', fontWeight: 900, cursor: 'pointer', boxShadow: 'var(--shadow-md)' }}>
+                <MessageSquare size={16} /> Direct Message Faculty
+              </button>
+            </div>
+          </div>
 
           <div style={{ display: 'flex', gap: '0.25rem', marginTop: '2rem', borderBottom: '1px solid var(--surface-3)' }}>
             {tabs.map(t => (
@@ -424,7 +578,10 @@ export default function StudentCommunityHub() {
           {activeTab === 'campus'  && <CampusLiveTab />}
           {activeTab === 'alumni'  && <AlumniTab />}
         </div>
-      </div>
+            </div>
+      
+      {showMsgModal && <MessageFacultyModal onClose={() => setShowMsgModal(false)} />}
+      {showBookingModal && <BookOfficeHoursModal onClose={() => setShowBookingModal(false)} />}
     </div>
   );
 }

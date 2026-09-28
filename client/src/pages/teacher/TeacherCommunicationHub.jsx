@@ -1,17 +1,45 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   MessageSquare, Calendar as CalendarIcon, Clock, Video, Reply, CheckCircle2, ChevronRight, Check
 } from 'lucide-react';
 
-// ── Tab: Unified Inbox ────────────────────────────────────────────────────
+import { communityAPI } from '../../services/api.service';
+
+// ── Tab: Unified Inbox ──────────────────────────────────────────────────
 function InboxTab() {
   const [activeMessage, setActiveMessage] = useState(1);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [replyText, setReplyText] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
-  const messages = [
-    { id: 1, sender: 'Alex Chen', course: 'Advanced Machine Learning', subject: 'Question regarding Assignment 2', time: '10:42 AM', unread: true },
-    { id: 2, sender: 'Sarah Jenkins', course: 'Data Structures 101', subject: 'Sick leave approval needed', time: 'Yesterday', unread: false },
-    { id: 3, sender: 'Michael Chang', course: 'Mentorship', subject: 'Career advice: Startup vs Big Tech', time: 'Aug 20', unread: false },
-  ];
+
+  const fetchMessages = () => {
+    communityAPI.getTeacherInbox()
+      .then(res => setMessages(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchMessages();
+  }, []);
+
+  const handleSendReply = async () => {
+    if (!replyText.trim()) return;
+    setIsSending(true);
+    try {
+      // Assuming activeMessage corresponds to the ID, and we reply to the same sender.
+      // We don't have the original sender ID in the mock, but let's assume we reply to sender_id = 1 (student) for now,
+      // or ideally we need sender_id from the message.
+      await communityAPI.sendMessage({ receiver_id: 1, content: replyText });
+      setReplyText('');
+      fetchMessages();
+    } catch (e) {
+      console.error(e);
+    }
+    setIsSending(false);
+  };
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '4rem', alignItems: 'start' }}>
@@ -21,7 +49,11 @@ function InboxTab() {
         <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Direct Messages</h2>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {messages.map(msg => (
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
+          ) : messages.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No messages</div>
+          ) : messages.map(msg => (
             <div 
               key={msg.id} 
               onClick={() => setActiveMessage(msg.id)}
@@ -76,12 +108,14 @@ function InboxTab() {
         {/* Reply Box */}
         <div style={{ padding: '1.5rem 2rem', borderTop: '1px solid var(--surface-2)' }}>
           <textarea 
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
             placeholder="Write your reply..." 
             style={{ width: '100%', minHeight: '100px', padding: '1rem', background: 'var(--surface-1)', border: '1px solid var(--surface-3)', borderRadius: 12, color: 'var(--text-primary)', fontSize: '0.9375rem', resize: 'vertical', outline: 'none', marginBottom: '1rem' }}
           />
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button style={{ background: 'var(--text-primary)', color: 'white', border: 'none', padding: '10px 24px', borderRadius: 8, fontSize: '0.9375rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Reply size={16} /> Send Reply
+            <button disabled={isSending || !replyText.trim()} onClick={handleSendReply} style={{ background: 'var(--text-primary)', color: 'white', border: 'none', padding: '10px 24px', borderRadius: 8, fontSize: '0.9375rem', fontWeight: 800, cursor: isSending ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, opacity: (isSending || !replyText.trim()) ? 0.7 : 1 }}>
+              <Reply size={16} /> {isSending ? 'Sending...' : 'Send Reply'}
             </button>
           </div>
         </div>
@@ -92,12 +126,17 @@ function InboxTab() {
   );
 }
 
-// ── Tab: Office Hours ─────────────────────────────────────────────────────
 function OfficeHoursTab() {
-  const bookings = [
-    { id: 1, student: 'Michael Chang', topic: 'Mentorship 1-on-1', time: '2:00 PM - 2:15 PM', status: 'upcoming' },
-    { id: 2, student: 'Priya Sharma', topic: 'Project Architecture Review', time: '2:30 PM - 2:45 PM', status: 'upcoming' },
-  ];
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+
+  useEffect(() => {
+    communityAPI.getTeacherOfficeHours()
+      .then(res => setBookings(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '4rem', alignItems: 'start' }}>
@@ -147,9 +186,13 @@ function OfficeHoursTab() {
             <CalendarIcon size={20} color="var(--brand-600)" />
             <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--brand-900)' }}>Today's Bookings</h3>
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {bookings.map(b => (
+        {/* ── Upcoming Bookings List ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading bookings...</div>
+          ) : bookings.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No upcoming bookings</div>
+          ) : bookings.map(b => (
               <div key={b.id} style={{ background: 'white', borderRadius: 12, padding: '1rem', border: '1px solid var(--brand-100)' }}>
                 <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-600)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.5rem' }}>
                   <Clock size={12} /> {b.time}
