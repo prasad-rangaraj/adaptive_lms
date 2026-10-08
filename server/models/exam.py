@@ -43,6 +43,7 @@ class ExamQuestion(Base):
     correct_answer = Column(Text, nullable=True)
     marks = Column(Float, default=1.0)
     difficulty = Column(String(20), default="medium")
+    tags = Column(JSON, nullable=True, default=list)
     order_index = Column(Integer, default=0)
 
     # AI generated?

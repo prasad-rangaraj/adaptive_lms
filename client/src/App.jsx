@@ -39,13 +39,14 @@ import TeacherMentorshipHub from './pages/teacher/TeacherMentorshipHub';
 import TeacherExamForge from './pages/teacher/TeacherExamForge';
 import TeacherCommunicationHub from './pages/teacher/TeacherCommunicationHub';
 
+
 // Admin Pages
 import OrgDashboard from './pages/admin/AdminDashboard'; // Assuming AdminDashboard is the org dashboard
 import OrgDataHub from './pages/admin/OrgDataHub';
 import OrgDirectoryHub from './pages/admin/OrgDirectoryHub';
-import OrgContentHub from './pages/admin/OrgContentHub';
 import CoursesHubAdmin from './pages/shared/CoursesHub';
 import OrgCommunicationHub from './pages/admin/OrgCommunicationHub';
+import ChatHub from './pages/shared/ChatHub';
 import OrgSecurityHub from './pages/admin/OrgSecurityHub';
 import OrgAiHub from './pages/admin/OrgAiHub';
 import OrgSettingsHub from './pages/admin/OrgSettingsHub';
@@ -128,6 +129,7 @@ export default function App() {
             <Route path="explore" element={<StudentExploreHub />} />
             <Route path="academic" element={<StudentAcademicHub />} />
             <Route path="community" element={<StudentCommunityHub />} />
+            <Route path="chat" element={<ChatHub />} />
             <Route path="career" element={<StudentCareerHub />} />
             <Route path="live/:courseId" element={<StudentLiveArena />} />
             <Route path="live" element={<StudentLiveArena />} /> {/* default for testing */}
@@ -154,7 +156,8 @@ export default function App() {
             <Route path="desk" element={<TeacherAcademicDesk />} />
             <Route path="mentorship" element={<TeacherMentorshipHub />} />
             <Route path="forge" element={<TeacherExamForge />} />
-            <Route path="inbox" element={<TeacherCommunicationHub />} />
+            <Route path="communication" element={<TeacherCommunicationHub />} />
+            <Route path="chat" element={<ChatHub />} />
             <Route path="courses" element={<CoursesHub />} />
           </Route>
 
@@ -176,6 +179,7 @@ export default function App() {
             <Route path="academic" element={<OrgAcademicMonitor />} />
             <Route path="assessment" element={<OrgAssessmentMonitor />} />
             <Route path="live" element={<OrgLiveMonitor />} />
+            <Route path="chat" element={<ChatHub />} />
           </Route>
 
           {/* Super Admin Routes */}

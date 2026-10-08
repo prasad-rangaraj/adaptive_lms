@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   ArrowRight, Award, Briefcase, ChevronRight, ExternalLink, 
   Star, TrendingUp, CheckCircle2, Lock, Zap, FileText, 
-  Download, Share2, PlayCircle, Clock
+  Download, Share2, PlayCircle, Clock, Target
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────
@@ -13,14 +13,14 @@ import {
 // ─────────────────────────────────────────────────────────────
 import { careerAPI } from '../../services/api.service';
 import { getTopicImage } from '../../utils/imageUtils';
-import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useAuthStore } from '../../store/authStore';
 
 // ─────────────────────────────────────────────────────────────
 // Tab: Career Pipeline & Resume
 // ─────────────────────────────────────────────────────────────
 function PipelineTab() {
-  const [selectedSkills, setSelectedSkills] = useState(['Python Core', 'Database & SQL']);
+  const [selectedSkills, setSelectedSkills] = useState([]);
   const { data: jobs = [] } = useQuery({
     queryKey: ['careerJobs'],
     queryFn: () => careerAPI.getJobs().then(res => res.data)
@@ -30,6 +30,13 @@ function PipelineTab() {
     queryKey: ['careerApplications'],
     queryFn: () => careerAPI.getApplications().then(res => res.data)
   });
+
+  const { data: skillNodes = [] } = useQuery({
+    queryKey: ['careerSkills'],
+    queryFn: () => careerAPI.getSkills().then(res => res.data)
+  });
+
+  const masteredSkills = skillNodes.filter(n => n.status === 'mastered').map(n => n.name);
 
   const resumeScore = 65 + (selectedSkills.length * 10);
 
@@ -125,7 +132,9 @@ function PipelineTab() {
           <div>
             <p style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Include Verified Skills:</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {['Python Core', 'Database & SQL', 'REST APIs', 'React.js'].map(s => {
+              {masteredSkills.length === 0 ? (
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Complete courses to unlock verified skills.</p>
+              ) : masteredSkills.map(s => {
                 const isSelected = selectedSkills.includes(s);
                 return (
                   <div key={s} onClick={() => toggleSkill(s)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: isSelected ? 'var(--brand-50)' : 'var(--surface-1)', border: `1px solid ${isSelected ? 'var(--brand-200)' : 'var(--surface-3)'}`, borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s' }}>
@@ -169,6 +178,8 @@ function SkillTreeTab() {
     queryFn: () => careerAPI.getSkills().then(res => res.data)
   });
   
+  const totalScore = skillNodes.reduce((acc, curr) => acc + curr.score, 0);
+  const masteryPercentage = skillNodes.length > 0 ? Math.round(totalScore / skillNodes.length) : 0;
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       
@@ -178,7 +189,7 @@ function SkillTreeTab() {
           <Target size={14} /> Target Career
         </div>
         <h2 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--brand-900)', letterSpacing: '-0.02em', marginBottom: '0.5rem' }}>Backend Engineer</h2>
-        <p style={{ fontSize: '0.9375rem', color: 'var(--brand-700)' }}>You are currently <strong>60%</strong> of the way to achieving this career goal.</p>
+        <p style={{ fontSize: '0.9375rem', color: 'var(--brand-700)' }}>You are currently <strong>{masteryPercentage}%</strong> of the way to achieving this career goal.</p>
       </div>
 
       {/* The Gamified Tree */}
@@ -227,6 +238,8 @@ function SkillTreeTab() {
 // Tab: Credentials Vault
 // ─────────────────────────────────────────────────────────────
 function VaultTab() {
+  const { user } = useAuthStore();
+  const username = user?.full_name?.toLowerCase().replace(/\s+/g, '-') || 'student';
   const { data: certificates = [] } = useQuery({
     queryKey: ['careerCertificates'],
     queryFn: () => careerAPI.getCertificates().then(res => res.data)
@@ -285,7 +298,7 @@ function VaultTab() {
         <p style={{ fontSize: '0.8125rem', color: 'var(--brand-700)', lineHeight: 1.5, marginBottom: '1.5rem' }}>Share a single verified link with recruiters containing your resume, cognitive profile, and certificates.</p>
         
         <div style={{ background: 'white', border: '1px solid var(--brand-100)', borderRadius: 12, padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>lumina.edu/p/karthik-r</span>
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>lumina.edu/p/{username}</span>
           <button style={{ background: 'transparent', border: 'none', color: 'var(--brand-600)', fontWeight: 800, fontSize: '0.75rem', cursor: 'pointer' }}>Copy</button>
         </div>
         

@@ -104,16 +104,16 @@ function PhaseFoundation({ course, onNext, onClose }) {
   const current = slides[slide];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '2rem 1rem', flex: 1 }}>
-      <div style={{ width: 80, height: 80, borderRadius: 24, background: 'var(--surface-1)', border: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2rem', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', transition: 'all 0.3s' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '0.5rem', flex: 1 }}>
+      <div style={{ width: 80, height: 80, borderRadius: 24, background: 'var(--surface-1)', border: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', transition: 'all 0.3s' }}>
         {current.icon}
       </div>
 
-      <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: '1rem', lineHeight: 1.2 }}>{current.heading}</h2>
-      <p style={{ fontSize: '1.0625rem', color: 'var(--text-secondary)', lineHeight: 1.7, maxWidth: 520, marginBottom: '3rem' }}>{current.body}</p>
+      <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: '0.75rem', lineHeight: 1.2 }}>{current.heading}</h2>
+      <p style={{ fontSize: '1.0625rem', color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: 520, marginBottom: '2rem' }}>{current.body}</p>
 
       {/* Dot indicators */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: '3rem' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: '2rem' }}>
         {slides.map((_, i) => (
           <div key={i} onClick={() => setSlide(i)} style={{
             width: i === slide ? 24 : 8, height: 8, borderRadius: 999,
@@ -937,7 +937,7 @@ export default function PlacementAssessmentModal({ course, startAtPhase = 1, onP
         </div>
 
         {/* Phase Content */}
-        <div style={{ padding: '2rem 2.5rem', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '1.5rem 2.5rem 2rem', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           {phase === 1 && (
             <PhaseFoundation
               course={course}

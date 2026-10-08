@@ -26,28 +26,36 @@ export function useProctoring() {
   useEffect(() => {
     let isMounted = true;
 
-    async function initModel() {
-      try {
-        const filesetResolver = await FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
-        );
-        const faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-          baseOptions: {
-            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
-            delegate: 'GPU',
-          },
-          outputFaceBlendshapes: true,
-          runningMode: 'VIDEO',
-          numFaces: 1,
-        });
+    async function initModel(retries = 3) {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          const filesetResolver = await FilesetResolver.forVisionTasks(
+            'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
+          );
+          const faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+            baseOptions: {
+              modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+              delegate: 'GPU',
+            },
+            outputFaceBlendshapes: true,
+            runningMode: 'VIDEO',
+            numFaces: 1,
+          });
 
-        if (isMounted) {
-          faceLandmarkerRef.current = faceLandmarker;
-          setStatus('ready');
+          if (isMounted) {
+            faceLandmarkerRef.current = faceLandmarker;
+            setStatus('ready');
+          }
+          return; // Success, exit retry loop
+        } catch (error) {
+          console.error(`MediaPipe Init Attempt ${attempt} failed:`, error);
+          if (attempt === retries && isMounted) {
+            setStatus('error');
+          } else {
+            // Wait 1 second before retrying
+            await new Promise(res => setTimeout(res, 1000));
+          }
         }
-      } catch (error) {
-        console.error('Failed to initialize MediaPipe FaceLandmarker:', error);
-        if (isMounted) setStatus('error');
       }
     }
 

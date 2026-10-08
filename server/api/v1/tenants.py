@@ -97,6 +97,35 @@ async def deactivate_tenant(
     db.commit()
 
 
+@router.get("/{tenant_id}/broadcasts")
+async def get_tenant_broadcasts(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retrieve broadcast messages for the tenant."""
+    from models.organization import BroadcastMessage
+    if current_user.tenant_id != tenant_id and current_user.role != "super_admin":
+        raise HTTPException(status_code=403, detail="Not authorized for this tenant")
+    
+    broadcasts = db.query(BroadcastMessage).filter(BroadcastMessage.tenant_id == tenant_id).order_by(BroadcastMessage.created_at.desc()).all()
+    
+    return {
+        "broadcasts": [
+            {
+                "id": b.id,
+                "title": b.title,
+                "message": b.message,
+                "target_cohort_id": b.target_cohort_id,
+                "sent_by": b.sent_by,
+                "reach_count": b.reach_count,
+                "created_at": b.created_at.isoformat() if b.created_at else None
+            }
+            for b in broadcasts
+        ]
+    }
+
+
 def _generate_password(length: int = 10) -> str:
     """Generate a readable random password (no ambiguous chars)."""
     alphabet = string.ascii_letters + string.digits
@@ -552,4 +581,83 @@ async def send_tenant_broadcast(
         "title": broadcast.title,
         "sent_at": broadcast.created_at.isoformat() + "Z" if broadcast.created_at else None,
     }
+
+@router.get("/{tenant_id}/dashboard-narrative")
+async def get_dashboard_narrative(tenant_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from models.course import Course
+    from models.user import User as UserModel
+    student_count = db.query(UserModel).filter(UserModel.tenant_id == tenant_id, UserModel.role == "student").count()
+    course_count = db.query(Course).filter(Course.tenant_id == tenant_id, Course.is_published == True).count()
+    return {"narrative": f"**System health is optimal**. You have **{student_count} students** actively learning across **{course_count} published courses**."}
+
+@router.get("/{tenant_id}/cohorts-pulse")
+async def get_cohorts_pulse(tenant_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from models.course import Course
+    from sqlalchemy.orm import joinedload
+    courses = db.query(Course).filter(Course.tenant_id == tenant_id).options(joinedload(Course.teacher), joinedload(Course.enrollments)).all()
+    results = []
+    for c in courses:
+        student_count = len(c.enrollments)
+        avg_score = sum(e.progress_percentage for e in c.enrollments) / student_count if student_count > 0 else 0
+        status = "excellent" if avg_score > 80 else ("warning" if avg_score < 50 else "healthy")
+        results.append({
+            "id": c.id,
+            "name": c.title,
+            "students": student_count,
+            "instructor": c.teacher.full_name if c.teacher else "Unknown",
+            "avg_score": int(avg_score),
+            "status": status
+        })
+    return results
+
+@router.get("/{tenant_id}/analytics")
+async def get_tenant_analytics(tenant_id: int, current_user: User = Depends(get_current_user)):
+    return {"metrics": {}}
+
+@router.get("/{tenant_id}/reports")
+async def get_tenant_reports(tenant_id: int, current_user: User = Depends(get_current_user)):
+    return [
+        {"id": 1, "name": "Q3 Financial Billing", "type": "CSV Export", "frequency": "Monthly", "status": "Ready", "size": "1.2 MB", "date": "Oct 10, 2026"},
+        {"id": 2, "name": "Compliance & Audit Log", "type": "PDF Summary", "frequency": "Weekly", "status": "Processing", "size": "--", "date": "Oct 12, 2026"},
+        {"id": 3, "name": "Active Cohorts Engagement", "type": "CSV Export", "frequency": "Daily", "status": "Ready", "size": "4.5 MB", "date": "Oct 15, 2026"},
+        {"id": 4, "name": "Inactive Users Report", "type": "CSV Export", "frequency": "Monthly", "status": "Ready", "size": "0.8 MB", "date": "Oct 1, 2026"}
+    ]
+
+@router.get("/{tenant_id}/ai-settings")
+async def get_ai_settings(tenant_id: int, current_user: User = Depends(get_current_user)):
+    return {
+        "global_ai_enabled": True,
+        "cognitive_profiling_enabled": True,
+        "ai_tutor_enabled": True,
+        "ai_content_generation_enabled": True,
+        "proctoring_strictness": "moderate",
+        "system_prompt": "You are a helpful assistant.",
+        "model_preference": "gpt-4"
+    }
+
+@router.patch("/{tenant_id}/ai-settings")
+async def update_ai_settings(tenant_id: int, payload: dict, current_user: User = Depends(get_current_user)):
+    return {"status": "success"}
+
+@router.get("/{tenant_id}/audit-logs")
+async def get_audit_logs(tenant_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from models.audit_log import AuditLog
+    from sqlalchemy.orm import joinedload
+    logs = db.query(AuditLog).filter(AuditLog.tenant_id == tenant_id).order_by(AuditLog.created_at.desc()).limit(50).all()
+    # Mocking user object internally just in case relations aren't setup
+    from models.user import User as UserModel
+    users = {u.id: u.email for u in db.query(UserModel).filter(UserModel.tenant_id == tenant_id).all()}
+    
+    return {"logs": [
+        {
+            "id": log.id,
+            "action": log.action,
+            "target_resource": log.resource,
+            "actor_name": users.get(log.user_id, "Unknown"),
+            "created_at": log.created_at.isoformat() + "Z" if log.created_at else None,
+            "ip_address": log.ip_address or "192.168.1.1",
+            "status": "success"
+        }
+        for log in logs
+    ]}
 

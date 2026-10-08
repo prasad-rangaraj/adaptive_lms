@@ -77,17 +77,16 @@ RECENT PERFORMANCE EVENT:
 
 Please generate the updated cognitive profile JSON."""
 
-    response = openai_client.chat.completions.create(
-        model=settings.CHAT_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.4,
-    )
-
     try:
+        response = openai_client.chat.completions.create(
+            model=settings.CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.4,
+        )
         updated_data = json.loads(response.choices[0].message.content)
         
         # Apply updates to the profile
@@ -118,7 +117,19 @@ Please generate the updated cognitive profile JSON."""
         print(f"Error parsing AI response for cognitive profile: {e}")
         return profile, []
 
+import time
+
+TRIVIA_CACHE = {}
+
 def generate_daily_trivia(profile: CognitiveProfile) -> dict:
+    user_id = profile.user_id
+    now = time.time()
+    
+    if user_id in TRIVIA_CACHE:
+        cached_data, timestamp = TRIVIA_CACHE[user_id]
+        if now - timestamp < 43200:
+            return cached_data
+
     system_prompt = """You are an AI generating a daily trivia question for a computer science / software engineering student.
 Output a JSON object exactly like this:
 {
@@ -132,22 +143,25 @@ Make it moderately challenging and ensure there are exactly 4 options. correctId
     if profile.weak_areas:
         user_prompt += f" Focus on one of their weak areas: {', '.join(profile.weak_areas)}."
         
-    response = openai_client.chat.completions.create(
-        model=settings.CHAT_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.7,
-    )
-    
     try:
-        return json.loads(response.choices[0].message.content)
+        response = openai_client.chat.completions.create(
+            model=settings.CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7,
+        )
+        data = json.loads(response.choices[0].message.content)
+        TRIVIA_CACHE[user_id] = (data, now)
+        return data
     except Exception as e:
         print(f"Trivia error: {e}")
-        return {
+        fallback = {
             "question": "Which HTTP method is typically used to update an existing resource entirely?",
             "options": ["POST", "PUT", "PATCH", "GET"],
             "correctIdx": 1
         }
+        TRIVIA_CACHE[user_id] = (fallback, now)
+        return fallback

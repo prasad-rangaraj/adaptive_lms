@@ -139,6 +139,9 @@ class CourseModuleUpdateRequest(BaseModel):
     title: Optional[str] = None
     level: Optional[str] = None
 
+class CourseMaterialUpdateRequest(BaseModel):
+    title: Optional[str] = None
+
 
 class CourseModuleCreateRequest(BaseModel):
     title: str
@@ -374,6 +377,12 @@ class AttendanceRecordResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class LeaveRequestCreate(BaseModel):
+    start_date: date
+    end_date: date
+    type: str
+    reason: str
 
 class LeaveRequestResponse(BaseModel):
     id: int

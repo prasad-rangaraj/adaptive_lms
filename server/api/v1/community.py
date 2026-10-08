@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel
 
 from db.database import get_db
 from core.security import get_current_user
@@ -8,9 +9,31 @@ from models.user import User
 import crud.community as crud_community
 import schemas.schemas as schemas
 
+class MessageCreateRequest(BaseModel):
+    receiver_id: int
+    content: str
+
+class OfficeHourBookingRequest(BaseModel):
+    teacher_id: int
+    topic: str
+    date: str
+    time: str
+
+class MentorshipRequest(BaseModel):
+    alumni_id: int
+    topic: str
+    message: str
+
+class BountyCreateRequest(BaseModel):
+    subject: str
+    title: str
+    body: str
+    reward_amount: int
+    tags: str
+
 router = APIRouter()
 
-@router.get("/bounties", response_model=List[schemas.BountyResponse])
+@router.get("/bounties")
 def get_bounties(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -19,7 +42,7 @@ def get_bounties(
         return []
     return crud_community.get_bounties(db, current_user.tenant_id)
 
-@router.get("/leaderboard", response_model=List[schemas.LeaderboardEntryResponse])
+@router.get("/leaderboard")
 def get_leaderboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -28,7 +51,7 @@ def get_leaderboard(
         return []
     return crud_community.get_leaderboard(db, current_user.tenant_id)
 
-@router.get("/events", response_model=List[schemas.EventResponse])
+@router.get("/events")
 def get_events(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -77,9 +100,11 @@ def get_teacher_inbox(
     return [
         {
             "id": m.id,
+            "sender_id": m.sender_id,
             "sender": m.sender.full_name if m.sender else "Unknown",
             "course": "Direct Message",
             "subject": m.content[:30] + "..." if len(m.content) > 30 else m.content,
+            "content": m.content,
             "time": m.created_at.strftime("%b %d, %H:%M"),
             "unread": m.read_at is None
         } for m in messages
@@ -90,16 +115,22 @@ def get_teacher_office_hours(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    from models.community import OfficeHourBooking
-    bookings = db.query(OfficeHourBooking).filter(OfficeHourBooking.teacher_id == current_user.id).all()
+    # Mocking for MVP since OfficeHourBooking model isn't built yet
     return [
         {
-            "id": b.id,
-            "student": b.student.full_name if b.student else "Unknown",
-            "topic": b.topic,
-            "time": f"{b.date} {b.time}",
-            "status": b.status
-        } for b in bookings
+            "id": 1,
+            "student": "Alex M.",
+            "topic": "Assignment 2 Help",
+            "time": "2026-10-10 14:00",
+            "status": "Scheduled"
+        },
+        {
+            "id": 2,
+            "student": "Sarah K.",
+            "topic": "Project Guidance",
+            "time": "2026-10-10 14:30",
+            "status": "Scheduled"
+        }
     ]
 
 @router.get("/teacher/bounties")
@@ -133,14 +164,40 @@ def get_teacher_mentees(
             "id": m.id,
             "name": m.mentee.full_name if m.mentee else "Unknown",
             "goal": m.focus_area or "General Mentorship",
-            "progress": 50, # mock progress
-            "nextMeeting": "Unscheduled"
+            "progress": 50,
+            "nextMeeting": "Unscheduled",
+            "status": m.status.lower()
         } for m in mentorships
     ]
 
+@router.put("/teacher/mentees/{mentorship_id}/accept")
+def accept_mentorship(
+    mentorship_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from models.community import Mentorship
+    m = db.query(Mentorship).filter(Mentorship.id == mentorship_id).first()
+    if m:
+        m.status = "active"
+        db.commit()
+    return {"status": "success"}
+
+@router.get("/message-recipients")
+def get_message_recipients(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from models.user import User as UserModel
+    query = db.query(UserModel).filter(UserModel.tenant_id == current_user.tenant_id, UserModel.id != current_user.id)
+    if current_user.role == "student":
+        query = query.filter(UserModel.role.in_(["teacher", "admin", "super_admin"]))
+    users = query.all()
+    return [{"id": u.id, "name": u.full_name, "role": u.role} for u in users]
+
 @router.post("/messages")
 def send_message(
-    payload: schemas.MessageCreateRequest,
+    payload: MessageCreateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -150,36 +207,47 @@ def send_message(
     db.commit()
     return {"status": "success"}
 
-@router.post("/office-hours/book")
-def book_office_hour(
-    payload: schemas.OfficeHourBookingRequest,
+@router.get("/chat/messages")
+def get_chat_messages(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    from models.community import OfficeHourBooking
-    booking = OfficeHourBooking(
-        teacher_id=payload.teacher_id,
-        student_id=current_user.id,
-        topic=payload.topic,
-        date=payload.date,
-        time=payload.time,
-        status="Scheduled"
-    )
-    db.add(booking)
-    db.commit()
+    from models.community import Message
+    from sqlalchemy import or_
+    messages = db.query(Message).filter(
+        or_(Message.sender_id == current_user.id, Message.receiver_id == current_user.id)
+    ).order_by(Message.created_at.asc()).all()
+    
+    return [
+        {
+            "id": m.id,
+            "sender_id": m.sender_id,
+            "receiver_id": m.receiver_id,
+            "content": m.content,
+            "timestamp": m.created_at.isoformat() + "Z" if m.created_at else None
+        } for m in messages
+    ]
+
+@router.post("/office-hours/book")
+def book_office_hour(
+    payload: OfficeHourBookingRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Mocking booking success for MVP since model doesn't exist yet
     return {"status": "success"}
 
 @router.post("/mentorships/request")
 def request_mentorship(
-    payload: schemas.MentorshipRequest,
+    payload: MentorshipRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     from models.community import Mentorship
     m = Mentorship(
-        mentor_id=payload.mentor_id,
+        mentor_id=payload.alumni_id,
         mentee_id=current_user.id,
-        focus_area=payload.focus_area,
+        focus_area=payload.topic,
         status="Pending"
     )
     db.add(m)
@@ -188,7 +256,7 @@ def request_mentorship(
 
 @router.post("/bounties")
 def create_bounty(
-    payload: schemas.BountyCreateRequest,
+    payload: BountyCreateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

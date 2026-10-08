@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import {
@@ -25,6 +26,7 @@ const navConfig = {
     ]},
     { section: 'Community', items: [
       { to: '/student/community', icon: Users, label: 'Community Hub' },
+      { to: '/student/chat', icon: MessageSquare, label: 'Messages' },
       { to: '/student/live', icon: Video, label: 'Live Classroom' },
     ]},
     { section: 'Future', items: [
@@ -38,7 +40,6 @@ const navConfig = {
     { section: 'Creator Studio', items: [
       { to: '/teacher/studio', icon: BookOpen, label: 'Course Studio' },
       { to: '/teacher/courses', icon: GraduationCap, label: 'All Courses' },
-      { to: '/teacher/inbox', icon: MessageSquare, label: 'Faculty Inbox' },
     ]},
     { section: 'Evaluation & Operations', items: [
       { to: '/teacher/forge', icon: Puzzle, label: 'Exam Forge' },
@@ -48,6 +49,7 @@ const navConfig = {
     { section: 'Community & Live', items: [
       { to: '/teacher/live', icon: Video, label: 'Live Sessions' },
       { to: '/teacher/mentorship', icon: HeartPulse, label: 'Mentorship Hub' },
+      { to: '/teacher/chat', icon: MessageSquare, label: 'Messages' },
     ]},
   ],
   admin: [
@@ -68,6 +70,7 @@ const navConfig = {
       { to: '/admin/directory',     icon: Users,           label: 'Directory Hub' },
       { to: '/admin/content',       icon: BookOpen,        label: 'Content Hub' },
       { to: '/admin/communication', icon: Megaphone,       label: 'Communication Hub' },
+      { to: '/admin/chat',          icon: MessageSquare,   label: 'Messages' },
     ]},
     { section: 'Administration', items: [
       { to: '/admin/security',      icon: Shield,          label: 'Security Hub' },
@@ -105,11 +108,17 @@ const roleConfig = {
 };
 
 // Routes that should use the full page (no max-width, edge-to-edge)
-const FULL_PAGE_ROUTES = ['/live', '/live/'];
+const FULL_PAGE_ROUTES = ['/live', '/live/', '/chat'];
 function isFullPage(pathname) {
   if (FULL_PAGE_ROUTES.some(r => pathname.endsWith(r) || pathname.includes('/live/'))) return true;
   if (pathname.match(/\/student\/course\/\d+/)) return true; // Learning Canvas Player
+  if (pathname.endsWith('/chat')) return true; // Chat Hub full page
   return false;
+}
+
+function isBareFullPage(pathname) {
+  // Completely bare — no padding wrapper at all (chat, full canvas)
+  return pathname.endsWith('/chat');
 }
 
 export default function DashboardLayout({ role }) {
@@ -119,6 +128,45 @@ export default function DashboardLayout({ role }) {
   const sections = navConfig[role] || [];
   const rc = roleConfig[role] || roleConfig.student;
   const fullPage = isFullPage(location.pathname);
+  const bareFullPage = isBareFullPage(location.pathname);
+
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const mockNotifs = {
+    student: [
+      { id: 1, text: "Your assignment for 'Data Structures' is due tomorrow.", time: "2h ago", unread: true },
+      { id: 2, text: "Professor Smith replied to your Mentorship request.", time: "5h ago", unread: true },
+      { id: 3, text: "New Community Bounty matches your skills!", time: "1d ago", unread: false }
+    ],
+    teacher: [
+      { id: 1, text: "Alice Learner submitted an assignment late.", time: "1h ago", unread: true },
+      { id: 2, text: "New Office Hours booking from John Doe.", time: "3h ago", unread: true },
+      { id: 3, text: "Mentorship request pending approval.", time: "1d ago", unread: false }
+    ],
+    admin: [
+      { id: 1, text: "System anomaly detected in Assessment Server.", time: "10m ago", unread: true },
+      { id: 2, text: "New teacher account registration requires approval.", time: "1h ago", unread: true },
+      { id: 3, text: "Weekly system report is ready.", time: "2d ago", unread: false }
+    ],
+    super_admin: [
+      { id: 1, text: "Global tenant limits reached for 'Demo Uni'.", time: "5m ago", unread: true },
+      { id: 2, text: "New platform update deployed successfully.", time: "2h ago", unread: true }
+    ]
+  };
+
+  const notifications = mockNotifs[role] || mockNotifs.student;
+  const unreadCount = notifications.filter(n => n.unread).length;
 
   const user = authStore.user || {
     full_name: 'Dev Admin',
@@ -244,11 +292,54 @@ export default function DashboardLayout({ role }) {
 
           <div style={{ flex: 1 }} />
 
-          {/* Bell */}
-          <button className="btn btn-ghost btn-icon" style={{ position: 'relative' }}>
-            <Bell size={17} color="var(--text-muted)" />
-            <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: '#e11d48', border: '1.5px solid var(--surface-1)' }} />
+          {/* Chat */}
+          <button className="btn btn-ghost btn-icon" onClick={() => navigate(`/${role}/chat`)} title="Open Lumina Chat">
+            <MessageSquare size={17} color="var(--text-muted)" />
           </button>
+
+          {/* Bell */}
+          <div ref={notifRef} style={{ position: 'relative' }}>
+            <button className="btn btn-ghost btn-icon" style={{ position: 'relative' }} onClick={() => setShowNotifications(!showNotifications)}>
+              <Bell size={17} color="var(--text-muted)" />
+              {unreadCount > 0 && <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: '#e11d48', border: '1.5px solid var(--surface-1)' }} />}
+            </button>
+
+            {/* Notification Dropdown */}
+            {showNotifications && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                width: 320, background: 'var(--surface-0)', border: '1px solid var(--surface-2)',
+                borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-xl)', zIndex: 100,
+                overflow: 'hidden', display: 'flex', flexDirection: 'column'
+              }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--surface-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-1)' }}>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Notifications</span>
+                  {unreadCount > 0 && <span style={{ fontSize: '0.6875rem', color: 'var(--brand-600)', fontWeight: 700, cursor: 'pointer' }} onClick={() => setShowNotifications(false)}>Mark all read</span>}
+                </div>
+                <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+                  {notifications.map(n => (
+                    <div key={n.id} style={{
+                      padding: '12px 16px', borderBottom: '1px solid var(--surface-2)',
+                      background: n.unread ? 'var(--brand-50)' : 'transparent',
+                      cursor: 'pointer', transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'}
+                    onMouseLeave={e => e.currentTarget.style.background = n.unread ? 'var(--brand-50)' : 'transparent'}
+                    >
+                      <p style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', margin: '0 0 4px 0', lineHeight: 1.4, fontWeight: n.unread ? 600 : 400 }}>{n.text}</p>
+                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{n.time}</span>
+                    </div>
+                  ))}
+                  {notifications.length === 0 && (
+                    <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>No notifications</div>
+                  )}
+                </div>
+                <div style={{ padding: '10px 16px', borderTop: '1px solid var(--surface-2)', textAlign: 'center', background: 'var(--surface-1)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: 'var(--brand-600)' }} onClick={() => setShowNotifications(false)}>
+                  View all notifications
+                </div>
+              </div>
+            )}
+          </div>
 
           <button className="btn btn-ghost btn-icon">
             <Settings size={17} color="var(--text-muted)" />
@@ -258,9 +349,11 @@ export default function DashboardLayout({ role }) {
         {/* Page Content */}
         <div style={{ flex: 1, overflowY: fullPage ? 'hidden' : 'auto', display: 'flex', flexDirection: 'column' }}>
           <div
-            style={fullPage
-              ? { flex: 1, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)', padding: '1.5rem 1.75rem', boxSizing: 'border-box' }
-              : { flex: 1, padding: '1.5rem 2.5rem', maxWidth: 1280, width: '100%', boxSizing: 'border-box' }
+            style={bareFullPage
+              ? { flex: 1, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)', boxSizing: 'border-box' }
+              : fullPage
+                ? { flex: 1, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)', padding: '1.5rem 1.75rem', boxSizing: 'border-box' }
+                : { flex: 1, padding: '1.5rem 2.5rem', maxWidth: 1280, width: '100%', boxSizing: 'border-box' }
             }
           >
             <Outlet />

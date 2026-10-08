@@ -64,13 +64,26 @@ function EnrollModal({ course, onConfirm, onClose }) {
             {loading ? (
               <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Loading syllabus...</div>
             ) : modules.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {modules.map((m, idx) => (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1rem', background: 'var(--surface-1)', borderRadius: 12, border: '1px solid var(--surface-2)' }}>
-                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-50)', color: 'var(--brand-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, flexShrink: 0 }}>{idx + 1}</div>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-secondary)' }}>{m.title}</span>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {['fundamentals', 'beginner', 'intermediate', 'advanced'].map(lvl => {
+                  const levelMods = modules.filter(m => (m.level === lvl) || (m.title && m.title.toLowerCase().includes(lvl.replace('fundamentals', 'fundamental').split(' ')[0])));
+                  if (levelMods.length === 0) return null;
+                  
+                  const heading = lvl === 'fundamentals' ? 'Fundamentals' : lvl.charAt(0).toUpperCase() + lvl.slice(1) + ' Level';
+                  return (
+                    <div key={lvl} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <h4 style={{ fontSize: '0.875rem', fontWeight: 900, color: 'var(--brand-600)', margin: '0 0 0.25rem 0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        {heading}
+                      </h4>
+                      {levelMods.map((m, idx) => (
+                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1rem', background: 'var(--surface-1)', borderRadius: 12, border: '1px solid var(--surface-2)' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'white', border: '1px solid var(--surface-3)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, flexShrink: 0 }}>{idx + 1}</div>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-secondary)' }}>{m.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', margin: 0 }}>Syllabus being finalized.</p>

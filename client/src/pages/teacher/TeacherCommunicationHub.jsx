@@ -7,7 +7,7 @@ import { communityAPI } from '../../services/api.service';
 
 // ── Tab: Unified Inbox ──────────────────────────────────────────────────
 function InboxTab() {
-  const [activeMessage, setActiveMessage] = useState(1);
+  const [activeMessage, setActiveMessage] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [replyText, setReplyText] = useState('');
@@ -16,7 +16,10 @@ function InboxTab() {
 
   const fetchMessages = () => {
     communityAPI.getTeacherInbox()
-      .then(res => setMessages(res.data))
+      .then(res => {
+        setMessages(res.data);
+        if (res.data.length > 0 && !activeMessage) setActiveMessage(res.data[0].id);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   };
@@ -26,13 +29,10 @@ function InboxTab() {
   }, []);
 
   const handleSendReply = async () => {
-    if (!replyText.trim()) return;
+    if (!replyText.trim() || !activeMsgData) return;
     setIsSending(true);
     try {
-      // Assuming activeMessage corresponds to the ID, and we reply to the same sender.
-      // We don't have the original sender ID in the mock, but let's assume we reply to sender_id = 1 (student) for now,
-      // or ideally we need sender_id from the message.
-      await communityAPI.sendMessage({ receiver_id: 1, content: replyText });
+      await communityAPI.sendMessage({ receiver_id: activeMsgData.sender_id, content: replyText });
       setReplyText('');
       fetchMessages();
     } catch (e) {
@@ -40,6 +40,8 @@ function InboxTab() {
     }
     setIsSending(false);
   };
+
+  const activeMsgData = messages.find(m => m.id === activeMessage);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '4rem', alignItems: 'start' }}>
@@ -76,34 +78,42 @@ function InboxTab() {
       {/* ── Right: Message Thread ── */}
       <div style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 20, display: 'flex', flexDirection: 'column', minHeight: '500px' }}>
         
-        {/* Thread Header */}
-        <div style={{ padding: '2rem', borderBottom: '1px solid var(--surface-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Question regarding Assignment 2</h3>
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>From <span style={{ fontWeight: 700 }}>Alex Chen</span> • Advanced Machine Learning</p>
-          </div>
-          <button style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-3)', padding: '8px 16px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-primary)' }}>
-            <Check size={14} /> Mark as Resolved
-          </button>
-        </div>
-
-        {/* Messages */}
-        <div style={{ padding: '2rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem', overflowY: 'auto' }}>
-          
-          <div style={{ display: 'flex', gap: '1.5rem' }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.875rem' }}>A</div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)' }}>Alex Chen</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>10:42 AM</span>
+        {activeMsgData ? (
+          <>
+            {/* Thread Header */}
+            <div style={{ padding: '2rem', borderBottom: '1px solid var(--surface-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>{activeMsgData.course}</h3>
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>From <span style={{ fontWeight: 700 }}>{activeMsgData.sender}</span></p>
               </div>
-              <p style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                Hi Professor, I was looking at the requirements for Assignment 2. Are we allowed to use PyTorch Lightning for the training loop, or do we need to write the raw PyTorch training loop from scratch?
-              </p>
+              <button style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-3)', padding: '8px 16px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-primary)' }}>
+                <Check size={14} /> Mark as Resolved
+              </button>
             </div>
-          </div>
 
-        </div>
+            {/* Messages */}
+            <div style={{ padding: '2rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem', overflowY: 'auto' }}>
+              
+              <div style={{ display: 'flex', gap: '1.5rem' }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.875rem' }}>{activeMsgData.sender.charAt(0).toUpperCase()}</div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)' }}>{activeMsgData.sender}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{activeMsgData.time}</span>
+                  </div>
+                  <p style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                    {activeMsgData.content}
+                  </p>
+                </div>
+              </div>
+
+            </div>
+          </>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+            Select a message to view
+          </div>
+        )}
 
         {/* Reply Box */}
         <div style={{ padding: '1.5rem 2rem', borderTop: '1px solid var(--surface-2)' }}>
@@ -126,96 +136,7 @@ function InboxTab() {
   );
 }
 
-function OfficeHoursTab() {
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-
-  useEffect(() => {
-    communityAPI.getTeacherOfficeHours()
-      .then(res => setBookings(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '4rem', alignItems: 'start' }}>
-      
-      {/* ── Left: Scheduler & Rules ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
-        
-        <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Office Hours Configuration</h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Set your availability. Students can automatically book open slots.</p>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '2rem' }}>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1.5rem', borderBottom: '1px solid var(--surface-2)' }}>
-            <div>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Weekly Availability</h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Tuesdays & Thursdays, 2 PM - 4 PM</p>
-            </div>
-            <button style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-3)', padding: '8px 16px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer' }}>Edit Rules</button>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1.5rem', borderBottom: '1px solid var(--surface-2)' }}>
-            <div>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Slot Duration</h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>15 minutes</p>
-            </div>
-            <button style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-3)', padding: '8px 16px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer' }}>Edit Duration</button>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Meeting Location</h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Lumina Built-in Video Conf</p>
-            </div>
-            <button style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-3)', padding: '8px 16px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer' }}>Edit Location</button>
-          </div>
-
-        </div>
-      </div>
-
-      {/* ── Right: Today's Schedule ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        
-        <div style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-100)', borderRadius: 20, padding: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1.5rem' }}>
-            <CalendarIcon size={20} color="var(--brand-600)" />
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--brand-900)' }}>Today's Bookings</h3>
-          </div>
-        {/* ── Upcoming Bookings List ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {loading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading bookings...</div>
-          ) : bookings.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No upcoming bookings</div>
-          ) : bookings.map(b => (
-              <div key={b.id} style={{ background: 'white', borderRadius: 12, padding: '1rem', border: '1px solid var(--brand-100)' }}>
-                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-600)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.5rem' }}>
-                  <Clock size={12} /> {b.time}
-                </p>
-                <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>{b.student}</h4>
-                <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>{b.topic}</p>
-                <button onClick={() => window.location.href = `/meet/booking-${b.id}`} style={{ width: '100%', background: 'var(--brand-500)', color: 'white', border: 'none', padding: '8px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  <Video size={14} /> Join Meeting
-                </button>
-              </div>
-            ))}
-            
-            {bookings.length === 0 && (
-              <p style={{ fontSize: '0.875rem', color: 'var(--brand-700)', textAlign: 'center', padding: '1rem 0' }}>No bookings for today.</p>
-            )}
-          </div>
-        </div>
-
-      </div>
-
-    </div>
-  );
-}
 
 // ── Main Hub ──────────────────────────────────────────────────────────────
 export default function TeacherCommunicationHub() {
@@ -237,7 +158,6 @@ export default function TeacherCommunicationHub() {
           <div style={{ display: 'flex', gap: '3rem', marginTop: '0', borderBottom: '1px solid var(--surface-3)' }}>
             {[
               { id: 'inbox', label: 'Unified Inbox' },
-              { id: 'office_hours', label: 'Office Hours Scheduler' },
             ].map(t => (
               <button 
                 key={t.id} onClick={() => setActiveTab(t.id)}
@@ -260,7 +180,6 @@ export default function TeacherCommunicationHub() {
         {/* ── Tab Content ── */}
         <div style={{ minHeight: '600px', paddingTop: '1rem' }}>
           {activeTab === 'inbox' && <InboxTab />}
-          {activeTab === 'office_hours' && <OfficeHoursTab />}
         </div>
 
       </div>

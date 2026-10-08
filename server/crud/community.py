@@ -5,21 +5,55 @@ from models.user import User
 
 def get_bounties(db: Session, tenant_id: int):
     bounties = db.query(Bounty).filter(Bounty.tenant_id == tenant_id).order_by(Bounty.created_at.desc()).all()
-    # Populate author name
+    results = []
     for b in bounties:
-        if b.author:
-            b.author_name = b.author.full_name
-    return bounties
+        author_name = b.author.full_name if b.author else "Unknown"
+        tag_list = [t.strip() for t in b.tags.split(",")] if b.tags else []
+        results.append({
+            "id": b.id,
+            "avatar": author_name[0].upper(),
+            "solved": b.is_solved,
+            "subject": tag_list[0] if tag_list else "General",
+            "bounty": b.reward_amount,
+            "title": b.title,
+            "body": b.body,
+            "author": author_name,
+            "time": b.created_at.strftime("%b %d") if b.created_at else "Now",
+            "replies": len(b.replies) if hasattr(b, 'replies') else 0
+        })
+    return results
 
 def get_leaderboard(db: Session, tenant_id: int):
     entries = db.query(LeaderboardEntry).filter(LeaderboardEntry.tenant_id == tenant_id).order_by(LeaderboardEntry.reputation.desc()).limit(10).all()
-    for e in entries:
-        if e.student:
-            e.student_name = e.student.full_name
-    return entries
+    results = []
+    colors = ["#f59e0b", "#94a3b8", "#b45309", "#8b5cf6", "#3b82f6", "#10b981", "#ef4444", "#06b6d4", "#f43f5e", "#84cc16"]
+    for i, e in enumerate(entries):
+        name = e.student.full_name if e.student else "Unknown"
+        results.append({
+            "rank": i + 1,
+            "color": colors[i % len(colors)],
+            "avatar": name[0].upper(),
+            "name": name,
+            "badge": e.badge or "Contributor",
+            "rep": e.reputation
+        })
+    return results
 
 def get_events(db: Session, tenant_id: int):
-    return db.query(Event).filter(Event.tenant_id == tenant_id).order_by(Event.created_at.desc()).all()
+    events = db.query(Event).filter(Event.tenant_id == tenant_id).order_by(Event.created_at.desc()).all()
+    results = []
+    for e in events:
+        results.append({
+            "id": e.id,
+            "date": e.date or "Jan 1, 2024",
+            "type": e.type or "Event",
+            "title": e.title,
+            "org": e.organization or "University",
+            "time": e.time or "TBA",
+            "venue": e.venue or "Campus",
+            "rsvp": False
+        })
+    return results
 
 def get_synapse_matches(db: Session, current_user_id: int, tenant_id: int):
     current_prof = db.query(CognitiveProfile).filter(CognitiveProfile.user_id == current_user_id).first()

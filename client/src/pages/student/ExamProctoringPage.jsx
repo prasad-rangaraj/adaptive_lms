@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { ProctoringWebSocket } from '../../lib/websocket';
+import { cognitiveAPI } from '../../services/api.service';
 import { Shield, AlertTriangle, Camera, Eye, Mic, Clock, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -112,12 +113,41 @@ export default function ExamProctoringPage() {
     toast.success('Exam started. Good luck!');
   };
 
-  const submitExam = () => {
+  const submitExam = async () => {
     wsRef.current?.disconnect();
     streamRef.current?.getTracks().forEach((t) => t.stop());
-    toast.success('Exam submitted successfully!');
+    
+    try {
+      const totalQ = MOCK_EXAM.questions.length || 1;
+      const correct = MOCK_EXAM.questions.filter(q => answers[q.id] === q.answer).length;
+      const pct = Math.round((correct / totalQ) * 100);
+
+      await cognitiveAPI.evaluate({
+        event: 'Exam Completed',
+        score: pct,
+        topic: MOCK_EXAM.title,
+        total_questions: totalQ,
+        correct_answers: correct,
+        time_taken_seconds: MOCK_EXAM.duration_minutes * 60 - timeLeft,
+      });
+      toast.success('Exam submitted and Cognitive Profile updated!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Exam submitted, but failed to update profile.');
+    }
+    
     navigate('/student/dashboard');
   };
+
+  const autoSubmittedRef = useRef(false);
+
+  useEffect(() => {
+    if (violations.length >= 5 && !autoSubmittedRef.current && examStarted) {
+      autoSubmittedRef.current = true;
+      toast.error('Test automatically ended due to excessive violations (5+).', { duration: 5000 });
+      submitExam();
+    }
+  }, [violations, examStarted]);
 
   const getRiskColor = () => {
     if (riskScore < 30) return '#10b981';

@@ -4,10 +4,15 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { academicAPI } from '../../services/api.service';
+import toast from 'react-hot-toast';
 
 // ── Tab: Attendance Operations ─────────────────────────────────────────────
-function AttendanceTab({ students = [], loading = false }) {
-
+function AttendanceTab({ students = [], loading = false, refetch }) {
+  const [filterCourse, setFilterCourse] = useState('all');
+  
+  const uniqueCourses = Array.from(new Map(students.map(s => [s.course_id, { id: s.course_id, title: s.course }])).values());
+  const filteredStudents = filterCourse === 'all' ? students : students.filter(s => s.course_id === parseInt(filterCourse));
+  const activeCourseTitle = filterCourse === 'all' ? 'All Active Classes' : uniqueCourses.find(c => c.id === parseInt(filterCourse))?.title;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '4rem', alignItems: 'start' }}>
       
@@ -17,10 +22,18 @@ function AttendanceTab({ students = [], loading = false }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>Today's Roster</h2>
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Advanced Machine Learning • Aug 22, 2026</p>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{activeCourseTitle} • {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
           </div>
           
           <div style={{ display: 'flex', gap: '1rem' }}>
+            <select 
+              value={filterCourse} 
+              onChange={e => setFilterCourse(e.target.value)} 
+              style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-0)', fontSize: '0.875rem', cursor: 'pointer', outline: 'none' }}
+            >
+              <option value="all">All Active Classes</option>
+              {uniqueCourses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+            </select>
             <div style={{ position: 'relative' }}>
               <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
               <input placeholder="Search Roll No..." style={{ padding: '8px 12px 8px 36px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-0)', fontSize: '0.875rem' }} />
@@ -38,9 +51,9 @@ function AttendanceTab({ students = [], loading = false }) {
 
           {loading ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
-          ) : students.length === 0 ? (
+          ) : filteredStudents.length === 0 ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No students found.</div>
-          ) : students.map(student => (
+          ) : filteredStudents.map(student => (
             <div key={student.id} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 200px', gap: '1rem', alignItems: 'center', padding: '1rem 0', borderBottom: '1px solid var(--surface-2)' }}>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -49,7 +62,7 @@ function AttendanceTab({ students = [], loading = false }) {
                 </div>
                 <div>
                   <h4 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)' }}>{student.name}</h4>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{student.roll}</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{student.roll} • {student.course}</p>
                 </div>
               </div>
 
@@ -58,9 +71,33 @@ function AttendanceTab({ students = [], loading = false }) {
               </div>
 
               <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                <button style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', background: student.status === 'present' ? '#10b981' : 'var(--surface-2)', color: student.status === 'present' ? 'white' : 'var(--text-muted)' }}>P</button>
-                <button style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', background: student.status === 'absent' ? '#ef4444' : 'var(--surface-2)', color: student.status === 'absent' ? 'white' : 'var(--text-muted)' }}>A</button>
-                <button style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', background: student.status === 'on_duty' ? 'var(--brand-500)' : 'var(--surface-2)', color: student.status === 'on_duty' ? 'white' : 'var(--text-muted)' }}>OD</button>
+                <button 
+                  onClick={async () => {
+                     try {
+                       await academicAPI.updateTeacherAttendance([{ student_id: student.id, course_id: student.course_id, date: new Date().toISOString().split('T')[0], status: 'present' }]);
+                       toast.success('Marked Present');
+                       refetch();
+                     } catch(e) { toast.error('Failed to update'); }
+                  }}
+                  style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', background: student.status === 'present' ? '#10b981' : 'var(--surface-2)', color: student.status === 'present' ? 'white' : 'var(--text-muted)' }}>P</button>
+                <button 
+                  onClick={async () => {
+                     try {
+                       await academicAPI.updateTeacherAttendance([{ student_id: student.id, course_id: student.course_id, date: new Date().toISOString().split('T')[0], status: 'absent' }]);
+                       toast.success('Marked Absent');
+                       refetch();
+                     } catch(e) { toast.error('Failed to update'); }
+                  }}
+                  style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', background: student.status === 'absent' ? '#ef4444' : 'var(--surface-2)', color: student.status === 'absent' ? 'white' : 'var(--text-muted)' }}>A</button>
+                <button 
+                  onClick={async () => {
+                     try {
+                       await academicAPI.updateTeacherAttendance([{ student_id: student.id, course_id: student.course_id, date: new Date().toISOString().split('T')[0], status: 'on_duty' }]);
+                       toast.success('Marked On-Duty');
+                       refetch();
+                     } catch(e) { toast.error('Failed to update'); }
+                  }}
+                  style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', background: student.status === 'on_duty' ? 'var(--brand-500)' : 'var(--surface-2)', color: student.status === 'on_duty' ? 'white' : 'var(--text-muted)' }}>OD</button>
               </div>
 
             </div>
@@ -79,16 +116,7 @@ function AttendanceTab({ students = [], loading = false }) {
           </button>
         </div>
 
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 20, padding: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
-            <ShieldAlert size={18} color="#ef4444" />
-            <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#991b1b' }}>Defaulters List</h3>
-          </div>
-          <p style={{ fontSize: '0.8125rem', color: '#b91c1c', marginBottom: '1.25rem', lineHeight: 1.5 }}>
-            3 students in this batch have dropped below the 75% mandatory attendance threshold.
-          </p>
-          <button style={{ background: '#ef4444', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer' }}>Generate Warning Letters</button>
-        </div>
+
 
       </div>
 
@@ -97,7 +125,7 @@ function AttendanceTab({ students = [], loading = false }) {
 }
 
 // ── Tab: Approvals ───────────────────────────────────────────────────────
-function ApprovalsTab({ requests = [], loading = false }) {
+function ApprovalsTab({ requests = [], loading = false, refetch }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -129,12 +157,36 @@ function ApprovalsTab({ requests = [], loading = false }) {
             </div>
 
             <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-              <button style={{ background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '8px 12px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <XCircle size={14} /> Reject
-              </button>
-              <button style={{ background: '#10b981', border: 'none', color: 'white', padding: '8px 12px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <CheckCircle2 size={14} /> Approve
-              </button>
+              {req.status === 'pending' ? (
+                <>
+                  <button 
+                    onClick={async () => {
+                      try {
+                        await academicAPI.updateLeaveRequest(req.id, { status: 'rejected' });
+                        toast.success('Request rejected');
+                        refetch();
+                      } catch (e) { toast.error('Error updating request'); }
+                    }}
+                    style={{ background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '8px 12px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <XCircle size={14} /> Reject
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      try {
+                        await academicAPI.updateLeaveRequest(req.id, { status: 'approved' });
+                        toast.success('Request approved');
+                        refetch();
+                      } catch (e) { toast.error('Error updating request'); }
+                    }}
+                    style={{ background: '#10b981', border: 'none', color: 'white', padding: '8px 12px', borderRadius: 8, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <CheckCircle2 size={14} /> Approve
+                  </button>
+                </>
+              ) : (
+                <span style={{ fontSize: '0.875rem', fontWeight: 900, textTransform: 'uppercase', color: req.status === 'approved' ? '#10b981' : '#ef4444', paddingRight: '0.5rem' }}>
+                  {req.status}
+                </span>
+              )}
             </div>
 
           </div>
@@ -153,17 +205,23 @@ export default function TeacherAcademicDesk() {
   const [loadingAtt, setLoadingAtt] = useState(true);
   const [loadingReq, setLoadingReq] = useState(true);
 
-
-  useEffect(() => {
+  const fetchAttendance = () => {
     academicAPI.getTeacherAttendance()
       .then(res => setStudents(res.data))
       .catch(() => {})
       .finally(() => setLoadingAtt(false));
+  };
 
+  const fetchRequests = () => {
     academicAPI.getTeacherLeaveRequests()
       .then(res => setRequests(res.data))
       .catch(() => {})
       .finally(() => setLoadingReq(false));
+  };
+
+  useEffect(() => {
+    fetchAttendance();
+    fetchRequests();
   }, []);
 
   return (
@@ -204,8 +262,8 @@ export default function TeacherAcademicDesk() {
 
         {/* ── Tab Content ── */}
         <div style={{ minHeight: '600px', paddingTop: '1rem' }}>
-          {activeTab === 'attendance' && <AttendanceTab students={students} loading={loadingAtt} />}
-          {activeTab === 'approvals' && <ApprovalsTab requests={requests} loading={loadingReq} />}
+          {activeTab === 'attendance' && <AttendanceTab students={students} loading={loadingAtt} refetch={fetchAttendance} />}
+          {activeTab === 'approvals' && <ApprovalsTab requests={requests} loading={loadingReq} refetch={fetchRequests} />}
         </div>
 
       </div>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   Play, Pause, Volume2, Settings, Maximize, ChevronRight, Sparkles, X,
   HelpCircle, FileText, Lightbulb, SkipForward, List, CheckCircle2,
-  BookOpen, Download, Search, Users, Loader2
+  BookOpen, Download, Search, Users, Loader2, Lock
 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { coursesAPI } from '../../services/api.service';
@@ -93,11 +93,15 @@ export default function StudentLearningCanvas() {
         setEnrollment(enrollRes.data);
         
         let rawModules = modulesRes.data;
-        const isPending = enrollRes.data?.learning_path === 'pending';
+        const userPath = enrollRes.data?.learning_path || 'pending';
+        const isPending = userPath === 'pending';
         
-        // If pending, take only first 2 modules (fundamentals)
+        const levelWeights = { fundamentals: 0, beginner: 1, basics: 1, intermediate: 2, advanced: 3 };
+        const userWeight = levelWeights[userPath] ?? 0;
+
+        // If pending, only show fundamentals
         if (isPending) {
-          rawModules = rawModules.slice(0, 2);
+          rawModules = rawModules.filter(m => m.level === 'fundamentals');
         }
         
         setCourseModules(rawModules);
@@ -105,6 +109,9 @@ export default function StudentLearningCanvas() {
         // Flatten modules into a list of items for the playlist
         const playlistItems = [];
         rawModules.forEach((mod, modIdx) => {
+          const modWeight = levelWeights[mod.level] ?? 0;
+          const isLocked = !isPending && modWeight > userWeight;
+
           mod.materials.forEach((m, matIdx) => {
             playlistItems.push({
               id: m.id,
@@ -114,7 +121,8 @@ export default function StudentLearningCanvas() {
               done: m.is_processed, // AI processing flag (not user completion)
               active: modIdx === 0 && matIdx === 0,
               type: m.material_type,
-              url: m.s3_url
+              url: m.external_url || m.s3_url,
+              locked: isLocked
             });
           });
         });
@@ -128,7 +136,8 @@ export default function StudentLearningCanvas() {
               done: false,
               active: false,
               type: 'quiz',
-              isCheckpoint: true
+              isCheckpoint: true,
+              locked: false
            });
         }
 
@@ -181,7 +190,7 @@ export default function StudentLearningCanvas() {
   }, [ytId, activeItem]);
 
   return (
-    <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', margin: '-1.5rem -1.75rem', padding: '0' }}>
+    <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', margin: '-1.5rem -1.75rem', padding: '0', minHeight: 'calc(100vh - 65px)' }}>
 
       {/* ── Cinematic Video Stage ── */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
@@ -390,7 +399,8 @@ export default function StudentLearningCanvas() {
             <div style={{ display: 'flex', borderBottom: '1px solid var(--surface-3)' }}>
               {[
                 { id: 'playlist', label: 'Playlist' },
-                { id: 'transcript', label: 'Transcript' }
+                { id: 'transcript', label: 'Transcript' },
+                { id: 'resources', label: 'Resources' }
               ].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, padding: '1.25rem 0 1rem', background: 'transparent', border: 'none', borderBottom: activeTab === t.id ? '2px solid var(--text-primary)' : '2px solid transparent', color: activeTab === t.id ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }}>
                   {t.label}
@@ -399,7 +409,7 @@ export default function StudentLearningCanvas() {
             </div>
 
             {/* Tab Content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 0' }} className="hide-scrollbar">
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 0 4rem' }} className="hide-scrollbar">
               
               {/* PLAYLIST */}
               {activeTab === 'playlist' && (
@@ -411,16 +421,24 @@ export default function StudentLearningCanvas() {
                     <div 
                       key={m.id} 
                       onClick={() => {
+                        if (m.locked) return;
                         if (m.isCheckpoint) {
                           setShowAssessment(true);
                         } else {
                           setActiveItem(m);
                         }
                       }}
-                      style={{ padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', background: activeItem?.id === m.id ? 'var(--brand-50)' : 'transparent', borderLeft: activeItem?.id === m.id ? '3px solid var(--brand-500)' : '3px solid transparent', cursor: 'pointer', transition: 'all 0.2s' }}
+                      style={{ 
+                        padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', 
+                        background: activeItem?.id === m.id ? 'var(--brand-50)' : 'transparent', 
+                        borderLeft: activeItem?.id === m.id ? '3px solid var(--brand-500)' : '3px solid transparent', 
+                        cursor: m.locked ? 'not-allowed' : 'pointer', 
+                        transition: 'all 0.2s',
+                        opacity: m.locked ? 0.5 : 1
+                      }}
                     >
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: isDone ? '#10b981' : m.active ? 'var(--brand-500)' : m.isCheckpoint ? '#8b5cf6' : 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white', fontSize: '0.75rem', fontWeight: 800 }}>
-                        {isDone ? '✓' : m.isCheckpoint ? '🎯' : i + 1}
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: m.locked ? 'var(--surface-3)' : isDone ? '#10b981' : activeItem?.id === m.id ? 'var(--brand-500)' : m.isCheckpoint ? '#8b5cf6' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: m.locked ? 'var(--text-muted)' : isDone || activeItem?.id === m.id || m.isCheckpoint ? 'white' : 'var(--text-muted)', fontSize: '0.875rem', fontWeight: 800 }}>
+                        {m.locked ? <Lock size={14} /> : isDone ? <CheckCircle2 size={16} /> : m.isCheckpoint ? '🎯' : (m.type === 'youtube' || m.type === 'video') ? <Play size={12} fill="currentColor" /> : m.type === 'pdf' ? '📄' : m.type === 'article' ? '📝' : i + 1}
                       </div>
                       <div style={{ flex: 1 }}>
                         <p style={{ fontSize: '0.875rem', fontWeight: m.active ? 800 : 600, color: m.active ? 'var(--brand-700)' : isDone ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: isDone ? 'line-through' : 'none' }}>
@@ -452,6 +470,33 @@ export default function StudentLearningCanvas() {
                       </div>
                     )) : (
                       <p style={{textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem', padding: '2rem'}}>Transcript not available.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* RESOURCES */}
+              {activeTab === 'resources' && (
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '0 1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1rem' }}>Module Resources</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {modules.filter(m => m.type === 'pdf').map(m => {
+                      const isDone = completedMaterials.includes(m.id);
+                      return (
+                        <div key={m.id} onClick={() => setActiveItem(m)} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '1rem', background: 'var(--surface-1)', border: '1px solid var(--surface-2)', borderRadius: 12, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand-400)'} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--surface-2)'}>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#e0f2fe', color: '#0369a1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            📄
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, textDecoration: isDone ? 'line-through' : 'none' }}>{m.title}</p>
+                            <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', margin: 0 }}>PDF Document</p>
+                          </div>
+                          <a href={m.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: 'var(--brand-500)', fontSize: '0.8125rem', fontWeight: 800, textDecoration: 'none' }}>Open</a>
+                        </div>
+                      );
+                    })}
+                    {modules.filter(m => m.type === 'pdf').length === 0 && (
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', textAlign: 'center', padding: '2rem 0' }}>No resources available.</p>
                     )}
                   </div>
                 </div>

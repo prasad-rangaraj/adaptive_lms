@@ -4,6 +4,7 @@ import {
   ChevronRight, TrendingUp, Calendar, FileText, Plus,
   MapPin, User, Download, FileArchive, Target, ShieldAlert
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 // ─────────────────────────────────────────────────────────────
 // Data
@@ -23,23 +24,15 @@ const gradePoints = { 'O': 10, 'A+': 9, 'A': 8, 'B+': 7, 'B': 6, 'C': 5, 'U': 0 
 // ─────────────────────────────────────────────────────────────
 // Tab: Timetable
 // ─────────────────────────────────────────────────────────────
-import { academicAPI } from '../../services/api.service';
-import { useQuery } from '@tanstack/react-query';
+import { academicAPI, assignmentsAPI } from '../../services/api.service';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 function TimetableTab() {
   const today = days[new Date().getDay() - 1] || 'Monday';
   const [selectedDay, setSelectedDay] = useState(today);
   const { data: timetable = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] } } = useQuery({
     queryKey: ['academicTimetable'],
-    queryFn: () => academicAPI.getTimetable().then(res => {
-      const grouped = { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [] };
-      res.data.forEach(ev => {
-        if (grouped[ev.day_of_week]) {
-          grouped[ev.day_of_week].push(ev);
-        }
-      });
-      return grouped;
-    })
+    queryFn: () => academicAPI.getTimetable().then(res => res.data)
   });
 
   // Mocking live class (e.g., 9:45 AM on Monday)
@@ -50,7 +43,7 @@ function TimetableTab() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
       {/* Live Class Tracker Banner */}
-      {isLiveDay && (
+      {isLiveDay && timetable[selectedDay] && timetable[selectedDay][liveClassIndex] && (
         <div style={{ background: 'var(--brand-500)', borderRadius: 16, padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'white', boxShadow: 'var(--shadow-brand)', animation: 'fadeIn 0.5s ease' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
             <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -61,15 +54,15 @@ function TimetableTab() {
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 10px #10b981', animation: 'pulse 2s infinite' }} />
                 <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.9 }}>Happening Now</span>
               </div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2 }}>Mathematics III</h2>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2 }}>{timetable[selectedDay][liveClassIndex].subject}</h2>
               <p style={{ fontSize: '0.9375rem', opacity: 0.9, display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <User size={14} /> Dr. Ramanujan &nbsp;•&nbsp; <MapPin size={14} /> Block A, Room 402
+                <User size={14} /> {timetable[selectedDay][liveClassIndex].faculty} &nbsp;•&nbsp; <MapPin size={14} /> {timetable[selectedDay][liveClassIndex].venue}
               </p>
             </div>
           </div>
           <div style={{ textAlign: 'right', background: 'rgba(0,0,0,0.15)', padding: '0.75rem 1.25rem', borderRadius: 12 }}>
             <p style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Time Remaining</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '0.02em', fontVariantNumeric: 'tabular-nums' }}>15:00</p>
+            <p style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '0.02em', fontVariantNumeric: 'tabular-nums' }}>{timetable[selectedDay][liveClassIndex].duration || '15:00'}</p>
           </div>
         </div>
       )}
@@ -91,7 +84,7 @@ function TimetableTab() {
           return (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '1.25rem', background: isLive ? 'rgba(8,145,178,0.05)' : 'var(--surface-0)', border: isLive ? '1px solid var(--brand-300)' : '1px solid var(--surface-3)', borderRadius: 14, borderLeft: cls ? (isLive ? '4px solid var(--brand-500)' : '4px solid var(--surface-4)') : '4px solid var(--surface-2)', transition: 'all 0.2s' }}>
               <div style={{ width: 72, flexShrink: 0 }}>
-                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: isLive ? 'var(--brand-600)' : 'var(--text-muted)' }}>{periods[i]}</p>
+                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: isLive ? 'var(--brand-600)' : 'var(--text-muted)' }}>{cls.time}</p>
               </div>
               {cls ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: 1 }}>
@@ -130,11 +123,44 @@ function AttendanceTab() {
     queryFn: () => academicAPI.getAttendance().then(res => res.data)
   });
 
-  const { data: leaveRequests = [] } = useQuery({
+  const { data: leaveRequests = [], refetch: refetchLeaveRequests } = useQuery({
     queryKey: ['academicLeaveRequests'],
     queryFn: () => academicAPI.getLeaveRequests().then(res => res.data)
   });
   const [targetPct, setTargetPct] = useState(75);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leaveType, setLeaveType] = useState('Medical Leave');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [showAllLeaves, setShowAllLeaves] = useState(false);
+
+  const handleSubmitLeave = async () => {
+    if (!startDate || !endDate || !reason.trim()) {
+      toast.error('Please fill all fields');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await academicAPI.submitLeaveRequest({
+        type: leaveType,
+        start_date: startDate,
+        end_date: endDate,
+        reason: reason
+      });
+      toast.success('Leave request submitted!');
+      setShowLeaveModal(false);
+      setStartDate('');
+      setEndDate('');
+      setReason('');
+      refetchLeaveRequests();
+    } catch (e) {
+      toast.error('Failed to submit leave request');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '3rem', alignItems: 'start' }}>
@@ -210,10 +236,10 @@ function AttendanceTab() {
         <div style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-primary)' }}>Leave Requests</h3>
-            <button style={{ background: 'transparent', border: 'none', color: 'var(--brand-600)', cursor: 'pointer', padding: 4 }}><Plus size={16} /></button>
+            <button onClick={() => setShowLeaveModal(true)} style={{ background: 'transparent', border: 'none', color: 'var(--brand-600)', cursor: 'pointer', padding: 4 }}><Plus size={16} /></button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {leaveRequests.map((lr, i) => (
+            {(showAllLeaves ? leaveRequests : leaveRequests.slice(0, 3)).map((lr, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', border: '1px solid var(--surface-3)', borderRadius: 12, background: 'var(--surface-1)' }}>
                 <div>
                   <p style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-primary)' }}>{lr.type}</p>
@@ -222,10 +248,57 @@ function AttendanceTab() {
                 <span style={{ fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase', color: lr.status === 'Approved' ? '#10b981' : '#f59e0b' }}>{lr.status}</span>
               </div>
             ))}
+            {leaveRequests.length > 3 && (
+              <button 
+                onClick={() => setShowAllLeaves(!showAllLeaves)} 
+                style={{ background: 'transparent', border: 'none', color: 'var(--brand-600)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', marginTop: '0.25rem', textDecoration: 'underline' }}>
+                {showAllLeaves ? 'Show Less' : 'View All'}
+              </button>
+            )}
           </div>
         </div>
 
       </div>
+
+      {showLeaveModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="card animate-scale-in" style={{ width: 400, padding: '1.5rem', borderRadius: 16 }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 900, marginBottom: '1rem' }}>New Leave Request</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label className="label">Leave Type</label>
+                <select value={leaveType} onChange={e => setLeaveType(e.target.value)} className="input">
+                  <option>Medical Leave</option>
+                  <option>On-Duty (Event)</option>
+                  <option>Personal Emergency</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label className="label">Start Date</label>
+                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="input" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="label">End Date</label>
+                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="input" />
+                </div>
+              </div>
+              <div>
+                <label className="label">Reason</label>
+                <textarea value={reason} onChange={e => setReason(e.target.value)} className="input" rows={3} style={{ resize: 'vertical' }} />
+              </div>
+              <div>
+                <label className="label">Proof Document (Optional)</label>
+                <input type="file" className="input" style={{ padding: '6px', fontSize: '0.8125rem' }} />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                <button onClick={() => setShowLeaveModal(false)} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
+                <button onClick={handleSubmitLeave} disabled={submitting} className="btn btn-primary" style={{ flex: 1 }}>{submitting ? 'Submitting...' : 'Submit'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -234,18 +307,36 @@ function AttendanceTab() {
 // Tab: Coursework & PYQs
 // ─────────────────────────────────────────────────────────────
 function CourseworkTab() {
-  const { data: assignments = [] } = useQuery({
+  const { data: assignments = [], refetch: refetchAssignments } = useQuery({
     queryKey: ['academicAssignments'],
     queryFn: () => academicAPI.getAssignments().then(res => res.data)
   });
   
   const { data: pyqs = [] } = useQuery({
     queryKey: ['academicPyqs'],
-    queryFn: () => academicAPI.getPyqs().then(res => res.data)
+    queryFn: () => academicAPI.getPYQs().then(res => res.data)
   });
+
+  const [uploading, setUploading] = useState(null);
 
   const pending = assignments.filter(a => !a.submitted);
   const done = assignments.filter(a => a.submitted);
+
+  const handleFileChange = async (assignmentId, e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      setUploading(assignmentId);
+      await assignmentsAPI.submit(assignmentId, file);
+      toast.success('Assignment submitted successfully! The AI is evaluating it.');
+      refetchAssignments();
+    } catch(err) {
+      console.error(err);
+      toast.error('Failed to submit assignment');
+    } finally {
+      setUploading(null);
+    }
+  };
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '3rem', alignItems: 'start' }}>
@@ -272,9 +363,10 @@ function CourseworkTab() {
                   <p style={{ fontSize: '0.75rem', fontWeight: 800, color: priorityColors[a.priority], textTransform: 'uppercase', letterSpacing: '0.05em' }}>{a.priority}</p>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>Due {a.due}</p>
                 </div>
-                <button style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: '1px solid var(--surface-3)', color: 'var(--text-secondary)', padding: '6px 14px', borderRadius: 999, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-                  <Upload size={13} /> Submit
-                </button>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: '1px solid var(--surface-3)', color: 'var(--text-secondary)', padding: '6px 14px', borderRadius: 999, fontSize: '0.75rem', fontWeight: 700, cursor: uploading === a.id ? 'wait' : 'pointer', flexShrink: 0 }}>
+                  <Upload size={13} /> {uploading === a.id ? 'Submitting...' : 'Submit'}
+                  <input type="file" style={{ display: 'none' }} onChange={e => handleFileChange(a.id, e)} disabled={uploading === a.id} />
+                </label>
               </div>
             ))}
           </div>

@@ -57,9 +57,19 @@ def get_skills(
     for i, area in enumerate(sorted(weak_areas)):
         skills.append({"id": f"weak_{i}", "name": area, "status": "in-progress", "score": 30})
 
+    # Fallback for demo purposes if no skills exist
+    if not skills:
+        skills = [
+            {"id": "mock_1", "name": "Python Programming", "status": "mastered", "score": 95},
+            {"id": "mock_2", "name": "Data Structures", "status": "mastered", "score": 92},
+            {"id": "mock_3", "name": "RESTful API Design", "status": "mastered", "score": 90},
+            {"id": "mock_4", "name": "System Architecture", "status": "in-progress", "score": 65},
+            {"id": "mock_5", "name": "Advanced Algorithms", "status": "locked", "score": 0},
+        ]
+
     return skills
 
-@router.get("/jobs", response_model=List[schemas.JobListingResponse])
+@router.get("/jobs")
 def get_jobs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -68,14 +78,14 @@ def get_jobs(
         return []
     return crud_career.get_jobs(db, current_user.tenant_id)
 
-@router.get("/applications", response_model=List[schemas.JobApplicationResponse])
+@router.get("/applications")
 def get_applications(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     return crud_career.get_student_applications(db, current_user.id)
 
-@router.get("/certificates", response_model=List[schemas.CertificateResponse])
+@router.get("/certificates")
 def get_certificates(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)

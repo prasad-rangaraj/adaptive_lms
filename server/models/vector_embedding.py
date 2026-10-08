@@ -20,10 +20,7 @@ class VectorEmbedding(Base):
     text_chunk = Column(Text, nullable=False)
 
     # OpenAI text-embedding-3-small produces 1536 dimensions
-    import os
-    from sqlalchemy.dialects.sqlite import JSON
-    is_sqlite = "sqlite" in os.getenv("DATABASE_URL", "")
-    embedding = Column(Vector(1536) if not is_sqlite else JSON, nullable=True)
+    embedding = Column(Vector(1536), nullable=True)
 
     chunk_index = Column(Integer, default=0)
 

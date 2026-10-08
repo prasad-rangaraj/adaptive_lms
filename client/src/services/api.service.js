@@ -21,7 +21,9 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       useAuthStore.getState().logout();
-      window.location.href = '/auth/login';
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -84,6 +86,7 @@ export const tenantsAPI = {
   getDashboardNarrative: (id) => api.get(`/api/tenants/${id}/dashboard-narrative`),
   getCohortsPulse: (id) => api.get(`/api/tenants/${id}/cohorts-pulse`),
   getAnalytics: (id) => api.get(`/api/tenants/${id}/analytics`),
+  getReports: (id) => api.get(`/api/tenants/${id}/reports`),
 
   // Users / Directory
   listUsers: (id) => api.get(`/api/tenants/${id}/users`),
@@ -121,6 +124,7 @@ export const coursesAPI = {
   getTranscript: (courseId, materialId) => api.get(`/api/courses/${courseId}/materials/${materialId}/transcript`),
   create: (data) => api.post('/api/courses', data),
   publish: (id) => api.patch(`/api/courses/${id}/publish`),
+  addMaterial: (courseId, moduleId, data) => api.post(`/api/courses/${courseId}/modules/${moduleId}/materials`, data),
   uploadMaterial: (courseId, moduleId, file) => {
     const form = new FormData();
     form.append('file', file);
@@ -132,8 +136,12 @@ export const coursesAPI = {
   createModule: (courseId, title, level = "fundamentals") => api.post(`/api/courses/${courseId}/modules`, { title, level }),
   updateCourse: (courseId, data) => api.patch(`/api/courses/${courseId}`, data),
   updateModule: (courseId, moduleId, data) => api.patch(`/api/courses/${courseId}/modules/${moduleId}`, data),
+  deleteModule: (courseId, moduleId) => api.delete(`/api/courses/${courseId}/modules/${moduleId}`),
+  updateMaterial: (courseId, materialId, data) => api.patch(`/api/courses/${courseId}/materials/${materialId}`, data),
+  reorderMaterials: (courseId, moduleId, data) => api.patch(`/api/courses/${courseId}/modules/${moduleId}/reorder`, data),
   getAssignments: (courseId) => api.get(`/api/courses/${courseId}/assignments`),
   createAssignment: (courseId, data) => api.post(`/api/courses/${courseId}/assignments`, data),
+  askCopilot: (courseId, prompt) => api.post(`/api/courses/${courseId}/copilot`, { prompt }),
 
   // ── Adaptive Enrollment Flow ──────────────────────────────────────────────
   enroll: (courseId) => api.post(`/api/courses/${courseId}/enroll`),
@@ -168,9 +176,7 @@ export const assignmentsAPI = {
   submit: (assignmentId, file) => {
     const form = new FormData();
     form.append('file', file);
-    return api.post(`/api/assignments/${assignmentId}/submit`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return api.post(`/api/assignments/${assignmentId}/submit`, form);
   },
   getResult: (assignmentId, submissionId) =>
     api.get(`/api/assignments/${assignmentId}/submissions/${submissionId}`),
@@ -215,15 +221,34 @@ export const cognitiveAPI = {
 // Academic
 // ─────────────────────────────────────────────────────────────────────────────
 export const academicAPI = {
+  getDepartments: () => api.get('/api/academic/departments'),
+  getCohorts: (deptId) => api.get(`/api/academic/departments/${deptId}/cohorts`),
+  getDeptTeachers: (deptId) => api.get(`/api/academic/departments/${deptId}/teachers`),
+  getTeachers: () => api.get('/api/academic/teachers'),
+  createTimetable: (data) => api.post('/api/academic/timetable', data),
   getTimetable: () => api.get('/api/academic/timetable'),
   getAttendance: () => api.get('/api/academic/attendance'),
   getLeaveRequests: () => api.get('/api/academic/leave-requests'),
+  submitLeaveRequest: (data) => api.post('/api/academic/leave-requests', data),
+  
+  // Exams
+  createExam: (data) => api.post('/api/academic/exams', data),
+  getPublishedExam: () => api.get('/api/academic/exams/published'),
+  submitExam: (examId, data) => api.post(`/api/academic/exams/${examId}/submit`, data),
   getAssignments: () => api.get('/api/academic/assignments'),
   getPYQs: () => api.get('/api/academic/pyqs'),
   getMarks: () => api.get('/api/academic/marks'),
   getTeacherAttendance: () => api.get('/api/academic/teacher/attendance'),
+  updateTeacherAttendance: (payload) => api.post('/api/academic/teacher/attendance', payload),
   getTeacherLeaveRequests: () => api.get('/api/academic/teacher/leave-requests'),
+  updateLeaveRequest: (id, payload) => api.put(`/api/academic/teacher/leave-requests/${id}`, payload),
   getTeacherQuestions: () => api.get('/api/academic/teacher/questions'),
+  saveTeacherQuestions: (payload) => api.post('/api/academic/teacher/questions', payload),
+  uploadMarks: (payload) => api.post('/api/academic/teacher/marks', payload),
+  uploadResource: (payload) => api.post('/api/academic/teacher/resources', payload),
+  getAdminAttendance: () => api.get('/api/academic/admin/attendance'),
+  getAdminLeaveRequests: () => api.get('/api/academic/admin/leave-requests'),
+  getAdminLiveExams: () => api.get('/api/academic/admin/exams/live'),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -261,8 +286,11 @@ export const communityAPI = {
   getTeacherOfficeHours: () => api.get('/api/community/teacher/office-hours'),
   getTeacherBounties: () => api.get('/api/community/teacher/bounties'),
   getTeacherMentees: () => api.get('/api/community/teacher/mentees'),
+  acceptMentorship: (id) => api.put(`/api/community/teacher/mentees/${id}/accept`),
   
   sendMessage: (data) => api.post('/api/community/messages', data),
+  getMessageRecipients: () => api.get('/api/community/message-recipients'),
+  getChatMessages: () => api.get('/api/community/chat/messages'),
   bookOfficeHour: (data) => api.post('/api/community/office-hours/book', data),
   requestMentorship: (data) => api.post('/api/community/mentorships/request', data),
   createBounty: (data) => api.post('/api/community/bounties', data),

@@ -3,17 +3,25 @@ import {
   Bot, CheckCircle2, AlertTriangle, Eye, ArrowRight, CornerDownRight, ChevronDown
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import toast from 'react-hot-toast';
 
 import { coursesAPI, assignmentsAPI, proctoringAPI } from '../../services/api.service';
 
 // ── Tab: Grading (Editorial Reading Style) ────────────────────────────────
 function GradingTab({ courses }) {
-  const [activeCourseId, setActiveCourseId] = useState(courses[0]?.id || null);
+  const [activeCourseId, setActiveCourseId] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [activeAssignmentId, setActiveAssignmentId] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [activeSubmissionId, setActiveSubmissionId] = useState(null);
   const [gradeInput, setGradeInput] = useState('');
+
+  // 0. Auto-select first course when loaded
+  useEffect(() => {
+    if (courses.length > 0 && !activeCourseId) {
+      setActiveCourseId(courses[0].id);
+    }
+  }, [courses, activeCourseId]);
 
   // 1. Fetch assignments when course changes
   useEffect(() => {
@@ -51,8 +59,10 @@ function GradingTab({ courses }) {
       // refresh
       const res = await assignmentsAPI.getSubmissions(activeAssignmentId);
       setSubmissions(res.data);
+      toast.success('Grade approved successfully!');
     } catch (e) {
       console.error(e);
+      toast.error('Failed to approve grade');
     }
   };
 
@@ -165,59 +175,78 @@ function ProctoringTab() {
       .finally(() => setLoading(false));
   }, []);
 
+  const highRiskCount = flags.filter(f => f.risk === 'High').length;
+  const medRiskCount = flags.filter(f => f.risk === 'Medium').length;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
-      <div style={{ display: 'flex', gap: '3rem' }}>
-        <div>
-          <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.1em' }}>High Risk Flags</p>
-          <span style={{ fontSize: '2.5rem', fontWeight: 900, color: '#ef4444', lineHeight: 1 }}>1</span>
+      {/* Professional Stats Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-2)', borderRadius: 12, padding: '1.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+          <p style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>High Risk Flags</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ef4444' }} />
+            <span style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>{highRiskCount}</span>
+          </div>
         </div>
-        <div>
-          <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Medium Risk</p>
-          <span style={{ fontSize: '2.5rem', fontWeight: 900, color: '#f59e0b', lineHeight: 1 }}>4</span>
+        <div style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-2)', borderRadius: 12, padding: '1.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+          <p style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Medium Risk</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#f59e0b' }} />
+            <span style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>{medRiskCount}</span>
+          </div>
         </div>
-        <div>
-          <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Clean Sessions</p>
-          <span style={{ fontSize: '2.5rem', fontWeight: 900, color: '#10b981', lineHeight: 1 }}>142</span>
+        <div style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-2)', borderRadius: 12, padding: '1.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+          <p style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Total Incidents</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--brand-500)' }} />
+            <span style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>{flags.length}</span>
+          </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: '2rem' }}>Action Required</h2>
+      {/* Professional List */}
+      <div style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--surface-3)', background: 'var(--surface-1)' }}>
+          <h2 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Incident Reports</h2>
+        </div>
         
-        {/* Organic List (No Table) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           {loading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
+            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}>Analyzing proctoring logs...</div>
           ) : flags.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No recent flags detected.</div>
-          ) : flags.map((flag) => (
-            <div key={flag.id} style={{ display: 'flex', alignItems: 'center', gap: '2rem', paddingBottom: '2rem', borderBottom: '1px solid var(--surface-3)' }}>
+            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+              <CheckCircle2 size={32} color="#10b981" />
+              <span style={{ fontWeight: 700 }}>No cheating incidents detected.</span>
+            </div>
+          ) : flags.map((flag, i) => (
+            <div key={flag.id} style={{ display: 'grid', gridTemplateColumns: '48px 2fr 1fr 1fr auto', alignItems: 'center', gap: '1.5rem', padding: '1.25rem 1.5rem', borderBottom: i === flags.length - 1 ? 'none' : '1px solid var(--surface-2)', background: 'var(--surface-0)', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-0)'}>
               
-              {/* Organic Risk Indicator */}
-              <div style={{ position: 'relative', width: 48, height: 48 }}>
-                <div style={{ position: 'absolute', inset: 0, borderRadius: '40% 60% 70% 30% / 40% 50% 60% 50%', background: flag.color, opacity: 0.1, animation: 'pulse 4s infinite alternate' }} />
-                <div style={{ position: 'absolute', inset: '8px', borderRadius: '50%', background: flag.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                  <AlertTriangle size={16} />
-                </div>
+              <div style={{ width: 40, height: 40, borderRadius: 8, background: `${flag.color}15`, border: `1px solid ${flag.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: flag.color }}>
+                <AlertTriangle size={18} />
               </div>
               
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)' }}>{flag.student}</h3>
-                  <span style={{ fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: flag.color }}>{flag.risk} Risk</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>{flag.student}</span>
+                  <span style={{ fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase', padding: '2px 8px', borderRadius: 999, background: `${flag.color}15`, color: flag.color }}>{flag.risk} Risk</span>
                 </div>
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{flag.course}</p>
+                <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{flag.course}</span>
               </div>
 
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>{flag.type}</p>
-                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{flag.time} • Duration: {flag.duration}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{flag.type}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{flag.duration}</span>
               </div>
 
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: 0 }}>
-                <Eye size={16} /> Review Evidence
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{flag.time}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Timestamp</span>
+              </div>
+
+              <button onClick={() => toast('Evidence viewer launching...', { icon: '📸' })} style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-3)', color: 'var(--text-primary)', fontSize: '0.8125rem', fontWeight: 800, padding: '8px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-3)'; e.currentTarget.style.borderColor = 'var(--text-muted)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.borderColor = 'var(--surface-3)'; }}>
+                <Eye size={14} /> Review
               </button>
 
             </div>
@@ -234,7 +263,7 @@ export default function TeacherAssessmentHub() {
   const [courses, setCourses] = useState([]);
 
   useEffect(() => {
-    coursesAPI.list().then(res => setCourses(res.data)).catch(console.error);
+    coursesAPI.myCourses().then(res => setCourses(res.data)).catch(console.error);
   }, []);
 
   return (

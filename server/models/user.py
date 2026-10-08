@@ -25,6 +25,8 @@ class User(Base):
     full_name = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default=UserRole.STUDENT)
     avatar_url = Column(String(500), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    cohort_id = Column(Integer, ForeignKey("cohorts.id"), nullable=True)
 
     # Verification
     is_active = Column(Boolean, default=False)

@@ -5,8 +5,16 @@ import {
 } from 'lucide-react';
 import Loader from '../../components/ui/Loader';
 
+import { useQuery } from '@tanstack/react-query';
+import { academicAPI } from '../../services/api.service';
+
 // ── Tab 1: Live Exam Operations ───────────────────────────────────────────────
 function LiveExamsTab() {
+  const { data: exams = [], isLoading } = useQuery({
+    queryKey: ['adminLiveExams'],
+    queryFn: () => academicAPI.getAdminLiveExams().then(res => res.data)
+  });
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '2rem', alignItems: 'flex-start' }}>
       <div className="glass-card" style={{ padding: '2rem' }}>
@@ -24,10 +32,8 @@ function LiveExamsTab() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {[
-            { id: 1, title: 'Midterm - Advanced Machine Learning', students: 145, active: 142, flagged: 3, teacher: 'Dr. Alan Turing' },
-            { id: 2, title: 'Quiz 3 - Data Structures', students: 200, active: 198, flagged: 0, teacher: 'Dr. Ada Lovelace' },
-          ].map(exam => (
+          {exams.length === 0 && !isLoading && <p style={{ color: 'var(--text-muted)' }}>No live exams found.</p>}
+          {exams.map(exam => (
             <div key={exam.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', background: 'var(--surface-0)', border: '1px solid var(--surface-2)', borderRadius: 12 }}>
               <div style={{ flex: 2 }}>
                 <p style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '1rem' }}>{exam.title}</p>

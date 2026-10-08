@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useProctoring } from '../../hooks/useProctoring';
-import { coursesAPI, cognitiveAPI, aiTutorAPI } from '../../services/api.service';
+import { coursesAPI, cognitiveAPI, aiTutorAPI, academicAPI } from '../../services/api.service';
 import PlacementAssessmentModal from './PlacementAssessmentModal';
 import toast from 'react-hot-toast';
 
@@ -80,35 +80,24 @@ function CourseRoadmapModal({ course, enrollment, onClose, onStartLearn }) {
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Loading roadmap...</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {modules.map((mod, modIdx) => {
+              {/* Phase 1: Fundamentals (Always show, indices 0-4) */}
+              {modules.filter(m => m.level === 'fundamentals').map((mod, modIdx) => {
                 const isExpanded = expandedMod === modIdx;
-                const isLocked = isPending && modIdx >= 2;
                 const materials = mod.materials || [];
                 return (
-                  <div key={mod.id} style={{ background: isLocked ? 'var(--surface-1)' : 'var(--surface-0)', border: `1px solid ${isLocked ? 'var(--surface-3)' : 'var(--surface-3)'}`, borderRadius: 16, overflow: 'hidden', opacity: isLocked ? 0.6 : 1, transition: 'all 0.3s' }}>
-                    {/* Module header */}
-                    <div
-                      onClick={() => !isLocked && setExpandedMod(isExpanded ? -1 : modIdx)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem', cursor: isLocked ? 'not-allowed' : 'pointer', userSelect: 'none' }}
-                    >
-                      <div style={{ width: 40, height: 40, borderRadius: 12, background: isLocked ? 'var(--surface-2)' : 'var(--brand-50)', border: `2px solid ${isLocked ? 'var(--surface-3)' : 'var(--brand-200)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 900, fontSize: '0.875rem', color: isLocked ? 'var(--text-muted)' : 'var(--brand-600)' }}>
-                        {isLocked ? <Lock size={16} /> : modIdx + 1}
+                  <div key={mod.id} style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 16, overflow: 'hidden', transition: 'all 0.3s' }}>
+                    <div onClick={() => setExpandedMod(isExpanded ? -1 : modIdx)} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem', cursor: 'pointer', userSelect: 'none' }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--brand-50)', border: '2px solid var(--brand-200)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 900, fontSize: '0.875rem', color: 'var(--brand-600)' }}>
+                        {modIdx + 1}
                       </div>
                       <div style={{ flex: 1 }}>
                         <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>{mod.title}</p>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, marginTop: 2 }}>{materials.length} materials{isLocked ? ' · 🔒 Complete assessment to unlock' : ''}</p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, marginTop: 2 }}>{materials.length} materials</p>
                       </div>
-                      {!isLocked && (
-                        <>
-                          <button
-                            onClick={e => { e.stopPropagation(); navigate(`/student/course/${course.id}?module=${mod.id}`); onClose(); }}
-                            style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, background: 'var(--brand-500)', color: 'white', border: 'none', borderRadius: 10, padding: '7px 14px', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer' }}
-                          >
-                            <Play size={13} /> Learn
-                          </button>
-                          {isExpanded ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
-                        </>
-                      )}
+                      <button onClick={e => { e.stopPropagation(); navigate(`/student/course/${course.id}?module=${mod.id}`); onClose(); }} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, background: 'var(--brand-500)', color: 'white', border: 'none', borderRadius: 10, padding: '7px 14px', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer' }}>
+                        <Play size={13} /> Learn
+                      </button>
+                      {isExpanded ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
                     </div>
 
                     {/* Materials list */}
@@ -169,6 +158,68 @@ function CourseRoadmapModal({ course, enrollment, onClose, onStartLearn }) {
                   )}
                 </div>
               </div>
+
+              {/* Phase 2: Path Modules (Indices 5-9) */}
+              {!isPending && modules.filter(m => {
+                if (learningPath === 'basics' && m.level === 'beginner') return true;
+                if (learningPath === 'intermediate' && m.level === 'intermediate') return true;
+                if (learningPath === 'advanced' && m.level === 'advanced') return true;
+                return false;
+              }).map((mod, index) => {
+                const modIdx = index + 5;
+                const isExpanded = expandedMod === modIdx;
+                const materials = mod.materials || [];
+                return (
+                  <div key={mod.id} style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 16, overflow: 'hidden', transition: 'all 0.3s' }}>
+                    <div onClick={() => setExpandedMod(isExpanded ? -1 : modIdx)} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem', cursor: 'pointer', userSelect: 'none' }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--brand-50)', border: '2px solid var(--brand-200)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 900, fontSize: '0.875rem', color: 'var(--brand-600)' }}>
+                        {modIdx + 1}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>{mod.title}</p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, marginTop: 2 }}>{materials.length} materials</p>
+                      </div>
+                      <button onClick={e => { e.stopPropagation(); navigate(`/student/course/${course.id}?module=${mod.id}`); onClose(); }} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, background: 'var(--brand-500)', color: 'white', border: 'none', borderRadius: 10, padding: '7px 14px', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer' }}>
+                        <Play size={13} /> Learn
+                      </button>
+                      {isExpanded ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
+                    </div>
+
+                    {isExpanded && materials.length > 0 && (
+                      <div style={{ borderTop: '1px solid var(--surface-2)', background: 'var(--surface-1)' }}>
+                        {materials.map((mat, mi) => {
+                          const isYT = mat.material_type === 'youtube';
+                          const isPDF = mat.material_type === 'pdf';
+                          let isDone = false;
+                          try {
+                            const stored = localStorage.getItem(`adaptive_completed_${course.id}`);
+                            if (stored) isDone = JSON.parse(stored).includes(mat.id);
+                          } catch (e) {}
+                          return (
+                            <div key={mat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.875rem 1.25rem 0.875rem 4.5rem', borderBottom: mi < materials.length - 1 ? '1px solid var(--surface-2)' : 'none' }}>
+                              <div style={{ width: 32, height: 32, borderRadius: 8, background: isDone ? '#10b981' : isYT ? '#fee2e2' : isPDF ? '#e0f2fe' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {isDone ? <CheckCircle2 size={16} color="white" /> : isYT ? <span style={{ fontSize: '0.875rem' }}>▶️</span> : isPDF ? <span style={{ fontSize: '0.875rem' }}>📄</span> : <Play size={14} color="var(--text-muted)" />}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: isDone ? 'line-through' : 'none' }}>{mat.title}</p>
+                                <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{mat.material_type}</p>
+                              </div>
+                              {isYT && (
+                                <a href={mat.s3_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#dc2626', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                                  YouTube ↗
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {isExpanded && materials.length === 0 && (
+                      <div style={{ padding: '1rem 1.25rem 1rem 4.5rem', color: 'var(--text-muted)', fontSize: '0.875rem', borderTop: '1px solid var(--surface-2)' }}>No materials yet</div>
+                    )}
+                  </div>
+                );
+              })}
 
               {/* Final Assessment node */}
               {progress >= 100 && (
@@ -233,6 +284,14 @@ export default function StudentExamArena() {
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [enrollments, setEnrollments] = useState({});
   const [selectedCourse, setSelectedCourse] = useState(null); // for roadmap modal
+  
+  // Published Exam from Teacher Forge
+  const [publishedExam, setPublishedExam] = useState(null);
+  useEffect(() => {
+    academicAPI.getPublishedExam().then(res => {
+      setPublishedExam(res.data);
+    }).catch(() => {});
+  }, []);
   
   // Exam progress state
   const [questions, setQuestions] = useState([]);
@@ -434,15 +493,9 @@ export default function StudentExamArena() {
   const startLobby = async (exam) => {
     try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (err) {}
     setSelectedExam(exam);
-    setTimeLeft(45 * 60);
+    setTimeLeft((exam.duration_minutes || 45) * 60);
     setExamState('lobby');
-    setQuestions([]); // Clear previous
-    aiTutorAPI.generateQuiz(exam.id, exam.title + " comprehensive concepts", "medium", 5)
-      .then(res => setQuestions(res.data.quiz || []))
-      .catch(err => {
-        console.error(err);
-        toast.error("Failed to generate exam questions.");
-      });
+    setQuestions(exam.questions || []); // Use the real questions
   };
 
   const exitToList = async () => {
@@ -479,6 +532,55 @@ export default function StudentExamArena() {
     if (q.type === 'text') return acc + 1; // Assuming manual review required, giving point for demo
     return acc;
   }, 0);
+
+  const autoSubmittedRef = useRef(false);
+
+  const submitExam = async () => {
+    if (examState === 'submitted') return;
+    setExamState('submitted');
+    try { if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); } catch (err) {}
+    const totalQ = questions.length || 1;
+    // Basic scoring
+    let correctMarks = 0;
+    Object.entries(answers).forEach(([qi, ans]) => {
+      const q = questions[parseInt(qi)];
+      const answerLetter = String.fromCharCode(65 + ans); // Converts 0 to "A", 1 to "B", etc.
+      if (q && q.correct_answer === answerLetter) {
+        correctMarks += q.marks || 1;
+      }
+    });
+
+    try {
+      if (selectedExam && selectedExam.id) {
+        await academicAPI.submitExam(selectedExam.id, {
+          answers,
+          score: correctMarks,
+          cheat_risk_score: violationCount * 20
+        });
+        toast.success("Exam submitted successfully!");
+      }
+
+      await cognitiveAPI.evaluate({
+        event: 'Exam Completed',
+        score: Math.round((correctMarks / (selectedExam?.total_marks || 100)) * 100),
+        topic: selectedExam?.title || 'Exam',
+        total_questions: totalQ,
+        correct_answers: Object.keys(answers).length,
+        flagged_questions: flagged.size,
+        time_taken_seconds: (selectedExam?.duration_minutes || 45) * 60 - timeLeft,
+      });
+    } catch (err) {
+      console.warn('Could not update profile or submit exam:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (proctoring.warnings >= 5 && !autoSubmittedRef.current && examState === 'active') {
+      autoSubmittedRef.current = true;
+      toast.error('Test automatically ended due to excessive violations (5+).', { duration: 5000 });
+      submitExam();
+    }
+  }, [proctoring.warnings, examState]);
 
   return (
     <div style={isFullScreen ? { 
@@ -575,6 +677,40 @@ export default function StudentExamArena() {
                 <h2 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Available Exams</h2>
               </div>
 
+              {publishedExam && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '2rem' }}>
+                    <div
+                      onClick={() => startLobby(publishedExam)}
+                      style={{ background: 'var(--surface-0)', border: '2px solid var(--brand-500)', borderRadius: 24, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.3s', boxShadow: '0 8px 24px rgba(16,185,129,0.15)' }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.boxShadow = '0 20px 40px rgba(16,185,129,0.2)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(16,185,129,0.15)'; }}
+                    >
+                      <div style={{ height: 180, background: `linear-gradient(to bottom right, rgba(16,185,129,0.8), rgba(6,78,59,0.9))`, display: 'flex', alignItems: 'flex-end', padding: '1.25rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, background: 'white', color: '#064e3b', padding: '4px 12px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Official Exam
+                        </span>
+                      </div>
+                      <div style={{ padding: '1.5rem' }}>
+                        <p style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '1rem', lineHeight: 1.3 }}>{publishedExam.title}</p>
+                        <div style={{ marginBottom: '1.25rem', padding: '0.75rem', background: 'var(--surface-1)', borderRadius: 12, border: '1px solid var(--surface-2)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <ShieldAlert size={16} color="#ef4444" />
+                            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 700 }}>Proctored Assessment</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid var(--surface-2)' }}>
+                          <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>{publishedExam.total_marks} Marks • {publishedExam.duration_minutes} Mins</span>
+                          <div style={{ background: 'var(--brand-50)', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <ArrowRight size={16} color="var(--brand-600)" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {(() => {
                 const examCourses = enrolledCourses.filter(c => {
                   const enr = enrollments[c.id];
@@ -615,7 +751,7 @@ export default function StudentExamArena() {
                         onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.1)'; e.currentTarget.style.borderColor = 'var(--brand-300)'; }}
                         onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.04)'; e.currentTarget.style.borderColor = 'var(--surface-3)'; }}
                       >
-                        <div style={{ height: 180, background: `linear-gradient(to bottom right, rgba(0,0,0,0.5), rgba(0,0,0,0.2)), url('${courseImages[course.id] || ''}')`, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', alignItems: 'flex-end', padding: '1.25rem' }}>
+                        <div style={{ height: 180, background: `linear-gradient(to bottom right, rgba(0,0,0,0.5), rgba(0,0,0,0.2)), url('${course.thumbnail_url || courseImages[course.id] || 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=600&q=80'}')`, backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', alignItems: 'flex-end', padding: '1.25rem' }}>
                           <span style={{ fontSize: '0.75rem', fontWeight: 800, background: pathColor, color: 'white', padding: '4px 12px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             {path === 'pending' ? '⏳ Pending' : path === 'basics' ? '🌱 Foundation' : path === 'intermediate' ? '🚀 Core' : '⚡ Expert'}
                           </span>
@@ -825,7 +961,7 @@ export default function StudentExamArena() {
                       Question {current + 1} of {questions.length}
                     </span>
                     <div style={{ flex: 1, height: 4, background: 'var(--surface-3)', borderRadius: 999, maxWidth: 300 }}>
-                      <div style={{ height: '100%', background: 'var(--brand-500)', borderRadius: 999, width: `${((current + 1) / questions.length) * 100}%`, transition: 'width 0.4s ease' }} />
+                      <div style={{ height: '100%', background: 'var(--brand-500)', borderRadius: 999, width: `${questions.length > 0 ? ((current + 1) / questions.length) * 100 : 0}%`, transition: 'width 0.4s ease' }} />
                     </div>
                   </div>
                   <button onClick={toggleFlag} style={{ display: 'flex', alignItems: 'center', gap: 6, background: flagged.has(current) ? '#fef3c7' : 'transparent', border: `1px solid ${flagged.has(current) ? '#fde68a' : 'var(--surface-3)'}`, padding: '6px 12px', borderRadius: 999, color: flagged.has(current) ? '#d97706' : 'var(--text-secondary)', fontWeight: 800, fontSize: '0.75rem', cursor: 'pointer', transition: 'all 0.2s' }}>
@@ -836,14 +972,29 @@ export default function StudentExamArena() {
 
                 {/* Question Text */}
                 <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.45, marginBottom: '2rem' }}>
-                  {q.q}
+                  {q.text || q.q}
                 </h2>
+                
+                {/* Question Image (if any) */}
+                {(q.image || q.image_url) && (
+                  <div style={{ marginBottom: '2rem', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--surface-3)', display: 'flex', justifyContent: 'center', background: 'var(--surface-1)' }}>
+                    <img src={q.image || q.image_url} alt="Question Attachment" style={{ maxWidth: '100%', maxHeight: '400px', objectFit: 'contain' }} />
+                  </div>
+                )}
+                
+                {/* Code Snippet (if any) */}
+                {(q.code || q.code_snippet) && (
+                  <pre style={{ marginBottom: '2rem', padding: '1.25rem', background: '#1e1e1e', color: '#d4d4d4', borderRadius: 12, overflowX: 'auto', fontSize: '0.875rem', border: '1px solid #333' }}>
+                    <code>{q.code || q.code_snippet}</code>
+                  </pre>
+                )}
 
                 {/* Question Input (Dynamic Type) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', marginBottom: '3rem' }}>
                   
                   {q.type === 'mcq' && q.options.map((opt, idx) => {
                     const isSelected = answers[current] === idx;
+                    const optionText = typeof opt === 'string' ? opt : opt.text;
                     return (
                       <button
                         key={idx}
@@ -864,7 +1015,7 @@ export default function StudentExamArena() {
                         }}>
                           {String.fromCharCode(65 + idx)}
                         </div>
-                        <span style={{ fontSize: '0.9375rem', fontWeight: isSelected ? 700 : 500, lineHeight: 1.4 }}>{opt}</span>
+                        <span style={{ fontSize: '0.9375rem', fontWeight: isSelected ? 700 : 500, lineHeight: 1.4 }}>{optionText}</span>
                       </button>
                     );
                   })}
@@ -992,27 +1143,7 @@ export default function StudentExamArena() {
               </div>
 
               <div style={{ borderTop: '1px solid var(--surface-3)', paddingTop: '1.5rem', marginTop: '2rem' }}>
-                <button onClick={async () => {
-                    setExamState('submitted');
-                    try { if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); } catch (err) {}
-                    // Compute exam score and trigger cognitive profile update
-                    const totalQ = questions.length || 1;
-                    const correct = Object.entries(answers).filter(([qi, ans]) => questions[parseInt(qi)]?.answer === ans).length;
-                    const pct = Math.round((correct / totalQ) * 100);
-                    try {
-                      await cognitiveAPI.evaluate({
-                        event: 'Exam Completed',
-                        score: pct,
-                        topic: selectedExam?.title || 'Exam',
-                        total_questions: totalQ,
-                        correct_answers: correct,
-                        flagged_questions: flagged.size,
-                        time_taken_seconds: (selectedExam?.duration_minutes || 45) * 60 - timeLeft,
-                      });
-                    } catch (err) {
-                      console.warn('Could not update cognitive profile after exam:', err);
-                    }
-                  }} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#10b981', color: 'white', border: 'none', padding: '14px', borderRadius: 12, fontWeight: 900, fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(16,185,129,0.35)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                <button onClick={submitExam} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#10b981', color: 'white', border: 'none', padding: '14px', borderRadius: 12, fontWeight: 900, fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(16,185,129,0.35)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
                   <ShieldCheck size={18} /> Finish Quest
                 </button>
               </div>

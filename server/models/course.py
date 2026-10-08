@@ -10,6 +10,7 @@ class Course(Base):
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
     teacher_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
 
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)

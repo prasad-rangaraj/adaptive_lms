@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str = "lms-media"
 
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:5173"]
+    BACKEND_CORS_ORIGINS: List[str] = ["*"]
 
     class Config:
         env_file = ".env"

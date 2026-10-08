@@ -9,7 +9,7 @@ from models.user import User
 from models.cognitive_profile import CognitiveProfile
 from models.vector_embedding import VectorEmbedding
 from schemas.schemas import (
-    CourseCreateRequest, CourseResponse, CourseMaterialResponse, CourseUpdateRequest,
+    CourseCreateRequest, CourseResponse, CourseMaterialResponse, CourseUpdateRequest, CourseMaterialUpdateRequest,
     CourseModuleCreateRequest, CourseModuleResponse, CourseModuleUpdateRequest,
     AssignmentCreateRequest, AssignmentResponse,
     EnrollResponse, EnrollmentStatusResponse,
@@ -431,6 +431,110 @@ async def update_course_module(
     db.refresh(module)
     return module
 
+@router.delete("/{course_id}/modules/{module_id}")
+async def delete_course_module(
+    course_id: int,
+    module_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
+):
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.tenant_id == current_user.tenant_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    module = db.query(CourseModule).filter(CourseModule.id == module_id, CourseModule.course_id == course_id).first()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+        
+    db.delete(module)
+    db.commit()
+    return {"status": "success"}
+
+@router.patch("/{course_id}/modules/{module_id}/reorder")
+async def reorder_module_materials(
+    course_id: int,
+    module_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
+):
+    course = db.query(Course).filter(Course.id == course_id, Course.tenant_id == current_user.tenant_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    module = db.query(CourseModule).filter(CourseModule.id == module_id, CourseModule.course_id == course_id).first()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+
+    item_ids = payload.get("itemIds", [])
+    for idx, mat_id in enumerate(item_ids):
+        mat = db.query(CourseMaterial).filter(CourseMaterial.id == mat_id, CourseMaterial.module_id == module_id).first()
+        if mat:
+            mat.order_index = idx
+            
+    db.commit()
+    return {"status": "success"}
+
+@router.patch("/{course_id}/materials/{material_id}", response_model=CourseMaterialResponse)
+async def update_course_material(
+    course_id: int,
+    material_id: int,
+    payload: CourseMaterialUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
+):
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.tenant_id == current_user.tenant_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    material = db.query(CourseMaterial).filter(CourseMaterial.id == material_id).first()
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+        
+    if payload.title is not None:
+        material.title = payload.title
+        
+    db.commit()
+    db.refresh(material)
+    return material
+
+
+@router.post("/{course_id}/modules/{module_id}/materials")
+async def create_material_url(
+    course_id: int,
+    module_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("teacher", "tenant_admin")),
+):
+    course = db.query(Course).filter(Course.id == course_id, Course.tenant_id == current_user.tenant_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    module = db.query(CourseModule).filter(CourseModule.id == module_id, CourseModule.course_id == course_id).first()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+
+    max_order = db.query(CourseMaterial).filter(CourseMaterial.module_id == module_id).count()
+
+    material = CourseMaterial(
+        module_id=module_id,
+        title=payload.get("title", "New Material"),
+        material_type=payload.get("type", "video"),
+        s3_url=payload.get("url", ""),
+        order_index=max_order,
+        is_processed=False,
+    )
+    db.add(material)
+    db.commit()
+    db.refresh(material)
+    return material
 
 @router.post("/{course_id}/modules/{module_id}/materials/upload")
 async def upload_material(
@@ -683,4 +787,26 @@ async def submit_placement_result(
         score=score,
         message=path_messages[assigned],
     )
+
+@router.post("/{course_id}/copilot")
+async def ask_studio_copilot(
+    course_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
+):
+    prompt = payload.get("prompt", "")
+    
+    # Mocking AI response for Studio Copilot to avoid missing OpenAI key errors
+    response = ""
+    if "quiz" in prompt.lower():
+        response = "I have drafted a 5-question quiz based on the latest module. Would you like me to attach it as a new material?"
+    elif "summary" in prompt.lower():
+        response = "Here is a drafted lesson summary: 'This module covers the foundational concepts of the subject, exploring core definitions and real-world applications.' Let me know if you want to refine this."
+    elif "objective" in prompt.lower():
+        response = "Suggested Learning Objectives:\n1. Understand the core principles.\n2. Apply the concepts to practical scenarios.\n3. Analyze edge cases."
+    else:
+        response = f"I am your Studio Copilot. I've analyzed your prompt: '{prompt}'. I can help you auto-generate quizzes, draft lesson summaries, or suggest learning objectives."
+        
+    return {"reply": response}
 

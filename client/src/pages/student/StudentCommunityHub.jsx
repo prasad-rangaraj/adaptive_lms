@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   MessageSquare, Users, Bell, ChevronRight,
   Search, Plus, MapPin, Target, Zap, Briefcase, 
@@ -15,18 +14,29 @@ import {
 // Tab: Bounty Board & Exchange
 // ─────────────────────────────────────────────────────────────
 import { communityAPI } from '../../services/api.service';
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 function MessageFacultyModal({ onClose }) {
   const [msg, setMsg] = useState('');
   const [sending, setSending] = useState(false);
+  const [recipients, setRecipients] = useState([]);
+  const [receiverId, setReceiverId] = useState('');
+
+  useEffect(() => {
+    communityAPI.getMessageRecipients()
+      .then(res => {
+        setRecipients(res.data);
+        if (res.data.length > 0) setReceiverId(res.data[0].id);
+      })
+      .catch(console.error);
+  }, []);
+
   const handleSend = async () => {
-    if(!msg.trim()) return;
+    if(!msg.trim() || !receiverId) return;
     setSending(true);
     try {
-      // Mocking receiver_id to 1 (usually a teacher/admin in the seed data)
-      await communityAPI.sendMessage({ receiver_id: 1, content: msg });
+      await communityAPI.sendMessage({ receiver_id: parseInt(receiverId), content: msg });
       onClose();
     } catch (e) {
       console.error(e);
@@ -38,9 +48,26 @@ function MessageFacultyModal({ onClose }) {
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
       <div style={{ position: 'relative', width: '100%', maxWidth: 500, background: 'var(--surface-0)', borderRadius: 24, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', boxShadow: 'var(--shadow-xl)' }}>
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>Message Faculty</h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Send a direct message to your instructors.</p>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>New Message</h2>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Send a direct message.</p>
         </div>
+        
+        {recipients.length > 0 ? (
+          <select 
+            value={receiverId} 
+            onChange={e => setReceiverId(e.target.value)}
+            style={{ width: '100%', padding: '0.875rem', background: 'var(--surface-1)', border: '1px solid var(--surface-3)', borderRadius: 12, outline: 'none' }}
+          >
+            {recipients.map(r => (
+              <option key={r.id} value={r.id}>{r.name} ({r.role})</option>
+            ))}
+          </select>
+        ) : (
+          <div style={{ padding: '0.875rem', background: 'var(--surface-1)', border: '1px solid var(--surface-3)', borderRadius: 12, color: 'var(--text-muted)' }}>
+            Loading recipients...
+          </div>
+        )}
+
         <textarea 
           autoFocus
           value={msg}
@@ -50,7 +77,7 @@ function MessageFacultyModal({ onClose }) {
         />
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
           <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--surface-2)', cursor: 'pointer', fontWeight: 800 }}>Cancel</button>
-          <button disabled={sending || !msg.trim()} onClick={handleSend} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--brand-500)', color: 'white', cursor: 'pointer', fontWeight: 800 }}>{sending ? 'Sending...' : 'Send Message'}</button>
+          <button disabled={sending || !msg.trim() || !receiverId} onClick={handleSend} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--brand-500)', color: 'white', cursor: 'pointer', fontWeight: 800 }}>{sending ? 'Sending...' : 'Send Message'}</button>
         </div>
       </div>
     </div>
@@ -61,13 +88,27 @@ function BookOfficeHoursModal({ onClose }) {
   const [topic, setTopic] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  const [teacherId, setTeacherId] = useState('');
+  const [teachers, setTeachers] = useState([]);
   const [sending, setSending] = useState(false);
 
+  useEffect(() => {
+    // Assuming academicAPI is imported or we can fetch directly. Wait, we need to import academicAPI?
+    // Let's use fetch or ensure academicAPI is in scope.
+    // I'll fetch from /api/academic/teachers
+    fetch('/api/academic/teachers', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
+      .then(res => res.json())
+      .then(data => {
+        setTeachers(data);
+        if(data.length > 0) setTeacherId(data[0].id);
+      }).catch(console.error);
+  }, []);
+
   const handleBook = async () => {
-    if(!topic.trim() || !date || !time) return;
+    if(!topic.trim() || !date || !time || !teacherId) return;
     setSending(true);
     try {
-      await communityAPI.bookOfficeHour({ teacher_id: 1, topic, date, time });
+      await communityAPI.bookOfficeHour({ teacher_id: parseInt(teacherId), topic, date, time });
       onClose();
     } catch (e) {
       console.error(e);
@@ -84,6 +125,19 @@ function BookOfficeHoursModal({ onClose }) {
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Schedule a 1-on-1 session with your teacher.</p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {teachers.length > 0 ? (
+            <select 
+              value={teacherId} 
+              onChange={e => setTeacherId(e.target.value)}
+              style={{ padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-1)', outline: 'none' }}
+            >
+              {teachers.map(t => (
+                <option key={t.id} value={t.id}>{t.name} ({t.department})</option>
+              ))}
+            </select>
+          ) : (
+            <div style={{ padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-1)', color: 'var(--text-muted)' }}>Loading teachers...</div>
+          )}
           <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Topic (e.g., Assignment 2 Help)" style={{ padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-1)', outline: 'none' }} />
           <div style={{ display: 'flex', gap: '1rem' }}>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-1)', outline: 'none' }} />
@@ -92,7 +146,7 @@ function BookOfficeHoursModal({ onClose }) {
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
           <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--surface-2)', cursor: 'pointer', fontWeight: 800 }}>Cancel</button>
-          <button disabled={sending || !topic.trim() || !date || !time} onClick={handleBook} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--brand-500)', color: 'white', cursor: 'pointer', fontWeight: 800 }}>{sending ? 'Booking...' : 'Book Slot'}</button>
+          <button disabled={sending || !topic.trim() || !date || !time || !teacherId} onClick={handleBook} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--brand-500)', color: 'white', cursor: 'pointer', fontWeight: 800 }}>{sending ? 'Booking...' : 'Book Slot'}</button>
         </div>
       </div>
     </div>
@@ -137,8 +191,56 @@ function RequestMentorshipModal({ alumni, onClose }) {
   );
 }
 
+function PlaceBountyModal({ onClose, refetch }) {
+  const [title, setTitle] = useState('');
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [reward, setReward] = useState(50);
+  const [sending, setSending] = useState(false);
+
+  const handlePlace = async () => {
+    if(!title.trim() || !body.trim() || !subject.trim()) return;
+    setSending(true);
+    try {
+      await communityAPI.createBounty({ title, subject, body, reward_amount: parseInt(reward), tags: subject });
+      if(refetch) refetch();
+      onClose();
+    } catch (e) {
+      console.error(e);
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 500, background: 'var(--surface-0)', borderRadius: 24, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', boxShadow: 'var(--shadow-xl)' }}>
+        <div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>Place Bounty</h2>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Offer reputation points for someone to solve your doubt.</p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject (e.g. DBMS, React)" style={{ padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-1)', outline: 'none' }} />
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Question Title" style={{ padding: '10px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-1)', outline: 'none' }} />
+          <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Describe your doubt in detail..." style={{ width: '100%', minHeight: 120, padding: '1rem', background: 'var(--surface-1)', border: '1px solid var(--surface-3)', borderRadius: 12, resize: 'vertical', outline: 'none' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: 'var(--surface-1)', borderRadius: 8, border: '1px solid var(--surface-3)' }}>
+            <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Reward Amount</span>
+            <input type="number" min={10} step={10} value={reward} onChange={e => setReward(e.target.value)} style={{ width: 80, padding: '5px', borderRadius: 6, border: '1px solid var(--surface-3)', outline: 'none' }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+          <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--surface-2)', cursor: 'pointer', fontWeight: 800 }}>Cancel</button>
+          <button disabled={sending || !title.trim() || !body.trim() || !subject.trim()} onClick={handlePlace} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--brand-500)', color: 'white', cursor: 'pointer', fontWeight: 800 }}>{sending ? 'Placing...' : 'Place Bounty'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BountyBoardTab() {
-  const { data: bounties = [] } = useQuery({
+  const [showPlaceBounty, setShowPlaceBounty] = useState(false);
+
+  const { data: bounties = [], refetch: refetchBounties } = useQuery({
     queryKey: ['communityBounties'],
     queryFn: () => communityAPI.getBounties().then(res => res.data)
   });
@@ -147,6 +249,8 @@ function BountyBoardTab() {
     queryKey: ['communityLeaderboard'],
     queryFn: () => communityAPI.getLeaderboard().then(res => res.data)
   });
+  
+  const myRank = leaderboard.length > 0 ? leaderboard[0] : null;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '3rem', alignItems: 'start' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -155,7 +259,7 @@ function BountyBoardTab() {
             <h2 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)' }}>Bounty Exchange</h2>
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: 4 }}>Help peers, solve doubts, and earn Campus Reputation.</p>
           </div>
-          <button style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--brand-500)', color: 'white', border: 'none', padding: '9px 18px', borderRadius: 999, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(8,145,178,0.2)' }}>
+          <button onClick={() => setShowPlaceBounty(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--brand-500)', color: 'white', border: 'none', padding: '9px 18px', borderRadius: 999, fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(8,145,178,0.2)' }}>
             <Plus size={16} /> Place Bounty
           </button>
         </div>
@@ -220,8 +324,8 @@ function BountyBoardTab() {
             <Award size={20} color="white" />
           </div>
           <h3 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--brand-700)', marginBottom: '0.5rem' }}>Your Reputation</h3>
-          <h1 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--brand-900)', lineHeight: 1, marginBottom: '0.5rem' }}>340</h1>
-          <p style={{ fontSize: '0.75rem', color: 'var(--brand-600)', lineHeight: 1.5 }}>Rank #42 • 160 more Rep to unlock 'Rising Star' badge.</p>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--brand-900)', lineHeight: 1, marginBottom: '0.5rem' }}>{myRank ? myRank.rep : 0}</h1>
+          <p style={{ fontSize: '0.75rem', color: 'var(--brand-600)', lineHeight: 1.5 }}>Rank #{myRank ? myRank.rank : '-'} • Earn more Rep to unlock badges.</p>
         </div>
       </div>
     </div>
@@ -354,6 +458,8 @@ function MatchmakingTab() {
 // Tab: Campus Live
 // ─────────────────────────────────────────────────────────────
 function CampusLiveTab() {
+  const [rsvps, setRsvps] = useState({});
+
   const { data: events = [] } = useQuery({
     queryKey: ['communityEvents'],
     queryFn: () => communityAPI.getEvents().then(res => res.data)
@@ -363,11 +469,10 @@ function CampusLiveTab() {
     queryKey: ['communityClubs'],
     queryFn: () => communityAPI.getClubs().then(res => res.data)
   });
-  
-  const { data: alumni = [] } = useQuery({
-    queryKey: ['communityAlumni'],
-    queryFn: () => communityAPI.getAlumni().then(res => res.data)
-  });
+
+  const handleRsvp = (id) => {
+    setRsvps(prev => ({ ...prev, [id]: !prev[id] }));
+  };
   
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '3rem', alignItems: 'start' }}>
@@ -392,8 +497,8 @@ function CampusLiveTab() {
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={14} /> {e.venue}</p>
                   </div>
                 </div>
-                <button style={{ background: e.rsvp ? '#f0fdf4' : 'var(--brand-500)', color: e.rsvp ? '#10b981' : 'white', border: e.rsvp ? '1px solid #bbf7d0' : 'none', padding: '10px 24px', borderRadius: 999, fontSize: '0.875rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {e.rsvp ? <><CheckCircle2 size={16} /> RSVP'd</> : 'RSVP Now'}
+                <button onClick={() => handleRsvp(e.id)} style={{ background: rsvps[e.id] ? '#f0fdf4' : 'var(--brand-500)', color: rsvps[e.id] ? '#10b981' : 'white', border: rsvps[e.id] ? '1px solid #bbf7d0' : 'none', padding: '10px 24px', borderRadius: 999, fontSize: '0.875rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {rsvps[e.id] ? <><CheckCircle2 size={16} /> RSVP'd</> : 'RSVP Now'}
                 </button>
               </div>
             </div>
@@ -404,30 +509,7 @@ function CampusLiveTab() {
       {/* Clubs & Live Occupancy */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         
-        {/* Live Occupancy Widget */}
-        <div style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-100)', borderRadius: 20, padding: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.5rem' }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--brand-500)', boxShadow: '0 0 10px rgba(8,145,178,0.5)' }} />
-            <h3 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--brand-900)' }}>Campus Live Occupancy</h3>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {[
-              { loc: 'Central Library', occ: '85%', color: '#f59e0b', status: 'Filling Fast' },
-              { loc: 'Innovation Lab', occ: '30%', color: '#10b981', status: 'Available' },
-              { loc: 'Cafeteria', occ: '95%', color: '#ef4444', status: 'Crowded' }
-            ].map(l => (
-              <div key={l.loc} style={{ background: 'white', border: '1px solid var(--brand-100)', padding: '1rem', borderRadius: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-900)' }}>{l.loc}</p>
-                  <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: l.color }}>{l.status}</p>
-                </div>
-                <div style={{ width: '100%', height: 4, background: 'var(--brand-100)', borderRadius: 999 }}>
-                  <div style={{ width: l.occ, height: '100%', background: l.color, borderRadius: 999 }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+
 
         {/* Club Directory */}
         <div style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '1.5rem' }}>
@@ -448,8 +530,6 @@ function CampusLiveTab() {
           <button style={{ width: '100%', padding: '0.75rem', marginTop: '0.5rem', background: 'transparent', border: '1.5px dashed var(--surface-3)', color: 'var(--text-secondary)', borderRadius: 12, fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer' }}>View All 42 Clubs</button>
         </div>
       </div>
-
-      {mentorshipModal && <RequestMentorshipModal alumni={mentorshipModal} onClose={() => setMentorshipModal(null)} />}
     </div>
   );
 }
@@ -458,7 +538,13 @@ function CampusLiveTab() {
 // Tab: Alumni Network
 // ─────────────────────────────────────────────────────────────
 function AlumniTab() {
-  const [mentorshipModal, setMentorshipModal] = React.useState(null);
+  const [mentorshipModal, setMentorshipModal] = useState(null);
+  
+  const { data: alumni = [] } = useQuery({
+    queryKey: ['communityAlumni'],
+    queryFn: () => communityAPI.getAlumni().then(res => res.data)
+  });
+  
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', maxWidth: 900 }}>
       
@@ -544,15 +630,12 @@ export default function StudentCommunityHub() {
         <div style={{ marginBottom: '2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-              <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-500)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Peers · Seniors · Alumni</p>
+              <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-500)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Lumina Platform</p>
               <h1 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>Community Hub</h1>
             </div>
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button onClick={() => setShowBookingModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 999, border: '2px solid var(--brand-500)', background: 'transparent', color: 'var(--brand-600)', fontWeight: 900, cursor: 'pointer' }}>
                 <Calendar size={16} /> Book Office Hours
-              </button>
-              <button onClick={() => setShowMsgModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 999, border: 'none', background: 'var(--brand-500)', color: 'white', fontWeight: 900, cursor: 'pointer', boxShadow: 'var(--shadow-md)' }}>
-                <MessageSquare size={16} /> Direct Message Faculty
               </button>
             </div>
           </div>

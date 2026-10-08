@@ -1,21 +1,26 @@
 import { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
+import { useQuery } from '@tanstack/react-query';
+import { tenantsAPI } from '../../services/api.service';
 import {
   Search, Command, Bell, Sparkles, ArrowRight, Table2, 
   Download, Filter, Key, Database, RefreshCw, FileSpreadsheet, Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-const DUMMY_REPORTS = [
-  { id: 1, name: 'Q3 Financial Billing', type: 'CSV Export', frequency: 'Monthly', status: 'Ready', size: '1.2 MB', date: 'Oct 10, 2026' },
-  { id: 2, name: 'Compliance & Audit Log', type: 'PDF Summary', frequency: 'Weekly', status: 'Processing', size: '--', date: 'Oct 12, 2026' },
-  { id: 3, name: 'Active Cohorts Engagement', type: 'CSV Export', frequency: 'Daily', status: 'Ready', size: '4.5 MB', date: 'Oct 15, 2026' },
-  { id: 4, name: 'Inactive Users Report', type: 'CSV Export', frequency: 'Monthly', status: 'Ready', size: '0.8 MB', date: 'Oct 1, 2026' },
-];
+import Loader from '../../components/ui/Loader';
 
 export default function OrgDataHub() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const tenantId = user?.tenant_id;
+
+  const { data: reports = [], isLoading } = useQuery({
+    queryKey: ['orgReports', tenantId],
+    queryFn: () => tenantsAPI.getReports(tenantId).then(res => res.data),
+    enabled: !!tenantId,
+  });
+
+  if (isLoading) return <Loader text="Loading reports..." />;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', maxWidth: 1400, margin: '0 auto' }}>
@@ -105,10 +110,10 @@ export default function OrgDataHub() {
                 </tr>
               </thead>
               <tbody>
-                {DUMMY_REPORTS.map((r, i) => {
+                {reports.map((r, i) => {
                   const isProcessing = r.status === 'Processing';
                   return (
-                    <tr key={r.id} style={{ borderBottom: i < DUMMY_REPORTS.length - 1 ? '1px solid var(--glass-border)' : 'none', transition: 'background 0.2s', cursor: 'pointer' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <tr key={r.id} style={{ borderBottom: i < reports.length - 1 ? '1px solid var(--glass-border)' : 'none', transition: 'background 0.2s', cursor: 'pointer' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <td style={{ padding: '1.25rem 1.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                           <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
