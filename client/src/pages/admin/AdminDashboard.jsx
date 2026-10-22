@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const tenantId = user?.tenant_id;
+  const [showActionItems, setShowActionItems] = useState(false);
 
   const { data: narrativeData, isLoading: loadingNarrative } = useQuery({
     queryKey: ['dashboard-narrative', tenantId],
@@ -32,6 +33,8 @@ export default function AdminDashboard() {
   // Parse narrative into styled segments (bold text inside **)
   const rawNarrative = narrativeData?.narrative || "Welcome to your Workspace. Everything is operating smoothly today.";
   const parts = rawNarrative.split(/(\*\*.*?\*\*)/g);
+
+  const actionItems = narrativeData?.action_items || [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', maxWidth: 1400, margin: '0 auto' }}>
@@ -59,7 +62,7 @@ export default function AdminDashboard() {
         
         <div style={{ display: 'flex', gap: 12 }}>
           <button className="btn btn-ghost btn-icon"><Bell size={18} /></button>
-          <button className="btn btn-primary" style={{ gap: 8 }} onClick={() => navigate('/admin/members')}>
+          <button className="btn btn-primary" style={{ gap: 8 }} onClick={() => navigate('/admin/directory')}>
             <Users size={16} /> Invite Members
           </button>
         </div>
@@ -85,20 +88,54 @@ export default function AdminDashboard() {
               {parts.map((p, i) => {
                 if (p.startsWith('**') && p.endsWith('**')) {
                   const content = p.replace(/\*\*/g, '');
-                  const color = content.toLowerCase().includes('down') || content.toLowerCase().includes('falling') ? '#e11d48' : 'var(--brand-700)';
+                  const color = content.toLowerCase().includes('down') || content.toLowerCase().includes('falling') || content.toLowerCase().includes('behind') ? '#e11d48' : 'var(--brand-700)';
                   return <strong key={i} style={{ color, fontWeight: 800 }}>{content}</strong>;
                 }
                 return p;
               })}
             </h2>
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-              <button className="btn btn-secondary btn-sm" style={{ gap: 6, fontSize: '0.8125rem', background: 'white' }}>
-                View Action Items <ArrowRight size={14} />
+              <button onClick={() => setShowActionItems(true)} className="btn btn-secondary btn-sm" style={{ gap: 6, fontSize: '0.8125rem', background: 'white' }}>
+                View Action Items {actionItems.length > 0 && `(${actionItems.length})`} <ArrowRight size={14} />
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Action Items Modal */}
+      {showActionItems && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: 540, padding: '2rem', background: 'var(--surface-0)', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Sparkles size={20} color="var(--brand-600)" />
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>Operational Action Items</h3>
+              </div>
+              <button onClick={() => setShowActionItems(false)} className="btn btn-ghost btn-sm" style={{ padding: 4 }}>Close</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+              {actionItems.map(item => (
+                <div key={item.id} style={{ padding: '1rem 1.25rem', background: 'var(--surface-1)', border: '1px solid var(--glass-border)', borderRadius: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ flex: 1, paddingRight: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-primary)' }}>{item.title}</span>
+                      <span style={{ fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase', padding: '2px 8px', borderRadius: 999, background: item.priority === 'high' ? '#fee2e2' : (item.priority === 'medium' ? '#fef3c7' : '#ecfdf5'), color: item.priority === 'high' ? '#dc2626' : (item.priority === 'medium' ? '#d97706' : '#10b981') }}>
+                        {item.priority}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{item.description}</p>
+                  </div>
+                  <button onClick={() => { setShowActionItems(false); navigate(item.link); }} className="btn btn-primary btn-sm" style={{ padding: '6px 14px', fontSize: '0.75rem', gap: 6 }}>
+                    Resolve <ArrowRight size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 3. Table-First Data Canvas (Asymmetrical Layout) ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '2rem', alignItems: 'flex-start' }}>
@@ -192,9 +229,9 @@ export default function AdminDashboard() {
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {[
-                { label: 'Manage Members', icon: Users, color: 'var(--brand-600)', path: '/admin/members' },
-                { label: 'Curriculum Library', icon: BookOpen, color: 'var(--brand-600)', path: '/admin/courses' },
-                { label: 'View Audit Trail', icon: ClipboardList, color: 'var(--brand-600)', path: '/admin/audit' },
+                { label: 'Manage Members', icon: Users, color: 'var(--brand-600)', path: '/admin/directory' },
+                { label: 'Curriculum Library', icon: BookOpen, color: 'var(--brand-600)', path: '/admin/content' },
+                { label: 'View Audit Trail', icon: ClipboardList, color: 'var(--brand-600)', path: '/admin/security' },
                 { label: 'Organization Settings', icon: Settings, color: 'var(--text-muted)', path: '/admin/settings' },
               ].map((action, i) => (
                 <button key={i} onClick={() => navigate(action.path)} style={{

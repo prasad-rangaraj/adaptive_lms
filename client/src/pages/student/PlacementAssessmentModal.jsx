@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
-import { coursesAPI, aiTutorAPI, cognitiveAPI } from '../../services/api.service';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { coursesAPI, aiTutorAPI, cognitiveAPI, proctoringAPI } from '../../services/api.service';
 import { useProctoring } from '../../hooks/useProctoring';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   BookOpen, Zap, Target, ArrowRight, X, CheckCircle2, Circle, ChevronRight,
   Brain, Sparkles, Trophy, ArrowLeft, Clock, RotateCcw, GraduationCap, AlertCircle,
-  Settings, Camera
+  Settings, Camera, ShieldAlert
 } from 'lucide-react';
 
 // ── Path config ───────────────────────────────────────────────────────────
@@ -269,69 +269,197 @@ const FALLBACK_QUESTIONS = (courseTitle) => [
   },
 ];
 
-function PhaseAssessment({ course, courseId, onComplete, prefetchedQuestions }) {
+const FALLBACK_TOPIC_QUESTIONS = (courseTitle, level, topics) => {
+  const safeTopics = (topics && topics.length > 0) ? topics : [
+    'Core Syntax & Semantics',
+    'Data Structures & Algorithms',
+    'Architecture & Control Flow',
+    'Error Handling & Exceptions',
+    'State & Lifecycle Management'
+  ];
+  return safeTopics.map((topic, i) => ({
+    question: `In ${courseTitle || 'software engineering'}, which best applies to "${topic}" at the ${level || 'curriculum'} level?`,
+    options: [
+      `It establishes essential modularity, predictability, and efficiency in ${topic}.`,
+      `It is an optional syntax extension rarely utilized in production code.`,
+      `It bypasses error handling and directly operates with unchecked parameters.`,
+      `It executes only during offline compilation phases.`
+    ],
+    correct: 0,
+    weight: null,
+  }));
+};
+
+function PhaseAssessment({ course, courseId, onComplete, prefetchedQuestions, initialStream, assessmentTitle }) {
   const [questions, setQuestions] = useState(prefetchedQuestions || []);
   const [loading, setLoading] = useState(!prefetchedQuestions || prefetchedQuestions.length === 0);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState({}); // { questionIdx: selectedIdx }
   const [selected, setSelected] = useState(null);
   const [animating, setAnimating] = useState(false);
-  const [permissionsGranted, setPermissionsGranted] = useState(false);
 
-  // Security states
+  // Security states & Violation Tracking
+  const MAX_VIOLATIONS = 5;
+  const [violationCount, setViolationCount] = useState(0);
+  const violationCountRef = useRef(0);
   const [focusWarning, setFocusWarning] = useState(false);
   const [keyWarning, setKeyWarning] = useState('');
   const [fsWarning, setFsWarning] = useState(false);
   const [activeBanner, setActiveBanner] = useState(null);
   const violationTimerRef = useRef(null);
-  const prevViolationRef = useRef(null);
+  const isTerminatingRef = useRef(false);
+  const lastViolationTimeRef = useRef({});
 
-  const proctoring = useProctoring();
   const hudVideoRef = useRef(null);
-  const streamRef = useRef(null);
+  const streamRef = useRef(initialStream || null);
 
-  // Cleanup stream on unmount
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-    };
-  }, []);
+  // Centralized Violation Handler for Placement Assessment
+  const handleViolation = useCallback((violationType, description, snapshot = null) => {
+    if (loading || isTerminatingRef.current) return;
 
-  // Start MediaPipe tracking when video mounts
-  useEffect(() => {
-    if (permissionsGranted && !loading && streamRef.current && hudVideoRef.current) {
-      if (hudVideoRef.current.srcObject !== streamRef.current) {
-        hudVideoRef.current.srcObject = streamRef.current;
-      }
-      proctoring.startTracking(hudVideoRef.current, courseId || 999999);
+    const now = Date.now();
+    const lastTime = lastViolationTimeRef.current[violationType] || 0;
+    if (now - lastTime < 2500) return;
+    lastViolationTimeRef.current[violationType] = now;
+
+    let capturedSnapshot = snapshot;
+    if (!capturedSnapshot && hudVideoRef.current && hudVideoRef.current.videoWidth) {
+      try {
+        const c = document.createElement('canvas');
+        c.width = 320;
+        c.height = 240;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(hudVideoRef.current, 0, 0, 320, 240);
+        capturedSnapshot = c.toDataURL('image/jpeg', 0.6);
+      } catch (e) {}
     }
-  }, [permissionsGranted, loading, proctoring.startTracking]);
 
-  useEffect(() => {
-    return () => { proctoring.stopTracking(); };
-  }, [proctoring.stopTracking]);
+    violationCountRef.current = (violationCountRef.current || 0) + 1;
+    const nextCount = violationCountRef.current;
+    setViolationCount(nextCount);
 
-  // YOLO / Mic Violation Tracking
-  useEffect(() => {
-    const violation = proctoring.lastViolation;
-    if (violation && violation !== prevViolationRef.current) {
-      prevViolationRef.current = violation;
+    if (nextCount < MAX_VIOLATIONS) {
+      const riskScore = Math.min(100, nextCount * 20);
+      proctoringAPI.logViolation({
+        exam_id: courseId || 1,
+        violation_type: violationType,
+        severity: nextCount >= 3 ? 'high' : 'medium',
+        description: `Warning ${nextCount}/${MAX_VIOLATIONS}: ${description}`,
+        cumulative_risk_score: riskScore,
+        screenshot: capturedSnapshot,
+      }).catch(err => console.error('Failed to log violation:', err));
+
+      toast.error(`⚠️ Warning ${nextCount}/${MAX_VIOLATIONS}: ${description}`, {
+        id: 'placement-warn-toast',
+        duration: 4000,
+      });
+
       let countdown = 5;
-      setActiveBanner({ type: violation, countdown });
+      setActiveBanner({
+        type: violationType,
+        text: description,
+        warningNum: nextCount,
+        maxWarnings: MAX_VIOLATIONS,
+        countdown,
+      });
+
       if (violationTimerRef.current) clearInterval(violationTimerRef.current);
       violationTimerRef.current = setInterval(() => {
         countdown -= 1;
-        setActiveBanner(b => b ? { ...b, countdown } : null);
+        setActiveBanner(b => (b && b.type !== 'terminated' ? { ...b, countdown } : null));
         if (countdown <= 0) {
           clearInterval(violationTimerRef.current);
           setActiveBanner(null);
         }
       }, 1000);
+    } else {
+      isTerminatingRef.current = true;
+      if (violationTimerRef.current) clearInterval(violationTimerRef.current);
+
+      proctoringAPI.logViolation({
+        exam_id: courseId || 1,
+        violation_type: 'exam_terminated',
+        severity: 'critical',
+        description: `Maximum warnings limit reached (5/5). Assessment auto-terminated. Reason: ${description}`,
+        cumulative_risk_score: 100,
+        screenshot: capturedSnapshot,
+      }).catch(err => console.error('Failed to log violation:', err));
+
+      toast.error('🚨 MAXIMUM WARNINGS EXCEEDED (5/5). Assessment automatically ended!', {
+        id: 'placement-term-toast',
+        duration: 6000,
+      });
+
+      setActiveBanner({
+        type: 'terminated',
+        text: '5 Proctoring Warnings Exceeded — Assessment Terminated',
+        countdown: 0,
+      });
+
+      setTimeout(() => {
+        try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch {}
+        onComplete(0);
+      }, 1200);
     }
-    if (!violation) {
-      prevViolationRef.current = null;
+  }, [loading, courseId, onComplete]);
+
+  const proctoring = useProctoring({
+    onViolation: (type, desc, snapshot) => {
+      handleViolation(type, desc, snapshot);
     }
-  }, [proctoring.lastViolation]);
+  });
+
+  // Handle initialStream from waiting room or fallback camera init
+  useEffect(() => {
+    if (initialStream) {
+      streamRef.current = initialStream;
+      if (hudVideoRef.current && hudVideoRef.current.srcObject !== initialStream) {
+        hudVideoRef.current.srcObject = initialStream;
+      }
+      return () => {
+        if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+        proctoring.stopTracking();
+      };
+    }
+
+    let active = true;
+    const initCamera = async () => {
+      try {
+        if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        }
+      } catch {}
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (!active) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (hudVideoRef.current) {
+          hudVideoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.warn("Camera auto-init: device not found or denied:", err);
+      }
+    };
+    initCamera();
+    return () => {
+      active = false;
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      proctoring.stopTracking();
+    };
+  }, [initialStream]);
+
+  // Start MediaPipe tracking when video or questions become ready
+  useEffect(() => {
+    if (!loading && streamRef.current && hudVideoRef.current) {
+      if (hudVideoRef.current.srcObject !== streamRef.current) {
+        hudVideoRef.current.srcObject = streamRef.current;
+      }
+      proctoring.startTracking(hudVideoRef.current, courseId || 1);
+    }
+  }, [loading, proctoring.startTracking, courseId]);
 
   // Load prefetched questions
   useEffect(() => {
@@ -341,36 +469,59 @@ function PhaseAssessment({ course, courseId, onComplete, prefetchedQuestions }) 
     }
   }, [prefetchedQuestions]);
 
-  // (Fullscreen is now requested explicitly via button click)
+  // Fullscreen cleanup
   useEffect(() => {
     return () => { try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch {} };
   }, []);
 
+  // Blur & Tab Switch
   useEffect(() => {
-    const onBlur = () => setFocusWarning(true);
+    const onBlur = () => {
+      setFocusWarning(true);
+      handleViolation('tab_switch', 'Tab switch or window defocus detected');
+    };
+    const onVisibility = () => {
+      if (document.hidden) {
+        setFocusWarning(true);
+        handleViolation('tab_switch', 'Navigated away from assessment window');
+      }
+    };
     const onFocus = () => setFocusWarning(false);
     window.addEventListener('blur', onBlur);
     window.addEventListener('focus', onFocus);
-    return () => { window.removeEventListener('blur', onBlur); window.removeEventListener('focus', onFocus); };
-  }, []);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [handleViolation]);
 
+  // Keys
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key.match(/^F(1[0-2]|[1-9])$/)) {
+      if (e.key.match(/^F(1[0-2]|[1-9])$/) || (e.altKey && e.key === 'Tab')) {
         e.preventDefault();
         setKeyWarning(`Blocked: ${e.key} is not allowed during assessment.`);
         setTimeout(() => setKeyWarning(''), 4000);
+        handleViolation('forbidden_key', `Prohibited key shortcut attempt: ${e.key}`);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [handleViolation]);
 
+  // Fullscreen Exit
   useEffect(() => {
-    const onChange = () => { if (!document.fullscreenElement) setFsWarning(true); };
+    const onChange = () => {
+      if (!document.fullscreenElement) {
+        setFsWarning(true);
+        handleViolation('screen_resize', 'Exited fullscreen examination mode');
+      }
+    };
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
+  }, [handleViolation]);
 
   const q = questions[current];
 
@@ -409,40 +560,7 @@ function PhaseAssessment({ course, courseId, onComplete, prefetchedQuestions }) 
   const answeredCount = Object.keys(answers).length;
   const progress = Math.round(((answeredCount + (selected !== null && answers[current] === undefined ? 1 : 0)) / questions.length) * 100);
 
-  if (!permissionsGranted) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'var(--surface-1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', fontFamily: 'var(--font-body)' }}>
-        <div style={{ width: 72, height: 72, borderRadius: 20, background: 'var(--brand-50)', border: '1px solid var(--brand-200)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Settings size={36} color="var(--brand-600)" />
-        </div>
-        <div style={{ textAlign: 'center', maxWidth: 420 }}>
-          <p style={{ fontWeight: 900, fontSize: '1.5rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>System Check</p>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: 1.5, marginBottom: '2rem' }}>
-            To begin the proctored assessment, you must grant permission to use your camera and enable full screen mode.
-          </p>
-          <button 
-            onClick={async () => {
-              try {
-                if (document.documentElement.requestFullscreen) {
-                  await document.documentElement.requestFullscreen();
-                }
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                streamRef.current = stream;
-                if (hudVideoRef.current) hudVideoRef.current.srcObject = stream;
-                setPermissionsGranted(true);
-              } catch (err) {
-                console.error("Permission denied", err);
-                alert("You must allow camera access and fullscreen to continue.");
-              }
-            }}
-            style={{ padding: '14px 28px', background: 'var(--brand-500)', color: 'white', border: 'none', borderRadius: 14, fontSize: '1.0625rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, margin: '0 auto', transition: 'all 0.2s', boxShadow: '0 8px 24px rgba(79,70,229,0.25)' }}
-          >
-            <Camera size={20} /> Grant Permissions & Start
-          </button>
-        </div>
-      </div>
-    );
-  }
+
 
   if (loading) {
     return (
@@ -514,7 +632,7 @@ function PhaseAssessment({ course, courseId, onComplete, prefetchedQuestions }) 
             <Sparkles size={18} color="var(--brand-600)" />
           </div>
           <div>
-            <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--brand-600)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Placement Assessment</p>
+            <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--brand-600)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>{assessmentTitle || 'Placement Assessment'}</p>
             <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{course?.title}</p>
           </div>
         </div>
@@ -800,24 +918,191 @@ function PhasePathReveal({ result, courseId, onConfirm }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Phase 3 (Alt): Level Test Completion & Topic Mastery Screen
+// ────────────────────────────────────────────────────────────────────────────
+function PhaseLevelResult({ result, courseId, level, levelTitle, topics, onPass, onClose }) {
+  const [submitting, setSubmitting] = useState(false);
+  const score = Math.round(result?.score || 0);
+  const passed = score >= 60;
+  const scoreColor = passed ? '#10b981' : '#ef4444';
+
+  const handleFinish = async () => {
+    setSubmitting(true);
+    try {
+      if (passed) {
+        await coursesAPI.submitLevelTestResult(courseId, { level, score, passed: true });
+        try {
+          const key = `adaptive_level_passed_${courseId}`;
+          const current = JSON.parse(localStorage.getItem(key) || '[]');
+          if (!current.includes(level)) {
+            localStorage.setItem(key, JSON.stringify([...current, level]));
+          }
+        } catch (e) {}
+
+        toast.success(`🎉 ${levelTitle || level} Passed! Next level unlocked.`, { duration: 4000 });
+        if (onPass) onPass(level, score);
+      }
+    } catch (e) {
+      console.error('Failed to submit level test result:', e);
+      if (onPass) onPass(level, score);
+    } finally {
+      setSubmitting(false);
+      onClose();
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', flex: 1, padding: '1rem 0' }}>
+      {/* Circular score gauge */}
+      <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+        <div style={{ position: 'relative', width: 130, height: 130, margin: '0 auto 1.25rem' }}>
+          <svg width="130" height="130" viewBox="0 0 130 130">
+            <circle cx="65" cy="65" r="54" fill="none" stroke="var(--surface-2)" strokeWidth="10" />
+            <circle cx="65" cy="65" r="54" fill="none" stroke={scoreColor} strokeWidth="10"
+              strokeDasharray={`${2 * Math.PI * 54}`}
+              strokeDashoffset={`${2 * Math.PI * 54 * (1 - score / 100)}`}
+              strokeLinecap="round" transform="rotate(-90 65 65)"
+              style={{ transition: 'stroke-dashoffset 1s ease' }}
+            />
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>{score}%</span>
+            <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: scoreColor, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
+              {passed ? 'Passed' : 'Needs Review'}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 999, background: passed ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', color: scoreColor, fontWeight: 800, fontSize: '0.8125rem', marginBottom: '0.75rem' }}>
+          {passed ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+          {passed ? 'Level Benchmark Met (≥ 60%)' : 'Passing Threshold is 60%'}
+        </div>
+
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', margin: '0 0 0.5rem' }}>
+          {passed ? `🎉 ${levelTitle || `${level.toUpperCase()} Test`} Cleared!` : 'Review Topics and Try Again'}
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', margin: 0, maxWidth: 480 }}>
+          {passed
+            ? 'Great job! You demonstrated mastery of all core topics tested in this level.'
+            : 'You are close, but need at least 60% to officially clear this level. Take some time to review the materials.'}
+        </p>
+      </div>
+
+      {/* Completed Topics Evaluated Breakdown */}
+      {topics && topics.length > 0 && (
+        <div style={{ width: '100%', maxWidth: 520, background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 16, padding: '1.25rem', marginBottom: '2rem' }}>
+          <p style={{ margin: '0 0 0.75rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Evaluated Curriculum Topics ({topics.length})
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {topics.map((t, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', background: 'var(--surface-1)', borderRadius: 10 }}>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)' }}>{t}</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: passed ? '#10b981' : '#f59e0b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {passed ? <CheckCircle2 size={14} color="#10b981" /> : <Circle size={12} color="#f59e0b" />}
+                  {passed ? 'Mastered' : 'Reviewed'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: 420 }}>
+        {passed ? (
+          <button
+            onClick={handleFinish}
+            disabled={submitting}
+            style={{
+              flex: 1, height: 48, borderRadius: 14, fontSize: '0.9375rem', fontWeight: 800,
+              border: 'none', background: 'linear-gradient(135deg, #10b981, #059669)',
+              color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              boxShadow: '0 4px 16px rgba(16,185,129,0.3)', transition: 'transform 0.2s'
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            {submitting ? 'Updating...' : 'Unlock Next Level & Continue'} <ArrowRight size={18} />
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={onClose}
+              style={{
+                flex: 1, height: 48, borderRadius: 14, fontSize: '0.875rem', fontWeight: 700,
+                border: '1px solid var(--surface-3)', background: 'var(--surface-0)',
+                color: 'var(--text-secondary)', cursor: 'pointer'
+              }}
+            >
+              Review Lessons
+            </button>
+            <button
+              onClick={() => {
+                window.location.reload();
+              }}
+              style={{
+                flex: 1, height: 48, borderRadius: 14, fontSize: '0.875rem', fontWeight: 800,
+                border: 'none', background: 'var(--brand-500)',
+                color: 'white', cursor: 'pointer'
+              }}
+            >
+              Retake Assessment
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Main Orchestrator
 // ────────────────────────────────────────────────────────────────────────────
-export default function PlacementAssessmentModal({ course, startAtPhase = 1, onPlacementComplete, onClose }) {
+export default function PlacementAssessmentModal({ 
+  course, 
+  startAtPhase = 1, 
+  onPlacementComplete, 
+  onClose,
+  assessmentType = 'placement', // 'placement' | 'level'
+  level = 'fundamentals',
+  levelTitle = '',
+  topics = [],
+  onLevelTestPass,
+}) {
   const navigate = useNavigate();
-  const [phase, setPhase] = useState(startAtPhase);      // 1 = Foundation, 2 = Assessment, 3 = PathReveal
+  const [phase, setPhase] = useState(startAtPhase);      // 1 = Foundation, 2 = Assessment, 3 = PathReveal / LevelResult
   const [placementResult, setPlacementResult] = useState(null);
-  const [showDosDonts, setShowDosDonts] = useState(false);
-  const [countdown, setCountdown] = useState(5);
+  const [showLobby, setShowLobby] = useState(startAtPhase === 2);
+  const [hardwareChecked, setHardwareChecked] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [mediaStream, setMediaStream] = useState(null);
+  const lobbyVideoRef = useRef(null);
   const [prefetchedQuestions, setPrefetchedQuestions] = useState(null);
 
   const courseId = course?.id;
+
+  const defaultLevelTitles = {
+    fundamentals: 'Level 1: Fundamentals Mastery Test',
+    beginner: 'Level 2: Beginner Mastery Test',
+    basics: 'Level 2: Beginner Mastery Test',
+    intermediate: 'Level 3: Intermediate Mastery Test',
+    advanced: 'Level 4: Advanced Mastery Test',
+  };
+  const displayLevelTitle = levelTitle || defaultLevelTitles[level] || `${level.toUpperCase()} Mastery Test`;
 
   // Pre-fetch questions in background as soon as modal opens
   useEffect(() => {
     let isMounted = true;
     const fetchQuestions = async () => {
       try {
-        const res = await aiTutorAPI.generateQuiz(courseId, course?.title, 'mixed', 20);
+        const queryTopic = topics && topics.length > 0
+          ? `${course?.title || 'Course'} - ${level.toUpperCase()} Level: ${topics.join(', ')}`
+          : `${course?.title || 'Course'} ${level} concepts`;
+        const diff = level === 'advanced' ? 'hard' : level === 'intermediate' ? 'medium' : 'easy';
+        const numQ = assessmentType === 'level' ? 10 : 20;
+
+        const res = await aiTutorAPI.generateQuiz(courseId, queryTopic, diff, numQ);
         const raw = res.data;
         let loaded = [];
         if (raw?.questions?.length) {
@@ -828,7 +1113,7 @@ export default function PlacementAssessmentModal({ course, startAtPhase = 1, onP
         
         if (!isMounted) return;
 
-        if (loaded.length >= 5) {
+        if (loaded.length >= 3) {
           setPrefetchedQuestions(loaded.map(q => ({
             question: q.question,
             options: q.options || ['Option A', 'Option B', 'Option C', 'Option D'],
@@ -836,28 +1121,65 @@ export default function PlacementAssessmentModal({ course, startAtPhase = 1, onP
             weight: null,
           })));
         } else {
-          setPrefetchedQuestions(FALLBACK_QUESTIONS(course?.title || 'this course'));
+          setPrefetchedQuestions(
+            assessmentType === 'level'
+              ? FALLBACK_TOPIC_QUESTIONS(course?.title || 'this course', level, topics)
+              : FALLBACK_QUESTIONS(course?.title || 'this course')
+          );
         }
       } catch {
-        if (isMounted) setPrefetchedQuestions(FALLBACK_QUESTIONS(course?.title || 'this course'));
+        if (isMounted) {
+          setPrefetchedQuestions(
+            assessmentType === 'level'
+              ? FALLBACK_TOPIC_QUESTIONS(course?.title || 'this course', level, topics)
+              : FALLBACK_QUESTIONS(course?.title || 'this course')
+          );
+        }
       }
     };
     fetchQuestions();
     return () => { isMounted = false; };
-  }, [courseId, course?.title]);
+  }, [courseId, course?.title, assessmentType, level, topics]);
 
-  // Start countdown when Do's & Don'ts shown
+  // Hardware & Camera check for Waiting Room
   useEffect(() => {
-    if (!showDosDonts) return;
-    setCountdown(5);
-    const interval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) { clearInterval(interval); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [showDosDonts]);
+    if (showLobby) {
+      let active = true;
+      navigator.mediaDevices?.getUserMedia({ video: true, audio: true })
+        .then(stream => {
+          if (!active) {
+            stream.getTracks().forEach(t => t.stop());
+            return;
+          }
+          setMediaStream(stream);
+          setHardwareChecked(true);
+        })
+        .catch(() => {
+          navigator.mediaDevices?.getUserMedia({ video: true })
+            .then(stream => {
+              if (!active) {
+                stream.getTracks().forEach(t => t.stop());
+                return;
+              }
+              setMediaStream(stream);
+              setHardwareChecked(true);
+            })
+            .catch(err => {
+              console.warn('Webcam access unavailable or denied:', err);
+              setHardwareChecked(true);
+            });
+        });
+      return () => {
+        active = false;
+      };
+    }
+  }, [showLobby]);
+
+  useEffect(() => {
+    if (lobbyVideoRef.current && mediaStream && lobbyVideoRef.current.srcObject !== mediaStream) {
+      lobbyVideoRef.current.srcObject = mediaStream;
+    }
+  }, [mediaStream, showLobby]);
 
   const handleAssessmentComplete = (score) => {
     const recommended = score < 40 ? 'basics' : score < 70 ? 'intermediate' : 'advanced';
@@ -887,15 +1209,144 @@ export default function PlacementAssessmentModal({ course, startAtPhase = 1, onP
     onClose();
   };
 
-  // If Phase 2, render full-screen Exam Arena directly without modal box wrapper
-  if (phase === 2) {
+  // If Phase 2 and lobby completed, render full-screen Exam Arena directly without modal box wrapper
+  if (phase === 2 && !showLobby) {
     return (
       <PhaseAssessment
         course={course}
         courseId={courseId}
         onComplete={handleAssessmentComplete}
         prefetchedQuestions={prefetchedQuestions}
+        initialStream={mediaStream}
+        assessmentTitle={displayLevelTitle}
       />
+    );
+  }
+
+  // ── Exam Waiting Room / Lobby (Identical to Exam Arena) ──
+  if (showLobby) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'var(--surface-1)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '2rem', overflowY: 'auto',
+        fontFamily: 'var(--font-body)',
+        animation: 'fadeIn 0.3s ease'
+      }}>
+        <div style={{ maxWidth: 640, width: '100%' }}>
+          
+          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--brand-50)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+              <ShieldAlert size={32} color="var(--brand-500)" />
+            </div>
+            <h1 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: '0.5rem' }}>Exam Waiting Room</h1>
+            <p style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>
+              You are about to start <strong>{displayLevelTitle}</strong> for <strong>{course?.title || 'Course'}</strong>. Please complete verification.
+            </p>
+            {assessmentType === 'level' && topics && topics.length > 0 && (
+              <div style={{ marginTop: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', maxWidth: 520, margin: '0.75rem auto 0' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)' }}>Tested Topics:</span>
+                {topics.map((t, idx) => (
+                  <span key={idx} style={{ fontSize: '0.6875rem', fontWeight: 800, background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 999, color: 'var(--brand-700)', border: '1px solid var(--surface-3)' }}>
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ background: 'var(--surface-0)', borderRadius: 20, border: '1px solid var(--surface-3)', boxShadow: '0 8px 30px rgba(0,0,0,0.04)', padding: '2rem', marginBottom: '2rem' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.5rem' }}>Hardware & Environment Check</h3>
+            
+            <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem' }}>
+              <div style={{ width: 160, height: 120, background: 'var(--surface-2)', borderRadius: 12, overflow: 'hidden', position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: hardwareChecked ? '2px solid #10b981' : '2px solid var(--surface-3)' }}>
+                <video
+                  ref={el => {
+                    lobbyVideoRef.current = el;
+                    if (el && mediaStream && el.srcObject !== mediaStream) el.srcObject = mediaStream;
+                  }}
+                  autoPlay playsInline muted
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+                />
+                {!hardwareChecked && <Camera size={24} color="var(--text-muted)" style={{ position: 'absolute' }} />}
+              </div>
+              
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {hardwareChecked ? <CheckCircle2 size={18} color="#10b981" /> : <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid var(--text-muted)' }} />}
+                  <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-primary)' }}>Camera & Microphone Access</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <CheckCircle2 size={18} color="#10b981" />
+                  <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-primary)' }}>Stable Internet Connection</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                   <CheckCircle2 size={18} color="#10b981" />
+                  <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-primary)' }}>Screen Sharing & Fullscreen</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.05)', borderRadius: 12, border: '1px solid rgba(239, 68, 68, 0.1)', marginBottom: '1.5rem' }}>
+              <h4 style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Academic Integrity Rules</h4>
+              <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                <li>Do not navigate away from this tab or exit fullscreen (it will be logged).</li>
+                <li>Ensure your face is clearly visible at all times.</li>
+                <li>No secondary devices or headphones are permitted.</li>
+              </ul>
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={agreedToTerms} onChange={e => setAgreedToTerms(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--brand-500)', cursor: 'pointer' }} />
+              <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                I agree to the academic integrity rules, consent to being recorded, and allow full-screen locking for proctoring purposes.
+              </span>
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <button
+              onClick={() => {
+                if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+                setShowLobby(false);
+                onClose();
+              }}
+              style={{ padding: '12px 24px', borderRadius: 999, background: 'var(--surface-0)', border: '1px solid var(--surface-3)', color: 'var(--text-primary)', fontWeight: 800, fontSize: '0.9375rem', cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={async () => {
+                if (!hardwareChecked || !agreedToTerms) return;
+                try {
+                  if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+                    await document.documentElement.requestFullscreen();
+                  }
+                } catch (err) {}
+                setShowLobby(false);
+                setPhase(2);
+              }}
+              disabled={!hardwareChecked || !agreedToTerms}
+              style={{
+                padding: '12px 32px',
+                borderRadius: 999,
+                background: hardwareChecked && agreedToTerms ? 'var(--brand-500)' : 'var(--surface-3)',
+                color: hardwareChecked && agreedToTerms ? 'white' : 'var(--text-muted)',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '0.9375rem',
+                cursor: hardwareChecked && agreedToTerms ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s',
+                boxShadow: hardwareChecked && agreedToTerms ? '0 4px 12px rgba(79,70,229,0.3)' : 'none'
+              }}
+            >
+              Start Examination
+            </button>
+          </div>
+
+        </div>
+      </div>
     );
   }
 
@@ -941,185 +1392,31 @@ export default function PlacementAssessmentModal({ course, startAtPhase = 1, onP
           {phase === 1 && (
             <PhaseFoundation
               course={course}
-              onNext={() => setShowDosDonts(true)}
+              onNext={() => setShowLobby(true)}
               onClose={onClose}
             />
           )}
           {phase === 3 && placementResult && (
-            <PhasePathReveal
-              result={placementResult}
-              courseId={courseId}
-              onConfirm={handlePathConfirmed}
-            />
+            assessmentType === 'level' ? (
+              <PhaseLevelResult
+                result={placementResult}
+                courseId={courseId}
+                level={level}
+                levelTitle={displayLevelTitle}
+                topics={topics}
+                onPass={onLevelTestPass}
+                onClose={onClose}
+              />
+            ) : (
+              <PhasePathReveal
+                result={placementResult}
+                courseId={courseId}
+                onConfirm={handlePathConfirmed}
+              />
+            )
           )}
         </div>
       </div>
-
-      {/* ── Do's & Don'ts Popup Overlay ── */}
-      {showDosDonts && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '1rem',
-          animation: 'fadeIn 0.3s ease',
-        }}>
-          <div style={{
-            width: '100%', maxWidth: 580,
-            background: 'var(--surface-0)',
-            borderRadius: 28,
-            boxShadow: '0 40px 100px rgba(0,0,0,0.2)',
-            overflow: 'hidden',
-            animation: 'slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          }}>
-            {/* Header */}
-            <div style={{
-              background: 'var(--brand-50)',
-              padding: '2rem 2.5rem 1.5rem',
-              borderBottom: '1px solid var(--brand-100)',
-              textAlign: 'center',
-            }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📋</div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--brand-900)', letterSpacing: '-0.02em', marginBottom: '0.4rem' }}>
-                Before You Begin Assessment
-              </h2>
-              <p style={{ fontSize: '0.875rem', color: 'var(--brand-600)', margin: 0 }}>
-                Please review the proctoring guidelines carefully
-              </p>
-            </div>
-
-            {/* Rules Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', padding: '1.75rem 2.5rem' }}>
-              {/* Do's */}
-              <div style={{
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                borderRadius: 16,
-                padding: '1.25rem',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem' }}>✅</div>
-                  <span style={{ fontSize: '0.8125rem', fontWeight: 900, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Do's</span>
-                </div>
-                {[
-                  '🎥 Keep face visible always',
-                  '💡 Stay in a well-lit room',
-                  '🖥️ Use only this tab',
-                  '📝 Answer all 20 questions',
-                  '🎧 Stay quiet & focused',
-                ].map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: '0.5rem' }}>
-                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', flexShrink: 0, marginTop: 6 }} />
-                    <p style={{ fontSize: '0.8125rem', color: '#166534', margin: 0, lineHeight: 1.5 }}>{item}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Don'ts */}
-              <div style={{
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: 16,
-                padding: '1.25rem',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem' }}>🚫</div>
-                  <span style={{ fontSize: '0.8125rem', fontWeight: 900, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Don'ts</span>
-                </div>
-                {[
-                  '🔀 Switch tabs or windows',
-                  '⌨️ Press F1–F12 keys',
-                  '🖥️ Exit fullscreen mode',
-                  '📱 Use secondary devices',
-                  '🗣️ Talk to others around',
-                ].map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: '0.5rem' }}>
-                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#ef4444', flexShrink: 0, marginTop: 6 }} />
-                    <p style={{ fontSize: '0.8125rem', color: '#991b1b', margin: 0, lineHeight: 1.5 }}>{item}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Warning strip */}
-            <div style={{
-              margin: '0 2.5rem',
-              padding: '0.875rem 1.25rem',
-              background: '#fffbeb',
-              border: '1px solid #fde68a',
-              borderRadius: 12,
-              display: 'flex', alignItems: 'flex-start', gap: 10,
-              marginBottom: '1.5rem',
-            }}>
-              <span style={{ fontSize: '1.125rem', flexShrink: 0 }}>⚠️</span>
-              <p style={{ fontSize: '0.8125rem', color: '#b45309', margin: 0, lineHeight: 1.5 }}>
-                <strong>Violations are logged.</strong> Tab switching or face-away detections will flag your assessment for review.
-              </p>
-            </div>
-
-            {/* CTA */}
-            <div style={{ padding: '0 2.5rem 2rem', display: 'flex', gap: 12, alignItems: 'center' }}>
-              <button
-                onClick={() => setShowDosDonts(false)}
-                style={{
-                  flex: '0 0 auto',
-                  padding: '12px 20px',
-                  background: 'var(--surface-1)',
-                  border: '1px solid var(--surface-3)',
-                  borderRadius: 14,
-                  color: 'var(--text-secondary)',
-                  fontSize: '0.875rem', fontWeight: 700,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-body)',
-                }}
-              >
-                ← Back
-              </button>
-              <button
-                onClick={() => {
-                  if (countdown > 0) return;
-                  setShowDosDonts(false);
-                  setPhase(2);
-                }}
-                disabled={countdown > 0}
-                style={{
-                  flex: 1,
-                  padding: '14px',
-                  background: countdown > 0 ? 'var(--surface-2)' : 'var(--brand-500)',
-                  border: 'none',
-                  borderRadius: 14,
-                  color: countdown > 0 ? 'var(--text-muted)' : 'white',
-                  fontSize: '1rem', fontWeight: 900,
-                  cursor: countdown > 0 ? 'not-allowed' : 'pointer',
-                  fontFamily: 'var(--font-body)',
-                  transition: 'all 0.4s ease',
-                  boxShadow: countdown > 0 ? 'none' : '0 8px 24px rgba(79,70,229,0.25)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                }}
-              >
-                {countdown > 0 ? (
-                  <>
-                    <span style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      border: '2px solid var(--text-muted)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '0.875rem', fontWeight: 900, color: 'var(--text-muted)',
-                    }}>{countdown}</span>
-                    Read rules carefully...
-                  </>
-                ) : (
-                  <>✅ I Understand — Start Quiz</>
-                )}
-              </button>
-            </div>
-          </div>
-
-          <style>{`
-            @keyframes slideUp { from { opacity: 0; transform: translateY(40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
-          `}</style>
-        </div>
-      )}
     </div>
   );
 }

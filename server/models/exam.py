@@ -21,6 +21,9 @@ class Exam(Base):
     start_time = Column(DateTime(timezone=True), nullable=True)
     end_time = Column(DateTime(timezone=True), nullable=True)
     is_published = Column(Boolean, default=False)
+    exam_type = Column(String(50), default="weekly_test")  # weekly_test, final_exam, standard
+    week_number = Column(Integer, nullable=True, default=1)
+    due_date = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

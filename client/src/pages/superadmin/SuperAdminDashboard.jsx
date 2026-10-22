@@ -119,18 +119,18 @@ export default function SuperAdminDashboard() {
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: 6 }}>Active Organizations</p>
         </div>
 
-        {/* API Requests */}
+        {/* Platform Users */}
         <div className="stat-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
             <div style={{ width: 42, height: 42, borderRadius: 12, background: '#fffbeb', border: '1px solid #fde68a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d97706' }}>
-              <Activity size={20} />
+              <Users size={20} />
             </div>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', background: 'var(--surface-2)', padding: '4px 9px', borderRadius: 999, border: '1px solid var(--glass-border)' }}>
-              100% uptime
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '4px 9px', borderRadius: 999, border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <TrendingUp size={12} /> Active
             </span>
           </div>
-          <p style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1, letterSpacing: '-0.03em' }}>92.3<span style={{ fontSize: '1.25rem', color: 'var(--text-muted)', fontWeight: 600 }}>K</span></p>
-          <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: 6 }}>API Requests Today</p>
+          <p style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1, letterSpacing: '-0.03em' }}>{stats?.total_users || 0}</p>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: 6 }}>Platform Users</p>
         </div>
 
         {/* Suspended */}

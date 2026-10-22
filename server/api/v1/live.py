@@ -76,12 +76,13 @@ def _enrich(session: LiveSession) -> LiveSessionResponse:
 async def create_session(
     payload: LiveSessionCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("teacher", "tenant_admin")),
+    current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
 ):
     """Create a new live session (scheduled or instant)."""
-    room_name = f"session-{current_user.tenant_id}-{uuid.uuid4().hex[:10]}"
+    tenant_id = current_user.tenant_id or 1
+    room_name = f"session-{tenant_id}-{uuid.uuid4().hex[:10]}"
     session = LiveSession(
-        tenant_id=current_user.tenant_id,
+        tenant_id=tenant_id,
         teacher_id=current_user.id,
         course_id=payload.course_id,
         title=payload.title,
@@ -106,7 +107,9 @@ async def list_sessions(
     List sessions for the current tenant.
     Filter: ?status=live  or  ?status=live,scheduled  (comma-separated)
     """
-    q = db.query(LiveSession).filter(LiveSession.tenant_id == current_user.tenant_id)
+    q = db.query(LiveSession)
+    if current_user.role != "super_admin":
+        q = q.filter(LiveSession.tenant_id == (current_user.tenant_id or 1))
     if status:
         statuses = [s.strip() for s in status.split(",")]
         q = q.filter(LiveSession.status.in_(statuses))
@@ -120,12 +123,11 @@ async def get_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    session = db.query(LiveSession).filter(
-        LiveSession.id == session_id,
-        LiveSession.tenant_id == current_user.tenant_id,
-    ).first()
+    session = db.query(LiveSession).filter(LiveSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    if current_user.role != "super_admin" and session.tenant_id != (current_user.tenant_id or 1):
+        raise HTTPException(status_code=403, detail="Forbidden")
     return _enrich(session)
 
 
@@ -133,17 +135,16 @@ async def get_session(
 async def delete_session(
     session_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("teacher", "tenant_admin")),
+    current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
 ):
-    """Teacher can delete a scheduled (not yet live) session."""
-    session = db.query(LiveSession).filter(
-        LiveSession.id == session_id,
-        LiveSession.teacher_id == current_user.id,
-    ).first()
+    """Delete a live session."""
+    session = db.query(LiveSession).filter(LiveSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    if session.status == "live":
-        raise HTTPException(status_code=400, detail="Cannot delete a live session. End it first.")
+    if current_user.role == "teacher" and session.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if current_user.role == "tenant_admin" and session.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     db.delete(session)
     db.commit()
 
@@ -154,17 +155,16 @@ async def delete_session(
 async def start_session(
     session_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("teacher", "tenant_admin")),
+    current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
 ):
-    """Teacher starts a session → status=live, returns LiveKit token."""
-    session = db.query(LiveSession).filter(
-        LiveSession.id == session_id,
-        LiveSession.teacher_id == current_user.id,
-    ).first()
+    """Start or restart a session → status=live, returns LiveKit token."""
+    session = db.query(LiveSession).filter(LiveSession.id == session_id).first()
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found or not yours")
-    if session.status == "ended":
-        raise HTTPException(status_code=400, detail="Cannot restart an ended session")
+        raise HTTPException(status_code=404, detail="Session not found")
+    if current_user.role == "teacher" and session.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to start this session")
+    if current_user.role == "tenant_admin" and session.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this organization")
 
     session.status = "live"
     session.started_at = datetime.now(timezone.utc)
@@ -181,14 +181,16 @@ async def join_session(
     current_user: User = Depends(get_current_user),
 ):
     """Student/anyone joins a live session → returns LiveKit token."""
-    session = db.query(LiveSession).filter(
-        LiveSession.id == session_id,
-        LiveSession.tenant_id == current_user.tenant_id,
-    ).first()
+    session = db.query(LiveSession).filter(LiveSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     if session.status != "live":
-        raise HTTPException(status_code=400, detail="Session is not live yet")
+        if current_user.role in ("teacher", "tenant_admin", "super_admin"):
+            session.status = "live"
+            session.started_at = datetime.now(timezone.utc)
+            db.commit()
+        else:
+            raise HTTPException(status_code=400, detail="Session is not live yet")
 
     can_publish = current_user.role in ("teacher", "tenant_admin", "super_admin")
     token = _mint_token(current_user, session.room_name, can_publish=can_publish)
@@ -199,19 +201,22 @@ async def join_session(
 async def end_session(
     session_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("teacher", "tenant_admin")),
+    current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
 ):
-    """Teacher ends a live session."""
-    session = db.query(LiveSession).filter(
-        LiveSession.id == session_id,
-        LiveSession.teacher_id == current_user.id,
-    ).first()
+    """Teacher or Administrator ends a live session."""
+    session = db.query(LiveSession).filter(LiveSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    if current_user.role == "teacher" and session.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to end this session")
+    if current_user.role == "tenant_admin" and session.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+
     session.status = "ended"
     session.ended_at = datetime.now(timezone.utc)
     db.commit()
     return {"message": "Session ended"}
+
 
 
 @router.get("/sessions/{session_id}/participants")
@@ -283,7 +288,39 @@ async def session_chat(session_id: int, websocket: WebSocket, token: str, db: Se
 # ── Legacy: generic room token ────────────────────────────────────────────────
 
 @router.post("/rooms")
-async def create_or_get_room(room_name: str, current_user: User = Depends(get_current_user)):
-    """Ad-hoc room token for MeetingArena / office hours."""
-    token = _mint_token(current_user, room_name, can_publish=True)
-    return {"url": settings.LIVEKIT_URL, "token": token, "name": room_name}
+async def create_or_get_room(
+    room_name: str,
+    shadow: bool = False,
+    current_user: User = Depends(get_current_user)
+):
+    """Ad-hoc room token for MeetingArena / office hours / admin shadow observation."""
+    can_publish = not shadow and (current_user.role in ("teacher", "tenant_admin", "super_admin"))
+    token = _mint_token(current_user, room_name, can_publish=can_publish)
+    return {"url": settings.LIVEKIT_URL, "token": token, "name": room_name, "shadow": shadow}
+
+
+@router.post("/sessions/{session_id}/shadow")
+async def shadow_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin", "super_admin")),
+):
+    """Admin connects to any active classroom in stealth shadow observation mode."""
+    session = db.query(LiveSession).filter(LiveSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Live session not found")
+    if current_user.role == "tenant_admin" and session.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if session.status != "live":
+        raise HTTPException(status_code=400, detail="Session is not currently live")
+
+    token = _mint_token(current_user, session.room_name, can_publish=False)
+    return {
+        "token": token,
+        "url": settings.LIVEKIT_URL,
+        "room_name": session.room_name,
+        "session_id": session.id,
+        "title": session.title,
+        "shadow": True,
+    }
+

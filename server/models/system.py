@@ -17,6 +17,7 @@ class SupportTicket(Base):
     status = Column(String(30), default="open")      # open, in_progress, resolved, closed
 
     raised_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    description = Column(Text, nullable=True)
     replies_count = Column(Integer, default=0)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

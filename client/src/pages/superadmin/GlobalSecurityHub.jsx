@@ -8,6 +8,7 @@ import {
   Calendar, Lock, Key, Server, EyeOff, ShieldCheck, MapPin, Fingerprint, Plus
 } from 'lucide-react';
 import Loader from '../../components/ui/Loader';
+import toast from 'react-hot-toast';
 
 const ACTION_CONFIG = {
   user_created:       { color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: UserPlus,       label: 'User Created',        severity: 'success' },
@@ -71,6 +72,18 @@ function AuditTrailTab() {
     return acc;
   }, {}) || {};
 
+  const handleExport = () => {
+    if (!filtered || !filtered.length) return toast.error('No logs to export');
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(filtered, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `platform_audit_logs_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    toast.success('Audit logs exported successfully');
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
@@ -97,7 +110,7 @@ function AuditTrailTab() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => refetch()} disabled={isFetching} className="btn btn-ghost btn-icon btn-sm"><RefreshCw size={14} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} /></button>
-            <button className="btn btn-secondary btn-sm" style={{ gap: 6 }}><Download size={14} /> Export</button>
+            <button onClick={handleExport} className="btn btn-secondary btn-sm" style={{ gap: 6 }}><Download size={14} /> Export</button>
           </div>
         </div>
 
@@ -143,8 +156,21 @@ function AuditTrailTab() {
 
 // ── Tab 2: Access Policies ────────────────────────────────────────────────────
 function AccessPoliciesTab() {
-  const [settings, setSettings] = useState({ mfa: true, ssoOnly: false, complexPasswords: true, sessionTimeout: true });
-  const set = (key) => (val) => setSettings(s => ({ ...s, [key]: val }));
+  const [settings, setSettings] = useState(() => {
+    try {
+      const s = localStorage.getItem('lms_global_security_policies');
+      return s ? JSON.parse(s) : { mfa: true, ssoOnly: false, complexPasswords: true, sessionTimeout: true };
+    } catch {
+      return { mfa: true, ssoOnly: false, complexPasswords: true, sessionTimeout: true };
+    }
+  });
+
+  const set = (key) => (val) => {
+    const updated = { ...settings, [key]: val };
+    setSettings(updated);
+    localStorage.setItem('lms_global_security_policies', JSON.stringify(updated));
+    toast.success('Security policy updated across all tenants');
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: 780 }}>
@@ -232,16 +258,46 @@ function ThreatDefenseTab() {
 
 // ── Tab 4: Identity Providers (SSO) ───────────────────────────────────────────
 function IdentityProvidersTab() {
-  const [providers, setProviders] = useState([
-    { id: 1, name: 'Google Workspace', protocol: 'OAuth 2.0', status: 'active', users: 1420 },
-    { id: 2, name: 'Microsoft Entra ID', protocol: 'SAML 2.0', status: 'active', users: 3105 },
-    { id: 3, name: 'Okta Enterprise', protocol: 'SAML 2.0', status: 'inactive', users: 0 },
-  ]);
+  const [providers, setProviders] = useState(() => {
+    try {
+      const s = localStorage.getItem('lms_global_idps');
+      return s ? JSON.parse(s) : [
+        { id: 1, name: 'Google Workspace', protocol: 'OAuth 2.0', status: 'active', users: 1420 },
+        { id: 2, name: 'Microsoft Entra ID', protocol: 'SAML 2.0', status: 'active', users: 3105 },
+        { id: 3, name: 'Okta Enterprise', protocol: 'SAML 2.0', status: 'inactive', users: 0 },
+      ];
+    } catch {
+      return [
+        { id: 1, name: 'Google Workspace', protocol: 'OAuth 2.0', status: 'active', users: 1420 },
+        { id: 2, name: 'Microsoft Entra ID', protocol: 'SAML 2.0', status: 'active', users: 3105 },
+        { id: 3, name: 'Okta Enterprise', protocol: 'SAML 2.0', status: 'inactive', users: 0 },
+      ];
+    }
+  });
+
+  const toggle = (id) => {
+    const updated = providers.map(p => p.id === id ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' } : p);
+    setProviders(updated);
+    localStorage.setItem('lms_global_idps', JSON.stringify(updated));
+    const target = updated.find(p => p.id === id);
+    toast.success(`${target.name} is now ${target.status}`);
+  };
+
+  const addProvider = () => {
+    const name = prompt('Enter Identity Provider Name (e.g. PingFederate, Auth0):');
+    if (!name) return;
+    const protocol = prompt('Protocol (SAML 2.0 or OAuth 2.0):') || 'SAML 2.0';
+    const newP = { id: Date.now(), name, protocol, status: 'active', users: 0 };
+    const updated = [...providers, newP];
+    setProviders(updated);
+    localStorage.setItem('lms_global_idps', JSON.stringify(updated));
+    toast.success(`Identity Provider "${name}" registered globally`);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: 860 }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <button className="btn btn-primary" style={{ gap: 6 }}><Plus size={15} /> Add Provider</button>
+        <button onClick={addProvider} className="btn btn-primary" style={{ gap: 6 }}><Plus size={15} /> Add Provider</button>
       </div>
       
       <div className="glass-card" style={{ padding: '2rem' }}>
@@ -260,7 +316,7 @@ function IdentityProvidersTab() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
                 <div style={{ textAlign: 'right' }}><p style={{ fontWeight: 700, fontSize: '0.875rem' }}>{p.users}</p><p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Active Users</p></div>
-                <Toggle checked={p.status === 'active'} onChange={() => {}} color="#059669" />
+                <Toggle checked={p.status === 'active'} onChange={() => toggle(p.id)} color="#059669" />
               </div>
             </div>
           ))}

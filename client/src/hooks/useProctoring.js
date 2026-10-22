@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
-export function useProctoring() {
+export function useProctoring(options = {}) {
+  const { onViolation } = options;
+  const onViolationRef = useRef(onViolation);
+  useEffect(() => {
+    onViolationRef.current = onViolation;
+  }, [onViolation]);
+
   const [status, setStatus] = useState('initializing'); // 'initializing', 'ready', 'tracking', 'error'
   const [isFaceVisible, setIsFaceVisible] = useState(true);
   const [isLookingAway, setIsLookingAway] = useState(false);
@@ -16,12 +22,15 @@ export function useProctoring() {
 
   // Thresholds
   const violationTimerRef = useRef(null);
+  const repeatViolationIntervalRef = useRef(null);
   const isViolatingRef = useRef(false);
 
   // Phase 2: YOLOv8 Backend Vision Websocket
   const wsRef = useRef(null);
   const canvasRef = useRef(null);
   const visionIntervalRef = useRef(null);
+
+  const pendingTrackingRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -45,6 +54,10 @@ export function useProctoring() {
           if (isMounted) {
             faceLandmarkerRef.current = faceLandmarker;
             setStatus('ready');
+            if (pendingTrackingRef.current) {
+              const { videoEl, examId } = pendingTrackingRef.current;
+              startTracking(videoEl, examId);
+            }
           }
           return; // Success, exit retry loop
         } catch (error) {
@@ -69,8 +82,26 @@ export function useProctoring() {
     };
   }, []);
 
-  const triggerViolation = useCallback(() => {
+  const triggerViolation = useCallback((violationType = 'eye_off_screen', description = 'Gaze deviation detected') => {
     setWarnings(prev => prev + 1);
+    setLastViolation(violationType);
+
+    // Capture snapshot if possible
+    let snapshot = null;
+    if (videoRef.current && videoRef.current.videoWidth) {
+      try {
+        const c = document.createElement('canvas');
+        c.width = 320;
+        c.height = 240;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(videoRef.current, 0, 0, 320, 240);
+        snapshot = c.toDataURL('image/jpeg', 0.6);
+      } catch (e) {}
+    }
+
+    if (onViolationRef.current) {
+      onViolationRef.current(violationType, description, snapshot);
+    }
   }, []);
 
   // Monitor the refs and trigger state/warnings smoothly
@@ -81,16 +112,28 @@ export function useProctoring() {
     const isCurrentlyViolating = !faceVisible || lookingAway;
 
     if (isCurrentlyViolating && !isViolatingRef.current) {
-      // Start timer
+      // Start initial timer: 2.5 seconds of violation = 1 warning
       isViolatingRef.current = true;
       violationTimerRef.current = setTimeout(() => {
-        triggerViolation();
-      }, 3000); // 3 seconds of looking away = 1 warning
+        const type = !faceVisible ? 'no_face' : 'eye_off_screen';
+        const desc = !faceVisible ? 'Face not visible in camera frame' : 'Student looked away from screen';
+        triggerViolation(type, desc);
+
+        // If violation continues, increment warning every 4 seconds
+        repeatViolationIntervalRef.current = setInterval(() => {
+          if (isViolatingRef.current) {
+            triggerViolation(type, desc);
+          }
+        }, 4000);
+      }, 2500);
     } else if (!isCurrentlyViolating && isViolatingRef.current) {
-      // Clear timer if they look back
+      // Clear timers if user looks back into frame
       isViolatingRef.current = false;
       if (violationTimerRef.current) {
         clearTimeout(violationTimerRef.current);
+      }
+      if (repeatViolationIntervalRef.current) {
+        clearInterval(repeatViolationIntervalRef.current);
       }
     }
   };
@@ -138,9 +181,10 @@ export function useProctoring() {
   const startTracking = useCallback((videoEl, examId = 1) => {
     if (status === 'tracking') return;
     if (status !== 'ready') {
-      console.warn('Proctoring engine not ready');
+      pendingTrackingRef.current = { videoEl, examId };
       return;
     }
+    pendingTrackingRef.current = null;
     videoRef.current = videoEl;
     setStatus('tracking');
     requestRef.current = requestAnimationFrame(processVideo);
@@ -164,9 +208,9 @@ export function useProctoring() {
             }
             if (data.status === 'violation') {
                 console.warn('Backend Vision Violation:', data.type);
+                const desc = data.type === 'phone_detected' ? 'Prohibited mobile phone detected' : 'Multiple people detected in view';
                 setLastViolation(data.type);
-                // Trigger frontend violation UI immediately
-                triggerViolation();
+                triggerViolation(data.type, desc);
             } else if (data.status === 'ok') {
                 setLastViolation(null);
             }
@@ -175,14 +219,11 @@ export function useProctoring() {
         // Start sampling interval (every 1.5 seconds for tighter monitoring)
         visionIntervalRef.current = setInterval(() => {
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && videoRef.current) {
-                // Skip frame if WebSocket is backed up (previous frame still sending)
-                // This prevents memory buildup and wasted CPU on stale frames
                 if (wsRef.current.bufferedAmount > 50000) return;
 
                 const vw = videoRef.current.videoWidth;
                 const vh = videoRef.current.videoHeight;
                 if (vw && vh) {
-                    // Preserve aspect ratio to prevent squishing (which breaks YOLO)
                     const targetWidth = 640;
                     const targetHeight = (vh / vw) * targetWidth;
                     
@@ -191,7 +232,6 @@ export function useProctoring() {
                     
                     const ctx = canvasRef.current.getContext('2d');
                     ctx.drawImage(videoRef.current, 0, 0, targetWidth, targetHeight);
-                    // Send high quality image
                     const base64Frame = canvasRef.current.toDataURL('image/jpeg', 0.85);
                     wsRef.current.send(base64Frame);
                 }
@@ -207,14 +247,22 @@ export function useProctoring() {
     if (violationTimerRef.current) {
       clearTimeout(violationTimerRef.current);
     }
+    if (repeatViolationIntervalRef.current) {
+      clearInterval(repeatViolationIntervalRef.current);
+    }
     if (visionIntervalRef.current) {
-        clearInterval(visionIntervalRef.current);
+      clearInterval(visionIntervalRef.current);
     }
     if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
+      wsRef.current.close();
+      wsRef.current = null;
     }
     setStatus('ready');
+  }, []);
+
+  const resetWarnings = useCallback(() => {
+    setWarnings(0);
+    setLastViolation(null);
   }, []);
 
   return {
@@ -222,6 +270,8 @@ export function useProctoring() {
     isFaceVisible,
     isLookingAway,
     warnings,
+    setWarnings,
+    resetWarnings,
     lastViolation,
     annotatedFrame,
     startTracking,

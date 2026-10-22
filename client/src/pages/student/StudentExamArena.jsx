@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   ShieldCheck, AlertCircle, Camera, Mic, Eye, Clock, ChevronLeft, ChevronRight, 
   Activity, BrainCircuit, Trophy, ArrowRight, ShieldAlert, CheckCircle2, FileText, Lock, 
   Flag, Cloud, CloudOff, RefreshCw, Calculator, Edit3, X, AlignLeft, Volume2, Wifi, Map, Sword,
-  BookOpen, Play, GraduationCap, Layers, Target, Sparkles, ChevronDown, ChevronUp
+  BookOpen, Play, GraduationCap, Layers, Target, Sparkles, ChevronDown, ChevronUp, Calendar, LayoutGrid
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useProctoring } from '../../hooks/useProctoring';
-import { coursesAPI, cognitiveAPI, aiTutorAPI, academicAPI } from '../../services/api.service';
+import { coursesAPI, cognitiveAPI, aiTutorAPI, academicAPI, proctoringAPI } from '../../services/api.service';
 import PlacementAssessmentModal from './PlacementAssessmentModal';
 import toast from 'react-hot-toast';
 
@@ -17,7 +17,16 @@ function CourseRoadmapModal({ course, enrollment, onClose, onStartLearn }) {
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAssessment, setShowAssessment] = useState(false);
+  const [assessmentConfig, setAssessmentConfig] = useState(null);
   const [expandedMod, setExpandedMod] = useState(0);
+
+  const [passedLevels, setPassedLevels] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`adaptive_level_passed_${course.id}`) || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     coursesAPI.getModules(course.id).then(res => {
@@ -26,6 +35,18 @@ function CourseRoadmapModal({ course, enrollment, onClose, onStartLearn }) {
     }).catch(() => setLoading(false));
   }, [course.id]);
 
+  useEffect(() => {
+    const prog = enrollment?.progress_percentage || 0;
+    setPassedLevels(prev => {
+      const next = [...prev];
+      if (prog >= 25 && !next.includes('fundamentals')) next.push('fundamentals');
+      if (prog >= 50 && !next.includes('beginner')) next.push('beginner');
+      if (prog >= 75 && !next.includes('intermediate')) next.push('intermediate');
+      if (prog >= 100 && !next.includes('advanced')) next.push('advanced');
+      return next;
+    });
+  }, [enrollment?.progress_percentage]);
+
   const isPending = enrollment?.learning_path === 'pending';
   const learningPath = enrollment?.learning_path || 'pending';
   const progress = enrollment?.progress_percentage || 0;
@@ -33,25 +54,38 @@ function CourseRoadmapModal({ course, enrollment, onClose, onStartLearn }) {
   const pathColors = { pending: '#f59e0b', basics: '#0891b2', intermediate: '#7c3aed', advanced: '#059669' };
   const pathLabels = { pending: '⏳ Assessment Pending', basics: '🌱 Foundation Path', intermediate: '🚀 Core Path', advanced: '⚡ Expert Path' };
 
+  const levelOrder = ['fundamentals', 'beginner', 'intermediate', 'advanced'];
+  const levelMeta = {
+    fundamentals: { name: 'Fundamentals', badge: 'LEVEL 1', color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', icon: '🌱' },
+    beginner: { name: 'Beginner', badge: 'LEVEL 2', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', icon: '🌿' },
+    intermediate: { name: 'Intermediate', badge: 'LEVEL 3', color: '#7c3aed', bg: '#faf5ff', border: '#c4b5fd', icon: '🚀' },
+    advanced: { name: 'Advanced', badge: 'LEVEL 4', color: '#ea580c', bg: '#fff7ed', border: '#fed7aa', icon: '⚡' },
+  };
+  const levelWeights = { fundamentals: 0, beginner: 1, basics: 1, intermediate: 2, advanced: 3 };
+  const userWeight = levelWeights[learningPath] ?? 0;
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div style={{ width: '100%', maxWidth: 760, maxHeight: '90vh', background: 'var(--surface-0)', borderRadius: 24, border: '1px solid var(--surface-3)', boxShadow: '0 32px 80px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideUp 0.3s ease' }}>
+      <div style={{ width: '100%', maxWidth: 840, maxHeight: '92vh', background: 'var(--surface-0)', borderRadius: 24, border: '1px solid var(--surface-3)', boxShadow: '0 32px 80px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideUp 0.3s ease' }}>
         
         {/* Header */}
-        <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)', padding: '2rem', position: 'relative', flexShrink: 0 }}>
+        <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)', padding: '1.75rem 2rem', position: 'relative', flexShrink: 0 }}>
           <button onClick={onClose} style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
             <X size={18} />
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Course Roadmap</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Course Roadmap & Level Tests</span>
           </div>
-          <h2 style={{ fontSize: '1.625rem', fontWeight: 900, color: 'white', letterSpacing: '-0.02em', marginBottom: '1rem', lineHeight: 1.2 }}>{course.title}</h2>
+          <h2 style={{ fontSize: '1.625rem', fontWeight: 900, color: 'white', letterSpacing: '-0.02em', marginBottom: '0.75rem', lineHeight: 1.2 }}>{course.title}</h2>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: pathColors[learningPath] + '33', border: `1px solid ${pathColors[learningPath]}66`, borderRadius: 999, padding: '4px 12px', fontSize: '0.8125rem', fontWeight: 800, color: 'white' }}>
               {pathLabels[learningPath]}
             </span>
-            <span style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>{modules.length} modules</span>
+            <span style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>{modules.length} modules</span>
+            <span style={{ fontSize: '0.8125rem', color: '#10b981', fontWeight: 800, background: 'rgba(16,185,129,0.15)', padding: '4px 10px', borderRadius: 999 }}>
+              🎯 {passedLevels.length}/4 Levels Mastered
+            </span>
           </div>
         </div>
 
@@ -66,7 +100,7 @@ function CourseRoadmapModal({ course, enrollment, onClose, onStartLearn }) {
               </div>
             </div>
             <button
-              onClick={() => setShowAssessment(true)}
+              onClick={() => { setAssessmentConfig(null); setShowAssessment(true); }}
               style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#d97706', color: 'white', border: 'none', borderRadius: 12, padding: '10px 20px', fontWeight: 800, fontSize: '0.875rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(217,119,6,0.3)' }}
             >
               <Target size={15} /> Start Assessment
@@ -79,161 +113,257 @@ function CourseRoadmapModal({ course, enrollment, onClose, onStartLearn }) {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Loading roadmap...</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {/* Phase 1: Fundamentals (Always show, indices 0-4) */}
-              {modules.filter(m => m.level === 'fundamentals').map((mod, modIdx) => {
-                const isExpanded = expandedMod === modIdx;
-                const materials = mod.materials || [];
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+              
+              {levelOrder.map((lvl, lvlIdx) => {
+                const meta = levelMeta[lvl];
+                const lvlMods = modules.filter(m => m.level === lvl || (lvl === 'beginner' && m.level === 'basics'));
+                if (lvlMods.length === 0) return null;
+
+                const lvlTopics = lvlMods.map(m => m.title.replace(/^Module\s+\d+:\s*/i, ''));
+                const modWeight = levelWeights[lvl] ?? 0;
+                const prevLvl = lvlIdx > 0 ? levelOrder[lvlIdx - 1] : null;
+                const isLevelLocked = isPending 
+                  ? lvl !== 'fundamentals' 
+                  : (modWeight > userWeight && (!prevLvl || !passedLevels.includes(prevLvl)));
+                const isLvlPassed = passedLevels.includes(lvl);
+
                 return (
-                  <div key={mod.id} style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 16, overflow: 'hidden', transition: 'all 0.3s' }}>
-                    <div onClick={() => setExpandedMod(isExpanded ? -1 : modIdx)} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem', cursor: 'pointer', userSelect: 'none' }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--brand-50)', border: '2px solid var(--brand-200)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 900, fontSize: '0.875rem', color: 'var(--brand-600)' }}>
-                        {modIdx + 1}
+                  <div key={lvl} style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+                    
+                    {/* Level Group Header */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '0.75rem 1rem', borderRadius: 14,
+                      background: isLvlPassed ? 'rgba(16,185,129,0.08)' : isLevelLocked ? 'var(--surface-1)' : meta.bg,
+                      border: `1.5px solid ${isLvlPassed ? '#a7f3d0' : isLevelLocked ? 'var(--surface-3)' : meta.border}`
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: '1.25rem' }}>{meta.icon}</span>
+                        <div>
+                          <span style={{ fontSize: '0.6875rem', fontWeight: 900, color: meta.color, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                            {meta.badge}
+                          </span>
+                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: 'var(--text-primary)' }}>
+                            {meta.name} ({lvlMods.length} Modules)
+                          </h4>
+                        </div>
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>{mod.title}</p>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, marginTop: 2 }}>{materials.length} materials</p>
+                      
+                      <div>
+                        {isLvlPassed ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 999, background: '#10b981', color: 'white', fontSize: '0.75rem', fontWeight: 800 }}>
+                            <CheckCircle2 size={13} /> Level Mastered
+                          </span>
+                        ) : isLevelLocked ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 999, background: 'var(--surface-2)', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 800 }}>
+                            <Lock size={12} /> Locked
+                          </span>
+                        ) : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 999, background: meta.color, color: 'white', fontSize: '0.75rem', fontWeight: 800 }}>
+                            ⚡ In Progress
+                          </span>
+                        )}
                       </div>
-                      <button onClick={e => { e.stopPropagation(); navigate(`/student/course/${course.id}?module=${mod.id}`); onClose(); }} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, background: 'var(--brand-500)', color: 'white', border: 'none', borderRadius: 10, padding: '7px 14px', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer' }}>
-                        <Play size={13} /> Learn
-                      </button>
-                      {isExpanded ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
                     </div>
 
-                    {/* Materials list */}
-                    {isExpanded && materials.length > 0 && (
-                      <div style={{ borderTop: '1px solid var(--surface-2)', background: 'var(--surface-1)' }}>
-                        {materials.map((mat, mi) => {
-                          const isYT = mat.material_type === 'youtube';
-                          const isPDF = mat.material_type === 'pdf';
-                          
-                          // Check local storage for completion
-                          let isDone = false;
-                          try {
-                            const stored = localStorage.getItem(`adaptive_completed_${course.id}`);
-                            if (stored) {
-                              isDone = JSON.parse(stored).includes(mat.id);
-                            }
-                          } catch (e) {}
-
-                          return (
-                            <div key={mat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.875rem 1.25rem 0.875rem 4.5rem', borderBottom: mi < materials.length - 1 ? '1px solid var(--surface-2)' : 'none' }}>
-                              <div style={{ width: 32, height: 32, borderRadius: 8, background: isDone ? '#10b981' : isYT ? '#fee2e2' : isPDF ? '#e0f2fe' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                {isDone ? <CheckCircle2 size={16} color="white" /> : isYT ? <span style={{ fontSize: '0.875rem' }}>▶️</span> : isPDF ? <span style={{ fontSize: '0.875rem' }}>📄</span> : <Play size={14} color="var(--text-muted)" />}
+                    {/* Modules in this Level */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingLeft: '0.5rem' }}>
+                      {lvlMods.map((mod) => {
+                        const globalIndex = modules.findIndex(m => m.id === mod.id);
+                        const isExpanded = expandedMod === globalIndex;
+                        const materials = mod.materials || [];
+                        return (
+                          <div key={mod.id} style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 14, overflow: 'hidden', opacity: isLevelLocked ? 0.65 : 1 }}>
+                            <div onClick={() => !isLevelLocked && setExpandedMod(isExpanded ? -1 : globalIndex)} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.875rem 1.25rem', cursor: isLevelLocked ? 'not-allowed' : 'pointer', userSelect: 'none' }}>
+                              <div style={{ width: 34, height: 34, borderRadius: 10, background: isLevelLocked ? 'var(--surface-2)' : meta.bg, border: `1.5px solid ${isLevelLocked ? 'var(--surface-3)' : meta.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 900, fontSize: '0.8125rem', color: isLevelLocked ? 'var(--text-muted)' : meta.color }}>
+                                {isLevelLocked ? <Lock size={14} /> : globalIndex + 1}
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: isDone ? 'line-through' : 'none' }}>{mat.title}</p>
-                                <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{mat.material_type}</p>
+                                <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mod.title}</p>
+                                <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', margin: 0, marginTop: 2 }}>{materials.length} learning materials</p>
                               </div>
-                              {isYT && (
-                                <a href={mat.s3_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#dc2626', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                                  YouTube ↗
-                                </a>
+                              {!isLevelLocked && (
+                                <button onClick={e => { e.stopPropagation(); navigate(`/student/course/${course.id}?module=${mod.id}`); onClose(); }} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, background: meta.color, color: 'white', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 800, fontSize: '0.75rem', cursor: 'pointer' }}>
+                                  <Play size={12} /> Learn
+                                </button>
                               )}
+                              {!isLevelLocked && (isExpanded ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />)}
                             </div>
-                          );
-                        })}
+
+                            {/* Materials list */}
+                            {isExpanded && !isLevelLocked && materials.length > 0 && (
+                              <div style={{ borderTop: '1px solid var(--surface-2)', background: 'var(--surface-1)' }}>
+                                {materials.map((mat, mi) => {
+                                  const isYT = mat.material_type === 'youtube';
+                                  const isPDF = mat.material_type === 'pdf';
+                                  let isDone = false;
+                                  try {
+                                    const stored = localStorage.getItem(`adaptive_completed_${course.id}`);
+                                    if (stored) isDone = JSON.parse(stored).includes(mat.id);
+                                  } catch (e) {}
+
+                                  return (
+                                    <div key={mat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.875rem 1.25rem 0.875rem 3.75rem', borderBottom: mi < materials.length - 1 ? '1px solid var(--surface-2)' : 'none' }}>
+                                      <div style={{ width: 28, height: 28, borderRadius: 6, background: isDone ? '#10b981' : isYT ? '#fee2e2' : isPDF ? '#e0f2fe' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                        {isDone ? <CheckCircle2 size={14} color="white" /> : isYT ? <span style={{ fontSize: '0.75rem' }}>▶️</span> : isPDF ? <span style={{ fontSize: '0.75rem' }}>📄</span> : <Play size={12} color="var(--text-muted)" />}
+                                      </div>
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: isDone ? 'line-through' : 'none' }}>{mat.title}</p>
+                                        <p style={{ fontSize: '0.625rem', color: 'var(--text-muted)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{mat.material_type}</p>
+                                      </div>
+                                      {isYT && mat.s3_url && (
+                                        <a href={mat.s3_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#dc2626', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                                          YouTube ↗
+                                        </a>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Level Mastery Test Checkpoint Node */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0 0.5rem', gap: '0.5rem' }}>
+                      <div style={{ width: 2, height: 28, background: isLvlPassed ? '#10b981' : isLevelLocked ? 'var(--surface-3)' : meta.color }} />
+                      
+                      <div style={{
+                        background: isLvlPassed 
+                          ? 'linear-gradient(135deg, #ecfdf5, #d1fae5)'
+                          : isLevelLocked 
+                            ? 'var(--surface-1)' 
+                            : 'linear-gradient(135deg, #ffffff, #f8fafc)',
+                        border: `2px solid ${isLvlPassed ? '#10b981' : isLevelLocked ? 'var(--surface-3)' : meta.color}`,
+                        borderRadius: 18,
+                        padding: '1.25rem 1.5rem',
+                        width: '100%',
+                        boxShadow: isLevelLocked ? 'none' : isLvlPassed ? '0 4px 14px rgba(16,185,129,0.12)' : '0 6px 20px rgba(0,0,0,0.06)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.875rem',
+                        transition: 'all 0.3s'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{
+                              width: 44, height: 44, borderRadius: 12,
+                              background: isLvlPassed ? '#10b981' : isLevelLocked ? 'var(--surface-2)' : meta.bg,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '1.25rem', flexShrink: 0,
+                              color: isLvlPassed ? 'white' : isLevelLocked ? 'var(--text-muted)' : meta.color
+                            }}>
+                              {isLvlPassed ? '✅' : isLevelLocked ? '🔒' : '🎯'}
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <p style={{ fontWeight: 900, fontSize: '0.9375rem', color: isLevelLocked ? 'var(--text-muted)' : 'var(--text-primary)', margin: 0 }}>
+                                  Level {lvlIdx + 1} Milestone Test: {meta.name} Mastery
+                                </p>
+                                <span style={{ fontSize: '0.6875rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: isLvlPassed ? 'rgba(16,185,129,0.2)' : 'rgba(99,102,241,0.1)', color: isLvlPassed ? '#065f46' : '#4338ca' }}>
+                                  🛡️ AI Proctored
+                                </span>
+                              </div>
+                              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
+                                {isLvlPassed 
+                                  ? `Level ${lvlIdx + 1} passed! Benchmark met (≥ 60%). Next level unlocked.` 
+                                  : isLevelLocked 
+                                    ? `Locked. Complete preceding Level ${lvlIdx} and pass its milestone test first.` 
+                                    : `Evaluates your mastery of the completed topics above before unlocking Level ${lvlIdx + 2}.`}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Action Button */}
+                          <div>
+                            {isLevelLocked ? (
+                              <button disabled style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-2)', color: 'var(--text-muted)', border: 'none', borderRadius: 10, padding: '8px 16px', fontWeight: 800, fontSize: '0.8125rem', cursor: 'not-allowed' }}>
+                                <Lock size={13} /> Locked
+                              </button>
+                            ) : isLvlPassed ? (
+                              <button
+                                onClick={() => {
+                                  setAssessmentConfig({
+                                    level: lvl,
+                                    levelTitle: `Level ${lvlIdx + 1} Assessment: ${meta.name} Mastery`,
+                                    topics: lvlTopics
+                                  });
+                                  setShowAssessment(true);
+                                }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#10b981', color: 'white', border: 'none', borderRadius: 10, padding: '8px 16px', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(16,185,129,0.25)' }}
+                              >
+                                <CheckCircle2 size={13} /> Passed · Retake Test
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setAssessmentConfig({
+                                    level: lvl,
+                                    levelTitle: `Level ${lvlIdx + 1} Assessment: ${meta.name} Mastery`,
+                                    topics: lvlTopics
+                                  });
+                                  setShowAssessment(true);
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 7,
+                                  background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                                  color: 'white', border: 'none', borderRadius: 10,
+                                  padding: '9px 18px', fontWeight: 900, fontSize: '0.8125rem',
+                                  cursor: 'pointer', boxShadow: '0 4px 14px rgba(79,70,229,0.3)',
+                                  transition: 'transform 0.15s'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                              >
+                                <Target size={14} /> Take Level {lvlIdx + 1} Test
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Evaluated Topics badges */}
+                        {lvlTopics.length > 0 && (
+                          <div style={{ paddingTop: '0.625rem', borderTop: '1px solid var(--surface-2)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              Evaluated Topics:
+                            </span>
+                            {lvlTopics.map((tp, tpi) => (
+                              <span key={tpi} style={{
+                                fontSize: '0.6875rem', fontWeight: 700,
+                                background: isLvlPassed ? 'rgba(16,185,129,0.1)' : 'var(--surface-2)',
+                                color: isLvlPassed ? '#065f46' : 'var(--text-secondary)',
+                                padding: '2px 8px', borderRadius: 6, border: '1px solid var(--surface-3)'
+                              }}>
+                                {tp}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {isExpanded && materials.length === 0 && (
-                      <div style={{ padding: '1rem 1.25rem 1rem 4.5rem', color: 'var(--text-muted)', fontSize: '0.875rem', borderTop: '1px solid var(--surface-2)' }}>No materials yet</div>
-                    )}
+                    </div>
+
                   </div>
                 );
               })}
 
-              {/* Assessment checkpoint node */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 0 0.5rem', gap: '0.75rem' }}>
-                <div style={{ width: 2, height: 40, background: 'linear-gradient(to bottom, var(--surface-3), #fbbf24)' }} />
-                <div style={{ background: isPending ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : 'linear-gradient(135deg, #d1fae5, #a7f3d0)', border: `2px solid ${isPending ? '#fbbf24' : '#10b981'}`, borderRadius: 16, padding: '1.25rem 1.5rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontSize: '1.75rem' }}>{isPending ? '🎯' : '✅'}</span>
-                    <div>
-                      <p style={{ fontWeight: 900, fontSize: '0.9375rem', color: isPending ? '#92400e' : '#065f46', margin: 0 }}>Placement Assessment</p>
-                      <p style={{ fontSize: '0.75rem', color: isPending ? '#b45309' : '#059669', margin: 0 }}>{isPending ? 'Not yet taken — unlock your path' : `Completed · Path: ${pathLabels[learningPath]}`}</p>
-                    </div>
-                  </div>
-                  {isPending && (
-                    <button onClick={() => setShowAssessment(true)} style={{ background: '#d97706', color: 'white', border: 'none', borderRadius: 10, padding: '8px 16px', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', flexShrink: 0 }}>Take Now</button>
-                  )}
-                </div>
-              </div>
-
-              {/* Phase 2: Path Modules (Indices 5-9) */}
-              {!isPending && modules.filter(m => {
-                if (learningPath === 'basics' && m.level === 'beginner') return true;
-                if (learningPath === 'intermediate' && m.level === 'intermediate') return true;
-                if (learningPath === 'advanced' && m.level === 'advanced') return true;
-                return false;
-              }).map((mod, index) => {
-                const modIdx = index + 5;
-                const isExpanded = expandedMod === modIdx;
-                const materials = mod.materials || [];
-                return (
-                  <div key={mod.id} style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 16, overflow: 'hidden', transition: 'all 0.3s' }}>
-                    <div onClick={() => setExpandedMod(isExpanded ? -1 : modIdx)} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem', cursor: 'pointer', userSelect: 'none' }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--brand-50)', border: '2px solid var(--brand-200)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 900, fontSize: '0.875rem', color: 'var(--brand-600)' }}>
-                        {modIdx + 1}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>{mod.title}</p>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, marginTop: 2 }}>{materials.length} materials</p>
-                      </div>
-                      <button onClick={e => { e.stopPropagation(); navigate(`/student/course/${course.id}?module=${mod.id}`); onClose(); }} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, background: 'var(--brand-500)', color: 'white', border: 'none', borderRadius: 10, padding: '7px 14px', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer' }}>
-                        <Play size={13} /> Learn
-                      </button>
-                      {isExpanded ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
-                    </div>
-
-                    {isExpanded && materials.length > 0 && (
-                      <div style={{ borderTop: '1px solid var(--surface-2)', background: 'var(--surface-1)' }}>
-                        {materials.map((mat, mi) => {
-                          const isYT = mat.material_type === 'youtube';
-                          const isPDF = mat.material_type === 'pdf';
-                          let isDone = false;
-                          try {
-                            const stored = localStorage.getItem(`adaptive_completed_${course.id}`);
-                            if (stored) isDone = JSON.parse(stored).includes(mat.id);
-                          } catch (e) {}
-                          return (
-                            <div key={mat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.875rem 1.25rem 0.875rem 4.5rem', borderBottom: mi < materials.length - 1 ? '1px solid var(--surface-2)' : 'none' }}>
-                              <div style={{ width: 32, height: 32, borderRadius: 8, background: isDone ? '#10b981' : isYT ? '#fee2e2' : isPDF ? '#e0f2fe' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                {isDone ? <CheckCircle2 size={16} color="white" /> : isYT ? <span style={{ fontSize: '0.875rem' }}>▶️</span> : isPDF ? <span style={{ fontSize: '0.875rem' }}>📄</span> : <Play size={14} color="var(--text-muted)" />}
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: isDone ? 'line-through' : 'none' }}>{mat.title}</p>
-                                <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{mat.material_type}</p>
-                              </div>
-                              {isYT && (
-                                <a href={mat.s3_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#dc2626', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                                  YouTube ↗
-                                </a>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {isExpanded && materials.length === 0 && (
-                      <div style={{ padding: '1rem 1.25rem 1rem 4.5rem', color: 'var(--text-muted)', fontSize: '0.875rem', borderTop: '1px solid var(--surface-2)' }}>No materials yet</div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Final Assessment node */}
-              {progress >= 100 && (
+              {/* Final Certification Exam node */}
+              {(passedLevels.length >= 4 || progress >= 100) && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 0 0.5rem', gap: '0.75rem' }}>
                   <div style={{ width: 2, height: 40, background: 'linear-gradient(to bottom, var(--surface-3), #3b82f6)' }} />
-                  <div style={{ background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '2px solid #3b82f6', borderRadius: 16, padding: '1.25rem 1.5rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: '1.75rem' }}>🏆</span>
+                  <div style={{ background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '2px solid #3b82f6', borderRadius: 18, padding: '1.5rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', boxShadow: '0 8px 24px rgba(59,130,246,0.15)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <span style={{ fontSize: '2rem' }}>🏆</span>
                       <div>
-                        <p style={{ fontWeight: 900, fontSize: '0.9375rem', color: '#1e40af', margin: 0 }}>Final Certification Exam</p>
-                        <p style={{ fontSize: '0.75rem', color: '#2563eb', margin: 0 }}>You've completed all modules! Take the final exam to get certified.</p>
+                        <p style={{ fontWeight: 900, fontSize: '1rem', color: '#1e40af', margin: 0 }}>Final Certification Exam</p>
+                        <p style={{ fontSize: '0.8125rem', color: '#2563eb', margin: '2px 0 0' }}>All 4 levels mastered! Take the final comprehensive certification exam to graduate.</p>
                       </div>
                     </div>
-                    <button onClick={onStartLearn} style={{ background: '#2563eb', color: 'white', border: 'none', borderRadius: 10, padding: '8px 16px', fontWeight: 800, fontSize: '0.8125rem', cursor: 'pointer', flexShrink: 0 }}>Take Exam</button>
+                    <button onClick={onStartLearn} style={{ background: '#2563eb', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontWeight: 800, fontSize: '0.875rem', cursor: 'pointer', flexShrink: 0, boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}>
+                      Take Final Exam
+                    </button>
                   </div>
                 </div>
               )}
@@ -256,13 +386,33 @@ function CourseRoadmapModal({ course, enrollment, onClose, onStartLearn }) {
       {showAssessment && (
         <PlacementAssessmentModal
           course={course}
-          startAtPhase={1}
+          startAtPhase={2}
+          assessmentType={assessmentConfig ? 'level' : 'placement'}
+          level={assessmentConfig?.level || 'fundamentals'}
+          levelTitle={assessmentConfig?.levelTitle}
+          topics={assessmentConfig?.topics || []}
+          onLevelTestPass={(passedLvl, scr) => {
+            setShowAssessment(false);
+            setAssessmentConfig(null);
+            setPassedLevels(prev => {
+              const next = [...new Set([...prev, passedLvl])];
+              try {
+                localStorage.setItem(`adaptive_level_passed_${course.id}`, JSON.stringify(next));
+              } catch (e) {}
+              return next;
+            });
+            toast.success(`🎉 Level ${passedLvl} Test Passed with score ${scr}%! Next level unlocked.`);
+          }}
           onPlacementComplete={(path) => {
             setShowAssessment(false);
+            setAssessmentConfig(null);
             toast.success(`Learning path set: ${path}!`);
             onClose();
           }}
-          onClose={() => setShowAssessment(false)}
+          onClose={() => {
+            setShowAssessment(false);
+            setAssessmentConfig(null);
+          }}
         />
       )}
 
@@ -276,6 +426,7 @@ function CourseRoadmapModal({ course, enrollment, onClose, onStartLearn }) {
 
 export default function StudentExamArena() {
   const navigate = useNavigate();
+  const { examId: routeExamId } = useParams();
   // State: 'list' -> 'lobby' -> 'active' -> 'submitted'
   const [examState, setExamState] = useState('list'); 
   const [selectedExam, setSelectedExam] = useState(null);
@@ -285,12 +436,37 @@ export default function StudentExamArena() {
   const [enrollments, setEnrollments] = useState({});
   const [selectedCourse, setSelectedCourse] = useState(null); // for roadmap modal
   
+  // Weekly Assessments for enrolled courses
+  const [weeklyExams, setWeeklyExams] = useState([]);
+  const [weeklyLoading, setWeeklyLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'available' | 'weekly'
+  const [weeklyLayout, setWeeklyLayout] = useState('carousel'); // 'carousel' | 'grid'
+  const [weeklyCollapsed, setWeeklyCollapsed] = useState(false);
+
+  const fetchWeeklyExams = useCallback(() => {
+    setWeeklyLoading(true);
+    academicAPI.getStudentWeeklyExams()
+      .then(res => setWeeklyExams(res.data || []))
+      .catch(err => console.error('Failed to load student weekly exams:', err))
+      .finally(() => setWeeklyLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetchWeeklyExams();
+  }, [fetchWeeklyExams]);
+  
   // Published Exam from Teacher Forge
   const [publishedExam, setPublishedExam] = useState(null);
   useEffect(() => {
     academicAPI.getPublishedExam().then(res => {
-      setPublishedExam(res.data);
-    }).catch(() => {});
+      if (res.data && res.data.title && res.data.title !== 'Global Question Bank' && Number(res.data.total_marks) > 0) {
+        setPublishedExam(res.data);
+      } else {
+        setPublishedExam(null);
+      }
+    }).catch(() => {
+      setPublishedExam(null);
+    });
   }, []);
   
   // Exam progress state
@@ -307,11 +483,16 @@ export default function StudentExamArena() {
   const [fsWarning, setFsWarning] = useState(false);
 
   // Violation tracking
+  // Violation tracking
   const MAX_VIOLATIONS = 5;
   const [violationCount, setViolationCount] = useState(0);
-  const [activeBanner, setActiveBanner] = useState(null); // { type, countdown }
+  const violationCountRef = useRef(0);
+  const [isAutoTerminated, setIsAutoTerminated] = useState(false);
+  const [activeBanner, setActiveBanner] = useState(null); // { type, text, countdown, warningNum, maxWarnings }
   const violationTimerRef = useRef(null);
-  const prevViolationRef = useRef(null);
+  const blurIntervalRef = useRef(null);
+  const isTerminatingRef = useRef(false);
+  const lastViolationTimeRef = useRef({});
   
   // Tools state
   const [showScratchpad, setShowScratchpad] = useState(false);
@@ -327,14 +508,185 @@ export default function StudentExamArena() {
   const hudVideoRef = useRef(null);
   const streamRef = useRef(null);
   const [mediaStream, setMediaStream] = useState(null);
-  
-  const proctoring = useProctoring();
+  const autoSubmittedRef = useRef(false);
+  const submitExamRef = useRef(null);
+  const handleViolationRef = useRef(null);
+
+  // Submit Exam handler
+  const submitExam = useCallback(async (options = {}) => {
+    if (examState === 'submitted' || autoSubmittedRef.current) return;
+    autoSubmittedRef.current = true;
+    setExamState('submitted');
+    try { if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); } catch (err) {}
+
+    const isTerminated = options?.autoTerminated || (violationCountRef.current >= MAX_VIOLATIONS);
+    if (isTerminated) setIsAutoTerminated(true);
+
+    const cheatScore = options?.forcedCheatScore !== undefined 
+      ? options.forcedCheatScore 
+      : (isTerminated ? 100 : Math.min(100, (violationCountRef.current || 0) * 20));
+
+    const totalQ = questions.length || 1;
+    let correctMarks = 0;
+    Object.entries(answers).forEach(([qi, ans]) => {
+      const q = questions[parseInt(qi)];
+      const answerLetter = String.fromCharCode(65 + ans);
+      if (q && q.correct_answer === answerLetter) {
+        correctMarks += q.marks || 1;
+      }
+    });
+
+    try {
+      const examId = selectedExam?.id || 1;
+      await academicAPI.submitExam(examId, {
+        answers,
+        score: correctMarks,
+        cheat_risk_score: cheatScore,
+      });
+
+      if (isTerminated) {
+        toast.error("Test auto-submitted due to 5 proctoring warnings (Review recorded).", { duration: 6000 });
+      } else {
+        toast.success("Exam submitted successfully!");
+      }
+
+      await cognitiveAPI.evaluate({
+        event: isTerminated ? 'Exam Auto-Terminated (Proctoring)' : 'Exam Completed',
+        score: Math.round((correctMarks / (selectedExam?.total_marks || 100)) * 100),
+        topic: selectedExam?.title || 'Exam',
+        total_questions: totalQ,
+        correct_answers: Object.keys(answers).length,
+        flagged_questions: flagged.size,
+        time_taken_seconds: (selectedExam?.duration_minutes || 45) * 60 - timeLeft,
+      });
+
+      fetchWeeklyExams();
+    } catch (err) {
+      console.warn('Could not update profile or submit exam:', err);
+    }
+  }, [examState, questions, answers, selectedExam, flagged, timeLeft, fetchWeeklyExams]);
+
+  useEffect(() => {
+    submitExamRef.current = submitExam;
+  }, [submitExam]);
+
+  // Centralized Violation Handler
+  const handleViolation = useCallback((violationType, description, snapshot = null) => {
+    if (examState !== 'active' || isTerminatingRef.current) return;
+
+    // Debounce duplicate violation type within 2.5s
+    const now = Date.now();
+    const lastTime = lastViolationTimeRef.current[violationType] || 0;
+    if (now - lastTime < 2500) return;
+    lastViolationTimeRef.current[violationType] = now;
+
+    // Capture snapshot from webcam frame if not provided
+    let capturedSnapshot = snapshot;
+    if (!capturedSnapshot && hudVideoRef.current && hudVideoRef.current.videoWidth) {
+      try {
+        const c = document.createElement('canvas');
+        c.width = 320;
+        c.height = 240;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(hudVideoRef.current, 0, 0, 320, 240);
+        capturedSnapshot = c.toDataURL('image/jpeg', 0.6);
+      } catch (e) {}
+    }
+
+    violationCountRef.current = (violationCountRef.current || 0) + 1;
+    const nextCount = violationCountRef.current;
+    setViolationCount(nextCount);
+
+    if (nextCount < MAX_VIOLATIONS) {
+      const riskScore = Math.min(100, nextCount * 20);
+      proctoringAPI.logViolation({
+        exam_id: selectedExam?.id || 1,
+        violation_type: violationType,
+        severity: nextCount >= 3 ? 'high' : 'medium',
+        description: `Warning ${nextCount}/${MAX_VIOLATIONS}: ${description}`,
+        cumulative_risk_score: riskScore,
+        screenshot: capturedSnapshot,
+      }).catch(err => console.error('Failed to log proctoring violation:', err));
+
+      toast.error(`⚠️ Warning ${nextCount}/${MAX_VIOLATIONS}: ${description}`, {
+        id: 'proctor-warn-toast',
+        duration: 4000,
+      });
+
+      let countdown = 5;
+      setActiveBanner({
+        type: violationType,
+        text: description,
+        warningNum: nextCount,
+        maxWarnings: MAX_VIOLATIONS,
+        countdown,
+      });
+
+      if (violationTimerRef.current) clearInterval(violationTimerRef.current);
+      violationTimerRef.current = setInterval(() => {
+        countdown -= 1;
+        setActiveBanner(b => (b && b.type !== 'terminated' ? { ...b, countdown } : null));
+        if (countdown <= 0) {
+          clearInterval(violationTimerRef.current);
+          setActiveBanner(null);
+        }
+      }, 1000);
+    } else {
+      // 5 WARNINGS REACHED: AUTO-TERMINATE THE TEST IMMEDIATELY!
+      isTerminatingRef.current = true;
+      setIsAutoTerminated(true);
+      if (violationTimerRef.current) clearInterval(violationTimerRef.current);
+      if (blurIntervalRef.current) clearInterval(blurIntervalRef.current);
+
+      proctoringAPI.logViolation({
+        exam_id: selectedExam?.id || 1,
+        violation_type: 'exam_terminated',
+        severity: 'critical',
+        description: `Maximum warnings limit reached (5/5). Exam automatically terminated. Final violation: ${description}`,
+        cumulative_risk_score: 100,
+        screenshot: capturedSnapshot,
+      }).catch(err => console.error('Failed to log termination:', err));
+
+      toast.error('🚨 MAXIMUM WARNINGS EXCEEDED (5/5). Test automatically ended!', {
+        id: 'proctor-term-toast',
+        duration: 6000,
+      });
+
+      setActiveBanner({
+        type: 'terminated',
+        text: '5 Proctoring Warnings Exceeded — Test Automatically Ended',
+        countdown: 0,
+      });
+
+      setTimeout(() => {
+        if (submitExamRef.current) {
+          submitExamRef.current({
+            autoTerminated: true,
+            reason: 'Excessive proctoring violations (5 warnings exceeded)',
+            forcedCheatScore: 100,
+          });
+        }
+      }, 1200);
+    }
+  }, [examState, selectedExam]);
+
+  useEffect(() => {
+    handleViolationRef.current = handleViolation;
+  }, [handleViolation]);
+
+  // Hook into Proctoring Engine
+  const proctoring = useProctoring({
+    onViolation: (type, desc, snapshot) => {
+      if (handleViolationRef.current) {
+        handleViolationRef.current(type, desc, snapshot);
+      }
+    }
+  });
 
   // Load enrolled courses + their enrollment status
   useEffect(() => {
     coursesAPI.getEnrolledCourses().then(res => {
       setEnrolledCourses(res.data || []);
-      // For each, fetch enrollment status to get learning_path + progress
       (res.data || []).forEach(course => {
         coursesAPI.getEnrollmentStatus(course.id).then(er => {
           setEnrollments(prev => ({ ...prev, [course.id]: er.data }));
@@ -343,50 +695,6 @@ export default function StudentExamArena() {
     }).catch(() => {});
   }, []);
 
-  // YOLO Violation: count, 5s countdown, auto-terminate at 5
-  useEffect(() => {
-    const violation = proctoring.lastViolation;
-    // Only react when a NEW violation appears (not on clear)
-    if (violation && violation !== prevViolationRef.current) {
-      prevViolationRef.current = violation;
-
-      setViolationCount(prev => {
-        const newCount = prev + 1;
-        // Start 5-second countdown banner
-        let countdown = 5;
-        setActiveBanner({ type: violation, countdown });
-
-        // Clear any existing timer
-        if (violationTimerRef.current) clearInterval(violationTimerRef.current);
-
-        violationTimerRef.current = setInterval(() => {
-          countdown -= 1;
-          setActiveBanner(b => b ? { ...b, countdown } : null);
-          if (countdown <= 0) {
-            clearInterval(violationTimerRef.current);
-            setActiveBanner(null);
-          }
-        }, 1000);
-
-        // Auto-terminate if max violations reached
-        if (newCount >= MAX_VIOLATIONS) {
-          clearInterval(violationTimerRef.current);
-          setActiveBanner({ type: 'terminated', countdown: 0 });
-          setTimeout(async () => {
-            try { if (document.fullscreenElement) await document.exitFullscreen(); } catch (e) {}
-            setExamState('submitted');
-          }, 2000);
-        }
-
-        return newCount;
-      });
-    }
-
-    if (!violation) {
-      prevViolationRef.current = null;
-    }
-  }, [proctoring.lastViolation]);
-
   // Timer logic
   useEffect(() => {
     if (examState !== 'active') return;
@@ -394,25 +702,79 @@ export default function StudentExamArena() {
     return () => clearInterval(t);
   }, [examState]);
 
-  // Focus tracking
+  // Focus tracking (Tab switch & Window Defocus with persistent repeat warnings)
   useEffect(() => {
-    if (examState !== 'active') return;
-    const onBlur  = () => setFocusWarning(true);
-    const onFocus = () => setFocusWarning(false);
+    if (examState !== 'active') {
+      if (blurIntervalRef.current) clearInterval(blurIntervalRef.current);
+      return;
+    }
+
+    const onBlur = () => {
+      setFocusWarning(true);
+      if (handleViolationRef.current) {
+        handleViolationRef.current('tab_switch', 'Tab switch or window defocus detected');
+      }
+      if (blurIntervalRef.current) clearInterval(blurIntervalRef.current);
+      blurIntervalRef.current = setInterval(() => {
+        if (document.hidden || !document.hasFocus()) {
+          if (handleViolationRef.current) {
+            handleViolationRef.current('tab_switch', 'Continued absence from exam tab');
+          }
+        } else {
+          clearInterval(blurIntervalRef.current);
+        }
+      }, 4000);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        setFocusWarning(true);
+        if (handleViolationRef.current) {
+          handleViolationRef.current('tab_switch', 'Navigated away from assessment tab');
+        }
+        if (blurIntervalRef.current) clearInterval(blurIntervalRef.current);
+        blurIntervalRef.current = setInterval(() => {
+          if (document.hidden) {
+            if (handleViolationRef.current) {
+              handleViolationRef.current('tab_switch', 'Continued absence from exam tab');
+            }
+          } else {
+            clearInterval(blurIntervalRef.current);
+          }
+        }, 4000);
+      } else {
+        setFocusWarning(false);
+        if (blurIntervalRef.current) clearInterval(blurIntervalRef.current);
+      }
+    };
+
+    const onFocus = () => {
+      setFocusWarning(false);
+      if (blurIntervalRef.current) clearInterval(blurIntervalRef.current);
+    };
+
     window.addEventListener('blur', onBlur);
     window.addEventListener('focus', onFocus);
-    return () => { window.removeEventListener('blur', onBlur); window.removeEventListener('focus', onFocus); };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      if (blurIntervalRef.current) clearInterval(blurIntervalRef.current);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [examState]);
 
   // Key Blocker
   useEffect(() => {
     if (examState !== 'active') return;
     const onKeyDown = (e) => {
-      // Block F1-F12
-      if (e.key.match(/^F(1[0-2]|[1-9])$/)) {
+      if (e.key.match(/^F(1[0-2]|[1-9])$/) || (e.altKey && e.key === 'Tab')) {
         e.preventDefault();
         setKeyWarning(`Action Blocked: ${e.key} key is not allowed.`);
         setTimeout(() => setKeyWarning(''), 5000);
+        if (handleViolationRef.current) {
+          handleViolationRef.current('forbidden_key', `Prohibited shortcut attempt: ${e.key}`);
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -423,7 +785,12 @@ export default function StudentExamArena() {
   useEffect(() => {
     if (examState !== 'active') return;
     const onFullscreenChange = () => {
-      if (!document.fullscreenElement) setFsWarning(true);
+      if (!document.fullscreenElement) {
+        setFsWarning(true);
+        if (handleViolationRef.current) {
+          handleViolationRef.current('screen_resize', 'Exited fullscreen examination mode');
+        }
+      }
     };
     document.addEventListener('fullscreenchange', onFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
@@ -470,9 +837,9 @@ export default function StudentExamArena() {
       if (hudVideoRef.current.srcObject !== mediaStream) {
         hudVideoRef.current.srcObject = mediaStream;
       }
-      proctoring.startTracking(hudVideoRef.current);
+      proctoring.startTracking(hudVideoRef.current, selectedExam?.id || 1);
     }
-  }, [examState, mediaStream, proctoring.startTracking]);
+  }, [examState, mediaStream, proctoring.status, proctoring.startTracking, selectedExam]);
 
   // Mock Cloud Sync
   const handleAnswerChange = (val) => {
@@ -495,8 +862,34 @@ export default function StudentExamArena() {
     setSelectedExam(exam);
     setTimeLeft((exam.duration_minutes || 45) * 60);
     setExamState('lobby');
-    setQuestions(exam.questions || []); // Use the real questions
+    setQuestions(exam.questions || []);
+    setViolationCount(0);
+    violationCountRef.current = 0;
+    isTerminatingRef.current = false;
+    autoSubmittedRef.current = false;
+    setIsAutoTerminated(false);
+    lastViolationTimeRef.current = {};
+    if (blurIntervalRef.current) clearInterval(blurIntervalRef.current);
+    if (violationTimerRef.current) clearInterval(violationTimerRef.current);
+    setActiveBanner(null);
+    proctoring.resetWarnings?.();
   };
+
+  // Auto-launch if routeExamId is provided in URL
+  useEffect(() => {
+    if (routeExamId) {
+      academicAPI.getExamById(routeExamId)
+        .then(res => {
+          if (res.data) {
+            startLobby(res.data);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to load exam by ID:', err);
+          toast.error('Could not load weekly assessment');
+        });
+    }
+  }, [routeExamId]);
 
   const exitToList = async () => {
     try { if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); } catch (err) {}
@@ -510,77 +903,15 @@ export default function StudentExamArena() {
   const answeredCount = Object.keys(answers).length;
   const isFullScreen = examState !== 'list';
 
-  // Gamified Roadmap Math
-  const getRoadmapPath = () => {
-    let p = `M 80 50`;
-    for(let i = 1; i < questions.length; i++) {
-       const prevX = (i - 1) % 2 === 0 ? 80 : 180;
-       const currX = i % 2 === 0 ? 80 : 180;
-       const prevY = (i - 1) * 110 + 50;
-       const currY = i * 110 + 50;
-       p += ` C ${prevX} ${prevY + 55}, ${currX} ${currY - 55}, ${currX} ${currY}`;
-    }
-    return p;
-  };
-  const roadmapPath = getRoadmapPath();
-  const roadmapHeight = questions.length * 110 + 40;
+
 
   // Basic mock score calculation
   const score = Object.keys(answers).reduce((acc, key) => {
     const q = questions[key];
     if (q.type === 'mcq') return acc + (answers[key] === q.correct ? 1 : 0);
-    if (q.type === 'text') return acc + 1; // Assuming manual review required, giving point for demo
+    if (q.type === 'text') return acc + 1;
     return acc;
   }, 0);
-
-  const autoSubmittedRef = useRef(false);
-
-  const submitExam = async () => {
-    if (examState === 'submitted') return;
-    setExamState('submitted');
-    try { if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); } catch (err) {}
-    const totalQ = questions.length || 1;
-    // Basic scoring
-    let correctMarks = 0;
-    Object.entries(answers).forEach(([qi, ans]) => {
-      const q = questions[parseInt(qi)];
-      const answerLetter = String.fromCharCode(65 + ans); // Converts 0 to "A", 1 to "B", etc.
-      if (q && q.correct_answer === answerLetter) {
-        correctMarks += q.marks || 1;
-      }
-    });
-
-    try {
-      if (selectedExam && selectedExam.id) {
-        await academicAPI.submitExam(selectedExam.id, {
-          answers,
-          score: correctMarks,
-          cheat_risk_score: violationCount * 20
-        });
-        toast.success("Exam submitted successfully!");
-      }
-
-      await cognitiveAPI.evaluate({
-        event: 'Exam Completed',
-        score: Math.round((correctMarks / (selectedExam?.total_marks || 100)) * 100),
-        topic: selectedExam?.title || 'Exam',
-        total_questions: totalQ,
-        correct_answers: Object.keys(answers).length,
-        flagged_questions: flagged.size,
-        time_taken_seconds: (selectedExam?.duration_minutes || 45) * 60 - timeLeft,
-      });
-    } catch (err) {
-      console.warn('Could not update profile or submit exam:', err);
-    }
-  };
-
-  useEffect(() => {
-    if (proctoring.warnings >= 5 && !autoSubmittedRef.current && examState === 'active') {
-      autoSubmittedRef.current = true;
-      toast.error('Test automatically ended due to excessive violations (5+).', { duration: 5000 });
-      submitExam();
-    }
-  }, [proctoring.warnings, examState]);
 
   return (
     <div style={isFullScreen ? { 
@@ -632,6 +963,15 @@ export default function StudentExamArena() {
                     <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: active ? '#10b981' : 'var(--text-muted)', textTransform: 'uppercase' }}>{label}</span>
                   </div>
                 ))}
+
+                {examState === 'active' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', background: violationCount === 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.15)', border: `1px solid ${violationCount === 0 ? 'rgba(16,185,129,0.3)' : '#ef4444'}`, borderRadius: 999, marginLeft: '0.5rem' }}>
+                    <ShieldAlert size={14} color={violationCount === 0 ? '#10b981' : '#ef4444'} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: violationCount === 0 ? '#10b981' : '#ef4444' }}>
+                      {violationCount === 0 ? 'Proctor: 0/5 Warnings' : `Proctor: ${violationCount}/5 Warnings`}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -663,21 +1003,330 @@ export default function StudentExamArena() {
         </div>
       )}
 
-      {/* ── Body ── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-
-        {/* ── LIST STATE: Immersive Level Select ── */}
-        {examState === 'list' && (
+      {/* ── LIST STATE: Immersive Level Select ── */}
+      {examState === 'list' && (
           <div style={{ flex: 1, overflowY: 'auto', background: 'var(--surface-1)', position: 'relative' }} className="hide-scrollbar">
 
-            {/* ── My Courses Section ── */}
-            <div style={{ position: 'relative', zIndex: 1, padding: '2.5rem 3rem 1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1.25rem' }}>
-                <BookOpen size={18} color="var(--brand-500)" />
-                <h2 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Available Exams</h2>
+            {/* ── Top Header & Tab Controls ── */}
+            <div style={{ padding: '1.75rem 3rem 1.25rem', borderBottom: '1px solid var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', background: 'var(--surface-0)', position: 'sticky', top: 0, zIndex: 10, backdropFilter: 'blur(8px)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--brand-50)', border: '1px solid var(--brand-200)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ShieldCheck size={22} color="var(--brand-600)" />
+                </div>
+                <div>
+                  <h1 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                    Exam Arena
+                  </h1>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                    Certification exams, course learning roadmaps, and mandatory weekly evaluations.
+                  </p>
+                </div>
               </div>
 
-              {publishedExam && (
+              {/* Navigation Segmented Tabs */}
+              <div style={{ display: 'flex', background: 'var(--surface-1)', padding: 4, borderRadius: 12, border: '1px solid var(--surface-3)', gap: 4 }}>
+                <button
+                  onClick={() => setActiveTab('all')}
+                  style={{
+                    padding: '7px 15px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: activeTab === 'all' ? 'var(--surface-0)' : 'transparent',
+                    color: activeTab === 'all' ? 'var(--brand-600)' : 'var(--text-secondary)',
+                    fontWeight: 800,
+                    fontSize: '0.8125rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    boxShadow: activeTab === 'all' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
+                  }}
+                >
+                  <Layers size={14} /> All Assessments
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('available')}
+                  style={{
+                    padding: '7px 15px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: activeTab === 'available' ? 'var(--surface-0)' : 'transparent',
+                    color: activeTab === 'available' ? 'var(--brand-600)' : 'var(--text-secondary)',
+                    fontWeight: 800,
+                    fontSize: '0.8125rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    boxShadow: activeTab === 'available' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
+                  }}
+                >
+                  <BookOpen size={14} /> Available Exams
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('weekly')}
+                  style={{
+                    padding: '7px 15px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: activeTab === 'weekly' ? 'var(--surface-0)' : 'transparent',
+                    color: activeTab === 'weekly' ? 'var(--brand-600)' : 'var(--text-secondary)',
+                    fontWeight: 800,
+                    fontSize: '0.8125rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    boxShadow: activeTab === 'weekly' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
+                  }}
+                >
+                  <Calendar size={14} /> Weekly Assessments
+                  {weeklyExams.length > 0 && (
+                    <span style={{
+                      fontSize: '0.6875rem', fontWeight: 900,
+                      background: weeklyExams.some(w => !w.has_attended) ? '#f59e0b' : '#10b981',
+                      color: 'white',
+                      padding: '1px 6px', borderRadius: 999
+                    }}>
+                      {weeklyExams.filter(w => !w.has_attended).length > 0
+                        ? `${weeklyExams.filter(w => !w.has_attended).length} Pending`
+                        : `${weeklyExams.length}`}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* ── Mandatory Weekly Assessments Section ── */}
+            {(activeTab === 'all' || activeTab === 'weekly') && (
+              <div style={{ position: 'relative', zIndex: 1, padding: activeTab === 'weekly' ? '2rem 3rem 1.5rem' : '1.75rem 3rem 0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, #f59e0b, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                      <Calendar size={17} />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <h2 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>
+                          Mandatory Course Weekly Assessments
+                        </h2>
+                        <span style={{ fontSize: '0.6875rem', fontWeight: 900, textTransform: 'uppercase', background: 'rgba(245,158,11,0.12)', color: '#d97706', padding: '2px 7px', borderRadius: 6, letterSpacing: '0.05em' }}>
+                          Attendance Monitored
+                        </span>
+                      </div>
+                      <p style={{ margin: '2px 0 0', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                        Instructor evaluations with automated proctoring & attendance verification.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-muted)' }}>
+                      {weeklyExams.filter(w => w.has_attended).length} / {weeklyExams.length} Attended
+                    </span>
+
+                    {/* Layout Controls (Only in 'all' view with multiple exams) */}
+                    {activeTab === 'all' && weeklyExams.length > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 10, padding: 3 }}>
+                        <button
+                          onClick={() => setWeeklyLayout(weeklyLayout === 'carousel' ? 'grid' : 'carousel')}
+                          title={weeklyLayout === 'carousel' ? "Switch to Grid View" : "Switch to Single-Row Carousel"}
+                          style={{
+                            padding: '4px 8px', borderRadius: 6, border: 'none',
+                            background: 'transparent', color: 'var(--text-secondary)',
+                            fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 4
+                          }}
+                        >
+                          <LayoutGrid size={13} /> {weeklyLayout === 'carousel' ? 'Grid' : 'Row'}
+                        </button>
+                        <div style={{ width: 1, height: 16, background: 'var(--surface-3)' }} />
+                        <button
+                          onClick={() => setWeeklyCollapsed(!weeklyCollapsed)}
+                          title={weeklyCollapsed ? "Expand Section" : "Collapse Section"}
+                          style={{
+                            padding: '4px 8px', borderRadius: 6, border: 'none',
+                            background: 'transparent', color: 'var(--text-secondary)',
+                            fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 4
+                          }}
+                        >
+                          {weeklyCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                          {weeklyCollapsed ? 'Expand' : 'Collapse'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {weeklyCollapsed ? (
+                  <div
+                    onClick={() => setWeeklyCollapsed(false)}
+                    style={{
+                      background: 'var(--surface-0)', border: '1px dashed var(--surface-3)', borderRadius: 14,
+                      padding: '10px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      cursor: 'pointer', marginBottom: '1.25rem', transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand-400)'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--surface-3)'}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                      <Calendar size={15} color="#f59e0b" />
+                      <span>{weeklyExams.length} weekly assessments scheduled ({weeklyExams.filter(w => w.has_attended).length} completed)</span>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-600)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      Show Assessments <ChevronDown size={14} />
+                    </span>
+                  </div>
+                ) : weeklyLoading ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <RefreshCw size={24} className="spin" style={{ margin: '0 auto 8px' }} />
+                    <p style={{ fontSize: '0.875rem' }}>Loading course weekly assessments...</p>
+                  </div>
+                ) : weeklyExams.length === 0 ? (
+                  <div style={{ background: 'var(--surface-0)', border: '1px dashed var(--surface-3)', borderRadius: 16, padding: '1.5rem', textAlign: 'center', marginBottom: '1.5rem' }}>
+                    <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                      No weekly assessments scheduled for your enrolled courses yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div style={
+                    activeTab === 'all' && weeklyLayout === 'carousel' ? {
+                      display: 'flex',
+                      gap: '1.25rem',
+                      overflowX: 'auto',
+                      paddingBottom: '0.75rem',
+                      marginBottom: '1.5rem'
+                    } : {
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                      gap: '1.25rem',
+                      marginBottom: '1.5rem'
+                    }
+                  } className="hide-scrollbar">
+                    {weeklyExams.map(exam => {
+                      const isAttended = exam.has_attended;
+                      const percent = exam.percentage !== undefined ? exam.percentage : (exam.total_marks > 0 ? Math.round((exam.student_score / exam.total_marks) * 100) : 0);
+                      return (
+                        <div
+                          key={exam.id}
+                          style={{
+                            width: (activeTab === 'all' && weeklyLayout === 'carousel') ? 340 : 'auto',
+                            minWidth: (activeTab === 'all' && weeklyLayout === 'carousel') ? 340 : 'auto',
+                            flexShrink: 0,
+                            background: 'var(--surface-0)',
+                            borderRadius: 18,
+                            border: isAttended ? '1px solid var(--surface-3)' : '2px solid rgba(245,158,11,0.4)',
+                            padding: '1.25rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.75rem',
+                            boxShadow: isAttended ? '0 4px 14px rgba(0,0,0,0.03)' : '0 6px 20px rgba(245,158,11,0.1)',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {/* Status bar top indicator */}
+                          <div style={{ height: 4, width: '100%', position: 'absolute', top: 0, left: 0, background: isAttended ? '#10b981' : 'linear-gradient(90deg, #f59e0b, #ef4444)' }} />
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                                <span style={{ fontSize: '0.6875rem', fontWeight: 900, textTransform: 'uppercase', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', padding: '2px 7px', borderRadius: 5 }}>
+                                  Week {exam.week_number}
+                                </span>
+                                <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)' }}>
+                                  {exam.course_code || 'COURSE'}
+                                </span>
+                              </div>
+                              <h3 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {exam.title}
+                              </h3>
+                              <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {exam.course_title}
+                              </p>
+                            </div>
+
+                            {isAttended ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '3px 8px', borderRadius: 999, fontSize: '0.6875rem', fontWeight: 800, flexShrink: 0 }}>
+                                <CheckCircle2 size={12} /> Attended
+                              </span>
+                            ) : (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(239,68,68,0.1)', color: '#ef4444', padding: '3px 8px', borderRadius: 999, fontSize: '0.6875rem', fontWeight: 800, flexShrink: 0 }}>
+                                <Clock size={12} /> Mandatory
+                              </span>
+                            )}
+                          </div>
+
+                          {exam.description && (
+                            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                              {exam.description}
+                            </p>
+                          )}
+
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem', fontSize: '0.6875rem', color: 'var(--text-secondary)' }}>
+                            <span style={{ background: 'var(--surface-1)', padding: '2px 6px', borderRadius: 5, fontWeight: 700 }}>
+                              ⏱️ {exam.duration_minutes}m
+                            </span>
+                            <span style={{ background: 'var(--surface-1)', padding: '2px 6px', borderRadius: 5, fontWeight: 700 }}>
+                              📝 {exam.question_count}Q
+                            </span>
+                            <span style={{ background: 'var(--surface-1)', padding: '2px 6px', borderRadius: 5, fontWeight: 700 }}>
+                              🏆 {exam.total_marks} Marks
+                            </span>
+                            {exam.proctoring_enabled && (
+                              <span style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '2px 6px', borderRadius: 5, fontWeight: 800 }}>
+                                🛡️ Proctored
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Attendance / Score footer */}
+                          <div style={{ marginTop: 'auto', paddingTop: '0.625rem', borderTop: '1px solid var(--surface-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            {isAttended ? (
+                              <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#10b981' }}>
+                                Score: {exam.student_score} / {exam.total_marks} ({percent}%)
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b' }}>
+                                Not Recorded
+                              </span>
+                            )}
+
+                            {isAttended ? (
+                              <button
+                                onClick={() => startLobby(exam)}
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--surface-3)', color: 'var(--text-primary)', fontWeight: 800, fontSize: '0.6875rem', cursor: 'pointer' }}
+                              >
+                                Retake / Review
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => startLobby(exam)}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', fontWeight: 900, fontSize: '0.75rem', cursor: 'pointer', boxShadow: '0 3px 10px rgba(217,119,6,0.3)', transition: 'transform 0.2s' }}
+                                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                              >
+                                Take Assessment <ArrowRight size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── My Courses Section ── */}
+            {(activeTab === 'all' || activeTab === 'available') && (
+              <div style={{ position: 'relative', zIndex: 1, padding: activeTab === 'available' ? '2rem 3rem 1.5rem' : '0.5rem 3rem 1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1.25rem' }}>
+                  <BookOpen size={18} color="var(--brand-500)" />
+                  <h2 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Available Exams</h2>
+                </div>
+
+              {publishedExam && publishedExam.title && publishedExam.title !== 'Global Question Bank' && Number(publishedExam.total_marks) > 0 && (
                 <div style={{ marginBottom: '2rem' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '2rem' }}>
                     <div
@@ -712,11 +1361,7 @@ export default function StudentExamArena() {
               )}
 
               {(() => {
-                const examCourses = enrolledCourses.filter(c => {
-                  const enr = enrollments[c.id];
-                  if (!enr) return false;
-                  return enr.learning_path === 'pending' || (enr.progress_percentage && enr.progress_percentage >= 100);
-                });
+                const examCourses = enrolledCourses.filter(c => !!enrollments[c.id]);
 
                 if (examCourses.length === 0) {
                   return (
@@ -768,18 +1413,18 @@ export default function StudentExamArena() {
                               ) : progress >= 100 ? (
                                 <>
                                   <CheckCircle2 size={16} color="#10b981" />
-                                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 700 }}>All Modules Completed</span>
+                                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 700 }}>All Modules Completed · Final Exam</span>
                                 </>
                               ) : (
                                 <>
-                                  <Activity size={16} color="var(--brand-500)" />
-                                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 700 }}>Learning in Progress</span>
+                                  <Target size={16} color="var(--brand-500)" />
+                                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 700 }}>Level Tests & Roadmap ({progress}%)</span>
                                 </>
                               )}
                             </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid var(--surface-2)' }}>
-                            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}><Layers size={16} color="var(--brand-500)" /> {path === 'pending' ? 'Take Assessment' : 'View Roadmap'}</span>
+                            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}><Layers size={16} color="var(--brand-500)" /> {path === 'pending' ? 'Take Placement Test' : 'Roadmap & Level Tests'}</span>
                             <div style={{ background: 'var(--brand-50)', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <ArrowRight size={16} color="var(--brand-600)" />
                             </div>
@@ -792,8 +1437,9 @@ export default function StudentExamArena() {
               );
             })()}
           </div>
-          </div>
         )}
+      </div>
+    )}
 
 
         {/* ── LOBBY STATE ── */}
@@ -871,29 +1517,41 @@ export default function StudentExamArena() {
         {/* ── ACTIVE EXAM STATE ── */}
         {examState === 'active' && (
           <>
-            {/* Top Banners for YOLO Violations */}
+            {/* Top Banners for Proctoring Violations */}
             {activeBanner && activeBanner.type !== 'terminated' && (
               <div style={{
                 position: 'absolute', top: 0, left: 0, right: 0, zIndex: 200,
-                background: activeBanner.type === 'phone_detected' ? '#dc2626' : '#ef4444',
-                color: 'white', padding: '14px 20px',
+                background: '#dc2626',
+                color: 'white', padding: '14px 24px',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                fontWeight: 900, fontSize: '1rem', letterSpacing: '0.03em',
-                animation: 'slideDown 0.3s ease', boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+                fontWeight: 900, fontSize: '1rem', letterSpacing: '0.02em',
+                animation: 'slideDown 0.3s ease', boxShadow: '0 8px 30px rgba(220,38,38,0.4)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <AlertCircle size={24} />
-                  {activeBanner.type === 'phone_detected'
-                    ? '⚠️ PROHIBITED DEVICE DETECTED — INCIDENT LOGGED!'
-                    : '⚠️ MULTIPLE PEOPLE DETECTED IN EXAM AREA!'}
+                  <div>
+                    <span style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {activeBanner.type === 'phone_detected' ? '⚠️ PROHIBITED DEVICE DETECTED' :
+                       activeBanner.type === 'multiple_faces' ? '⚠️ MULTIPLE PEOPLE DETECTED' :
+                       activeBanner.type === 'tab_switch' ? '⚠️ TAB SWITCH / DEFOCUS DETECTED' :
+                       activeBanner.type === 'no_face' ? '⚠️ FACE NOT DETECTED IN CAMERA' :
+                       activeBanner.type === 'eye_off_screen' ? '⚠️ LOOKING AWAY FROM SCREEN' :
+                       activeBanner.type === 'screen_resize' ? '⚠️ FULLSCREEN EXITED' :
+                       activeBanner.type === 'forbidden_key' ? '⚠️ PROHIBITED KEY DETECTED' :
+                       '⚠️ PROCTORING VIOLATION DETECTED'}
+                    </span>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, opacity: 0.9 }}>
+                      {activeBanner.text}
+                    </div>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: 999, fontSize: '0.875rem' }}>
-                    Violation {violationCount}/{MAX_VIOLATIONS}
+                  <div style={{ background: 'rgba(255,255,255,0.25)', padding: '6px 14px', borderRadius: 999, fontSize: '0.875rem', fontWeight: 800 }}>
+                    Warning {activeBanner.warningNum || violationCount}/{MAX_VIOLATIONS}
                   </div>
                   <div style={{
                     width: 36, height: 36, borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.2)',
+                    background: 'rgba(255,255,255,0.25)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '1.25rem', fontWeight: 900
                   }}>
@@ -905,34 +1563,41 @@ export default function StudentExamArena() {
             {activeBanner?.type === 'terminated' && (
               <div style={{
                 position: 'absolute', inset: 0, zIndex: 300,
-                background: 'rgba(0,0,0,0.85)',
+                background: 'rgba(15,23,42,0.95)', backdropFilter: 'blur(8px)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: 16, color: 'white', animation: 'fadeIn 0.3s ease'
+                gap: 20, color: 'white', animation: 'fadeIn 0.3s ease', textAlign: 'center', padding: '2rem'
               }}>
-                <AlertCircle size={64} color="#ef4444" />
-                <div style={{ fontSize: '2rem', fontWeight: 900 }}>Exam Terminated</div>
-                <div style={{ fontSize: '1rem', opacity: 0.8 }}>Maximum violations exceeded. Your session has been flagged.</div>
+                <div style={{ width: 88, height: 88, borderRadius: '50%', background: 'rgba(239,68,68,0.2)', border: '2px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <AlertCircle size={48} color="#ef4444" />
+                </div>
+                <div style={{ fontSize: '2.25rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Exam Auto-Terminated</div>
+                <div style={{ fontSize: '1.125rem', opacity: 0.85, maxWidth: 500, lineHeight: 1.5 }}>
+                  Maximum proctoring limit (5 warnings) reached. Your exam session has been locked, flagged for teacher review, and submitted.
+                </div>
+                <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', padding: '8px 20px', borderRadius: 999, color: '#f87171', fontWeight: 800, fontSize: '0.875rem' }}>
+                  5/5 Security Violations Recorded
+                </div>
               </div>
             )}
 
             {/* Proctoring HUD */}
             <div style={{ position: 'absolute', bottom: '2rem', right: '2rem', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-end', animation: 'fadeIn 0.5s ease' }}>
-              {/* Only show bottom popup for MediaPipe face warnings (not YOLO, those go to top) */}
-              {proctoring.status === 'tracking' && (proctoring.warnings > 0 || !proctoring.isFaceVisible || proctoring.isLookingAway) && !proctoring.lastViolation && (
+              {/* Only show bottom popup for MediaPipe face warnings when no top banner active */}
+              {proctoring.status === 'tracking' && (violationCount > 0 || !proctoring.isFaceVisible || proctoring.isLookingAway) && !activeBanner && (
                 <div style={{ background: '#ef4444', color: 'white', padding: '12px 16px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 30px rgba(239,68,68,0.4)', maxWidth: 280, animation: 'fadeIn 0.3s ease' }}>
                   <AlertCircle size={20} />
                   <div>
                     <div style={{ fontSize: '0.8125rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        {proctoring.lastViolation === 'phone_detected' ? 'Prohibited Device' : 'Focus Lost'}
+                        {!proctoring.isFaceVisible ? 'Face Not Visible' : proctoring.isLookingAway ? 'Gaze Deviation' : 'Proctoring Warning'}
                     </div>
                     <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>
-                        {proctoring.lastViolation ? 'This incident has been logged.' : `Re-center to maintain multiplier. Warning ${proctoring.warnings}/3`}
+                        Re-center face to avoid auto-submission. Warning {violationCount}/{MAX_VIOLATIONS}
                     </div>
                   </div>
                 </div>
               )}
               
-              <div style={{ position: 'relative', width: 220, height: 140, borderRadius: 16, overflow: 'hidden', border: proctoring.status === 'tracking' && (!proctoring.isFaceVisible || proctoring.isLookingAway || proctoring.lastViolation) ? '3px solid #ef4444' : '3px solid var(--surface-3)', boxShadow: '0 12px 40px rgba(0,0,0,0.15)', background: 'var(--surface-2)' }}>
+              <div style={{ position: 'relative', width: 220, height: 140, borderRadius: 16, overflow: 'hidden', border: proctoring.status === 'tracking' && (!proctoring.isFaceVisible || proctoring.isLookingAway || violationCount > 0) ? '3px solid #ef4444' : '3px solid var(--surface-3)', boxShadow: '0 12px 40px rgba(0,0,0,0.15)', background: 'var(--surface-2)' }}>
                 <video ref={hudVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
                 
                 {/* YOLO Annotated Frame Overlay */}
@@ -941,10 +1606,10 @@ export default function StudentExamArena() {
                 )}
                 
                 {/* Status Indicator overlay */}
-                <div style={{ position: 'absolute', bottom: 12, right: 12, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.6)', padding: '4px 10px', borderRadius: 999, backdropFilter: 'blur(4px)' }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: proctoring.status !== 'tracking' ? '#f59e0b' : (!proctoring.isFaceVisible || proctoring.isLookingAway || proctoring.lastViolation) ? '#ef4444' : '#10b981', boxShadow: `0 0 10px ${proctoring.status !== 'tracking' ? '#f59e0b' : (!proctoring.isFaceVisible || proctoring.isLookingAway || proctoring.lastViolation) ? '#ef4444' : '#10b981'}` }} />
+                <div style={{ position: 'absolute', bottom: 12, right: 12, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.7)', padding: '4px 10px', borderRadius: 999, backdropFilter: 'blur(4px)' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: violationCount >= 5 ? '#ef4444' : violationCount > 0 ? '#f59e0b' : '#10b981', boxShadow: `0 0 10px ${violationCount >= 5 ? '#ef4444' : violationCount > 0 ? '#f59e0b' : '#10b981'}` }} />
                   <span style={{ fontSize: '0.625rem', fontWeight: 800, color: 'white', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {proctoring.status !== 'tracking' ? 'Initializing AI' : proctoring.lastViolation ? 'Violation Logged' : (!proctoring.isFaceVisible) ? 'Face Missing' : (proctoring.isLookingAway) ? 'Look Forward' : 'Tracking Active'}
+                    {violationCount > 0 ? `${violationCount}/5 Warnings` : 'Tracking Active'}
                   </span>
                 </div>
               </div>
@@ -970,29 +1635,36 @@ export default function StudentExamArena() {
                   </button>
                 </div>
 
-                {/* Question Text */}
-                <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.45, marginBottom: '2rem' }}>
-                  {q.text || q.q}
-                </h2>
-                
-                {/* Question Image (if any) */}
-                {(q.image || q.image_url) && (
-                  <div style={{ marginBottom: '2rem', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--surface-3)', display: 'flex', justifyContent: 'center', background: 'var(--surface-1)' }}>
-                    <img src={q.image || q.image_url} alt="Question Attachment" style={{ maxWidth: '100%', maxHeight: '400px', objectFit: 'contain' }} />
+                {!q ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                    <RefreshCw size={24} className="spin" style={{ marginBottom: 12 }} />
+                    <p>Loading examination questions...</p>
                   </div>
-                )}
-                
-                {/* Code Snippet (if any) */}
-                {(q.code || q.code_snippet) && (
-                  <pre style={{ marginBottom: '2rem', padding: '1.25rem', background: '#1e1e1e', color: '#d4d4d4', borderRadius: 12, overflowX: 'auto', fontSize: '0.875rem', border: '1px solid #333' }}>
-                    <code>{q.code || q.code_snippet}</code>
-                  </pre>
-                )}
+                ) : (
+                  <>
+                    {/* Question Text */}
+                    <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.45, marginBottom: '2rem' }}>
+                      {q.text || q.q || 'Question'}
+                    </h2>
+                    
+                    {/* Question Image (if any) */}
+                    {(q.image || q.image_url) && (
+                      <div style={{ marginBottom: '2rem', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--surface-3)', display: 'flex', justifyContent: 'center', background: 'var(--surface-1)' }}>
+                        <img src={q.image || q.image_url} alt="Question Attachment" style={{ maxWidth: '100%', maxHeight: '400px', objectFit: 'contain' }} />
+                      </div>
+                    )}
+                    
+                    {/* Code Snippet (if any) */}
+                    {(q.code || q.code_snippet) && (
+                      <pre style={{ marginBottom: '2rem', padding: '1.25rem', background: '#1e1e1e', color: '#d4d4d4', borderRadius: 12, overflowX: 'auto', fontSize: '0.875rem', border: '1px solid #333' }}>
+                        <code>{q.code || q.code_snippet}</code>
+                      </pre>
+                    )}
 
-                {/* Question Input (Dynamic Type) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', marginBottom: '3rem' }}>
-                  
-                  {q.type === 'mcq' && q.options.map((opt, idx) => {
+                    {/* Question Input (Dynamic Type) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', marginBottom: '3rem' }}>
+                      
+                      {q.type === 'mcq' && Array.isArray(q.options) && q.options.map((opt, idx) => {
                     const isSelected = answers[current] === idx;
                     const optionText = typeof opt === 'string' ? opt : opt.text;
                     return (
@@ -1047,104 +1719,125 @@ export default function StudentExamArena() {
                     Next <ChevronRight size={18} />
                   </button>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
+          </div>
+        </div>
 
-            {/* Right Sidebar: Gamified Map Pin Roadmap & Tools */}
-            <div style={{ width: 400, background: 'var(--surface-0)', borderLeft: '1px solid var(--surface-3)', padding: '1.5rem', display: 'flex', flexDirection: 'column', flexShrink: 0, zIndex: 10 }}>
+            {/* Right Sidebar: Clean Question Palette & Tools */}
+            <div style={{ width: 340, background: 'var(--surface-0)', borderLeft: '1px solid var(--surface-3)', padding: '1.5rem', display: 'flex', flexDirection: 'column', flexShrink: 0, zIndex: 10 }}>
               
-              <div style={{ marginBottom: '1rem', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }} className="hide-scrollbar">
-                <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
-                  <h3 style={{ fontSize: '0.875rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <BrainCircuit size={16} color="var(--brand-500)" /> Exam Quest
+              <div style={{ marginBottom: '1.5rem', flex: 1, overflowY: 'auto' }} className="hide-scrollbar">
+                {/* Header with counter */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                  <h3 style={{ fontSize: '0.875rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Layers size={16} color="var(--brand-500)" /> Question Palette
                   </h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'linear-gradient(135deg, #f59e0b, #ef4444)', padding: '4px 8px', borderRadius: 999, color: 'white', fontSize: '0.6875rem', fontWeight: 800, boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)' }}>
-                    🔥 2x Streak
+                  <div style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', padding: '3px 10px', borderRadius: 999, fontSize: '0.75rem', fontWeight: 800 }}>
+                    {answeredCount}/{questions.length} Answered
                   </div>
                 </div>
-                
-                <div style={{ position: 'relative', height: roadmapHeight, width: 260, margin: '0 auto' }}>
-                  {/* Background Track */}
-                  <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
-                    <path d={roadmapPath} fill="none" stroke="var(--surface-3)" strokeWidth="6" strokeLinecap="round" />
-                    
-                    {/* Active Track (Animated Clip) */}
-                    <clipPath id="progressClip">
-                      <rect x="0" y="0" width="100%" height={current * 110 + 50} style={{ transition: 'height 0.6s cubic-bezier(0.4, 0, 0.2, 1)' }} />
-                    </clipPath>
-                    <path d={roadmapPath} fill="none" stroke="#1e3a8a" strokeWidth="6" strokeLinecap="round" clipPath="url(#progressClip)" />
-                  </svg>
-                  
-                  {/* Map Pin Nodes */}
-                  {questions.map((q, i) => {
+
+                {/* Status Legend */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', padding: '0.75rem', background: 'var(--surface-1)', borderRadius: 12, border: '1px solid var(--surface-2)', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 3, background: '#10b981' }} /> Answered
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 3, background: '#3b82f6', border: '1px solid #1d4ed8' }} /> Current
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 3, background: '#f59e0b' }} /> Flagged
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--surface-3)', border: '1px solid var(--surface-3)' }} /> Not Visited
+                  </div>
+                </div>
+
+                {/* Question Numbers Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.625rem' }}>
+                  {questions.map((qItem, i) => {
                     const isAnswered = answers[i] !== undefined && answers[i] !== '';
                     const isFlagged = flagged.has(i);
                     const isCurrent = current === i;
-                    const isFuture = i > current && !isAnswered;
-                    
-                    const x = i % 2 === 0 ? 80 : 180;
-                    const y = i * 110 + 50;
 
-                    let color = 'var(--surface-3)';
-                    let icon = <Lock size={20} color="var(--text-muted)" />;
+                    let bg = 'var(--surface-1)';
+                    let color = 'var(--text-secondary)';
+                    let border = '1px solid var(--surface-3)';
+                    let boxShadow = 'none';
 
-                    if (isAnswered) { 
-                      color = '#10b981'; // Green
-                      icon = <CheckCircle2 size={24} color={color} />;
+                    if (isAnswered) {
+                      bg = '#10b981';
+                      color = 'white';
+                      border = '1px solid #059669';
                     }
-                    if (isFlagged) { 
-                      color = '#f59e0b'; // Yellow/Orange
-                      icon = <Flag size={20} fill={color} color={color} />;
+                    if (isFlagged) {
+                      bg = '#f59e0b';
+                      color = 'white';
+                      border = '1px solid #d97706';
                     }
-                    if (isCurrent) { 
-                      color = '#3b82f6'; // Blue
-                      icon = <BrainCircuit size={22} color={color} />;
+                    if (isCurrent) {
+                      bg = isAnswered ? '#10b981' : '#3b82f6';
+                      color = 'white';
+                      border = '2px solid #1d4ed8';
+                      boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.35)';
                     }
 
                     return (
-                      <div key={i} style={{ position: 'absolute', left: x, top: y, cursor: 'pointer' }} onClick={() => setCurrent(i)}>
-                        {/* Dot on the path */}
-                        <div style={{ position: 'absolute', left: -6, top: -6, width: 12, height: 12, borderRadius: '50%', background: color, zIndex: 3 }} />
-                        
-                        {/* Map Pin Bubble */}
-                        <div className={isCurrent ? 'pulse-pin' : ''} style={{ position: 'absolute', top: -52, left: -24, width: 48, height: 48, borderRadius: '50% 50% 50% 0', transform: 'rotate(-45deg)', border: `4px solid ${color}`, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 16px rgba(0,0,0,0.06)', zIndex: 4, transition: 'all 0.3s' }}>
-                          <div style={{ transform: 'rotate(45deg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {icon}
-                          </div>
-                        </div>
-
-                        {/* Label Text */}
-                        <div style={{ 
-                          position: 'absolute', top: -30, 
-                          ...(i % 2 === 0 ? { right: 36, textAlign: 'right' } : { left: 36, textAlign: 'left' }),
-                          width: 140, pointerEvents: 'none'
-                        }}>
-                          <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>{q.topic}</div>
-                          <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: 2, fontWeight: 600 }}>Question {i + 1}</div>
-                        </div>
-                      </div>
+                      <button
+                        key={i}
+                        onClick={() => setCurrent(i)}
+                        title={`Question ${i + 1}${isFlagged ? ' (Flagged)' : ''}${isAnswered ? ' (Answered)' : ''}`}
+                        style={{
+                          height: 42,
+                          borderRadius: 10,
+                          border,
+                          background: bg,
+                          color,
+                          fontWeight: 800,
+                          fontSize: '0.875rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          transition: 'all 0.15s ease',
+                          boxShadow
+                        }}
+                        onMouseEnter={e => {
+                          if (!isCurrent) e.currentTarget.style.transform = 'scale(1.05)';
+                        }}
+                        onMouseLeave={e => {
+                          if (!isCurrent) e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                      >
+                        {i + 1}
+                        {isFlagged && (
+                          <div style={{ position: 'absolute', top: 2, right: 2, width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
+                        )}
+                      </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div style={{ marginBottom: 'auto' }}>
-                <h3 style={{ fontSize: '0.875rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', marginBottom: '1rem' }}>
-                  Tools
+              <div style={{ marginBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '0.8125rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                  Exam Tools
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <button onClick={() => setShowScratchpad(!showScratchpad)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: showScratchpad ? 'var(--brand-50)' : 'var(--surface-1)', border: `1px solid ${showScratchpad ? 'var(--brand-200)' : 'var(--surface-3)'}`, color: showScratchpad ? 'var(--brand-700)' : 'var(--text-primary)', borderRadius: 12, fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}>
-                    <Edit3 size={16} /> Digital Scratchpad
+                  <button onClick={() => setShowScratchpad(!showScratchpad)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: showScratchpad ? 'var(--brand-50)' : 'var(--surface-1)', border: `1px solid ${showScratchpad ? 'var(--brand-200)' : 'var(--surface-3)'}`, color: showScratchpad ? 'var(--brand-700)' : 'var(--text-primary)', borderRadius: 12, fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}>
+                    <Edit3 size={15} /> Digital Scratchpad
                   </button>
-                  <button onClick={() => setShowCalculator(!showCalculator)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: showCalculator ? 'var(--brand-50)' : 'var(--surface-1)', border: `1px solid ${showCalculator ? 'var(--brand-200)' : 'var(--surface-3)'}`, color: showCalculator ? 'var(--brand-700)' : 'var(--text-primary)', borderRadius: 12, fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}>
-                    <Calculator size={16} /> Basic Calculator
+                  <button onClick={() => setShowCalculator(!showCalculator)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: showCalculator ? 'var(--brand-50)' : 'var(--surface-1)', border: `1px solid ${showCalculator ? 'var(--brand-200)' : 'var(--surface-3)'}`, color: showCalculator ? 'var(--brand-700)' : 'var(--text-primary)', borderRadius: 12, fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}>
+                    <Calculator size={15} /> Basic Calculator
                   </button>
                 </div>
               </div>
 
-              <div style={{ borderTop: '1px solid var(--surface-3)', paddingTop: '1.5rem', marginTop: '2rem' }}>
-                <button onClick={submitExam} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#10b981', color: 'white', border: 'none', padding: '14px', borderRadius: 12, fontWeight: 900, fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(16,185,129,0.35)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
-                  <ShieldCheck size={18} /> Finish Quest
+              <div style={{ borderTop: '1px solid var(--surface-3)', paddingTop: '1.25rem' }}>
+                <button onClick={submitExam} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#10b981', color: 'white', border: 'none', padding: '12px', borderRadius: 12, fontWeight: 900, fontSize: '0.9375rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(16,185,129,0.3)', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                  <ShieldCheck size={18} /> Submit Assessment
                 </button>
               </div>
             </div>
@@ -1189,27 +1882,46 @@ export default function StudentExamArena() {
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', overflowY: 'auto', animation: 'fadeIn 0.5s ease' }}>
             <div style={{ maxWidth: 800, width: '100%' }}>
               
-              <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-                <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-                  <Trophy size={40} color="#10b981" />
+              {isAutoTerminated ? (
+                <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+                  <div style={{ width: 88, height: 88, borderRadius: '50%', background: 'rgba(239,68,68,0.12)', border: '2px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', animation: 'breathe 2s infinite' }}>
+                    <AlertTriangle size={44} color="#ef4444" />
+                  </div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', padding: '6px 16px', borderRadius: 999, color: '#ef4444', fontWeight: 800, fontSize: '0.8125rem', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <ShieldAlert size={14} /> 5/5 Warnings Exceeded • Test Terminated
+                  </div>
+                  <h1 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', marginBottom: '0.5rem' }}>Exam Auto-Terminated</h1>
+                  <p style={{ fontSize: '1.0625rem', color: 'var(--text-secondary)', maxWidth: 600, margin: '0 auto', lineHeight: 1.6 }}>
+                    Your session was automatically concluded and locked due to 5 proctoring security warnings (e.g., tab switches, leaving camera view, or gaze deviations). Your current answers and full violation audit log have been submitted to your instructor for review.
+                  </p>
                 </div>
-                <h1 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', marginBottom: '0.5rem' }}>Exam Completed</h1>
-                <p style={{ fontSize: '1.125rem', color: 'var(--text-secondary)' }}>You scored <strong>{score} out of {questions.length}</strong> in {selectedExam?.title}.</p>
-              </div>
+              ) : (
+                <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+                  <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+                    <Trophy size={40} color="#10b981" />
+                  </div>
+                  <h1 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', marginBottom: '0.5rem' }}>Exam Completed</h1>
+                  <p style={{ fontSize: '1.125rem', color: 'var(--text-secondary)' }}>You scored <strong>{score} out of {questions.length}</strong> in {selectedExam?.title}.</p>
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '3rem' }}>
-                <div style={{ background: 'var(--surface-0)', padding: '1.5rem', borderRadius: 20, border: '1px solid var(--surface-3)', boxShadow: '0 8px 24px rgba(0,0,0,0.03)' }}>
+                <div style={{ background: 'var(--surface-0)', padding: '1.5rem', borderRadius: 20, border: isAutoTerminated ? '1px solid rgba(239,68,68,0.2)' : '1px solid var(--surface-3)', boxShadow: '0 8px 24px rgba(0,0,0,0.03)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem' }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(245, 158, 11, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Activity size={20} color="#f59e0b" />
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: isAutoTerminated ? 'rgba(239,68,68,0.1)' : 'rgba(245, 158, 11, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {isAutoTerminated ? <ShieldAlert size={20} color="#ef4444" /> : <Activity size={20} color="#f59e0b" />}
                     </div>
                     <div>
-                      <h3 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)' }}>Speed Metric</h3>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Cognitive Profile Update</p>
+                      <h3 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)' }}>{isAutoTerminated ? 'Security Audit' : 'Speed Metric'}</h3>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isAutoTerminated ? 'Proctoring Log' : 'Cognitive Profile Update'}</p>
                     </div>
                   </div>
                   <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                    You averaged <strong>45s per question</strong>. This is 15s slower than your benchmark. Your Speed score has been adjusted by <span style={{ color: '#ef4444', fontWeight: 800 }}>-2 points</span>.
+                    {isAutoTerminated ? (
+                      <>5 proctoring violations recorded. Evidence frames and audit log sent to <strong style={{ color: '#ef4444' }}>Teacher Assessment Hub</strong>.</>
+                    ) : (
+                      <>You averaged <strong>45s per question</strong>. This is 15s slower than your benchmark. Your Speed score has been adjusted by <span style={{ color: '#ef4444', fontWeight: 800 }}>-2 points</span>.</>
+                    )}
                   </p>
                 </div>
 
@@ -1242,8 +1954,6 @@ export default function StudentExamArena() {
           </div>
         )}
 
-      </div>
-      
       <style>{`
         @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
@@ -1265,7 +1975,7 @@ export default function StudentExamArena() {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.4; transform: scale(0.7); }
         }
-        }\n        [style*="pulse-dot"] { animation: pulseDot 1.4s infinite; }
+        [style*="pulse-dot"] { animation: pulseDot 1.4s infinite; }
         @keyframes breathe {
           0%, 100% { box-shadow: 0 0 0 8px rgba(99,102,241,0.2), 0 0 40px rgba(99,102,241,0.4); }
           50% { box-shadow: 0 0 0 16px rgba(99,102,241,0.1), 0 0 60px rgba(99,102,241,0.6); }

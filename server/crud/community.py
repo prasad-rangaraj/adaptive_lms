@@ -7,19 +7,20 @@ def get_bounties(db: Session, tenant_id: int):
     bounties = db.query(Bounty).filter(Bounty.tenant_id == tenant_id).order_by(Bounty.created_at.desc()).all()
     results = []
     for b in bounties:
-        author_name = b.author.full_name if b.author else "Unknown"
+        author_name = b.author.full_name if (b.author and b.author.full_name) else "Unknown"
         tag_list = [t.strip() for t in b.tags.split(",")] if b.tags else []
+        subject_name = b.subject or (tag_list[0] if tag_list else "General")
         results.append({
             "id": b.id,
-            "avatar": author_name[0].upper(),
-            "solved": b.is_solved,
-            "subject": tag_list[0] if tag_list else "General",
-            "bounty": b.reward_amount,
-            "title": b.title,
-            "body": b.body,
+            "avatar": author_name[0].upper() if author_name else "U",
+            "solved": bool(b.is_solved),
+            "subject": subject_name,
+            "bounty": b.reward_amount or 50,
+            "title": b.title or "Untitled Doubt",
+            "body": b.body or "",
             "author": author_name,
-            "time": b.created_at.strftime("%b %d") if b.created_at else "Now",
-            "replies": len(b.replies) if hasattr(b, 'replies') else 0
+            "time": b.created_at.strftime("%b %d") if b.created_at else "Today",
+            "replies": len(b.replies) if hasattr(b, 'replies') and b.replies else 0
         })
     return results
 

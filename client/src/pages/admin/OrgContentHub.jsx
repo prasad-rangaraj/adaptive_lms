@@ -53,7 +53,7 @@ export default function OrgContentHub() {
         
         <div style={{ display: 'flex', gap: 12 }}>
           <button className="btn btn-ghost btn-icon"><Bell size={18} /></button>
-          <button className="btn btn-primary" style={{ gap: 8 }} onClick={() => navigate('/teacher/courses/builder')}>
+          <button className="btn btn-primary" style={{ gap: 8 }} onClick={() => navigate('/teacher/studio')}>
             <Plus size={16} /> Create Course
           </button>
         </div>

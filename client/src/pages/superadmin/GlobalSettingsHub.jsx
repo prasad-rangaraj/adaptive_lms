@@ -49,24 +49,39 @@ function SettingRow({ title, description, value, onChange, color, danger, icon: 
 }
 
 // ── Global Config Tab ─────────────────────────────────────────────────────────
+const DEFAULT_CONFIG = {
+  maintenanceMode: false,
+  allowNewRegistrations: true,
+  aiTutor: true,
+  aiProctoring: true,
+  aiRecommendations: true,
+  debugMode: false,
+};
+
 function GlobalConfigTab() {
   const [saving, setSaving] = useState(false);
-  const [settings, setSettings] = useState({
-    maintenanceMode: false, allowNewRegistrations: true,
-    aiTutor: true, aiProctoring: true, aiRecommendations: true, debugMode: false,
+  const [settings, setSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('adaptive_lms_global_settings');
+      return saved ? JSON.parse(saved) : DEFAULT_CONFIG;
+    } catch {
+      return DEFAULT_CONFIG;
+    }
   });
 
   const set = (key) => (val) => setSettings(s => ({ ...s, [key]: val }));
 
   const handleSave = async () => {
     setSaving(true);
-    await new Promise(r => setTimeout(r, 700));
+    await new Promise(r => setTimeout(r, 500));
+    localStorage.setItem('adaptive_lms_global_settings', JSON.stringify(settings));
     setSaving(false);
-    toast.success('Platform settings saved successfully.');
+    toast.success('Platform configuration saved to platform registry.');
   };
 
   const handleReset = () => {
-    setSettings({ maintenanceMode: false, allowNewRegistrations: true, aiTutor: true, aiProctoring: true, aiRecommendations: true, debugMode: false });
+    setSettings(DEFAULT_CONFIG);
+    localStorage.setItem('adaptive_lms_global_settings', JSON.stringify(DEFAULT_CONFIG));
     toast('Settings reset to defaults.');
   };
 
@@ -147,10 +162,35 @@ function PaymentGatewaysTab() {
   const totalTenants = (planDist.basic || 0) + (planDist.pro || 0) + (planDist.enterprise || 0);
   const maxPlanCount = Math.max(...Object.values(planDist), 1);
 
+  const handleExportReport = () => {
+    const csvContent = [
+      'Metric,Value',
+      `Monthly Recurring Revenue (MRR),$${mrr}`,
+      `Annual Recurring Revenue (ARR),$${mrr * 12}`,
+      `Active Organizations,${stats?.active_tenants || 0}`,
+      `Suspended Accounts,${stats?.suspended_tenants || 0}`,
+      `Basic Plan Count,${planDist.basic || 0}`,
+      `Pro Plan Count,${planDist.pro || 0}`,
+      `Enterprise Plan Count,${planDist.enterprise || 0}`,
+      `Exported At,${new Date().toISOString()}`
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `platform_financial_report_${Date.now()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('Financial report exported successfully.');
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <button className="btn btn-secondary" style={{ gap: 8 }}><Download size={15} /> Export Report</button>
+        <button onClick={handleExportReport} className="btn btn-secondary" style={{ gap: 8 }}><Download size={15} /> Export Report</button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
@@ -220,19 +260,41 @@ function PaymentGatewaysTab() {
 }
 
 // ── Tab 3: Feature Flags ────────────────────────────────────────────────────────
+const DEFAULT_FLAGS = [
+  { id: 'ff_1', name: 'AI Exam Proctoring V2', description: 'Next generation behavioral monitoring algorithms.', status: 'enabled', rollout: 'Global', audiences: [] },
+  { id: 'ff_2', name: 'New Analytics Engine', description: 'Real-time cohort insights processing.', status: 'partial', rollout: 'Enterprise Tier', audiences: ['Enterprise'] },
+  { id: 'ff_3', name: 'Student Gamification', description: 'Leaderboards, badges, and streaks.', status: 'partial', rollout: 'Beta Tenants', audiences: ['Org #12', 'Org #4'] },
+  { id: 'ff_4', name: 'Custom Domain SSL', description: 'Automated LetsEncrypt cert generation.', status: 'disabled', rollout: 'None', audiences: [] },
+];
+
 function FeatureFlagsTab() {
-  const flags = [
-    { id: 'ff_1', name: 'AI Exam Proctoring V2', description: 'Next generation behavioral monitoring algorithms.', status: 'enabled', rollout: 'Global', audiences: [] },
-    { id: 'ff_2', name: 'New Analytics Engine', description: 'Real-time cohort insights processing.', status: 'partial', rollout: 'Enterprise Tier', audiences: ['Enterprise'] },
-    { id: 'ff_3', name: 'Student Gamification', description: 'Leaderboards, badges, and streaks.', status: 'partial', rollout: 'Beta Tenants', audiences: ['Org #12', 'Org #4'] },
-    { id: 'ff_4', name: 'Custom Domain SSL', description: 'Automated LetsEncrypt cert generation.', status: 'disabled', rollout: 'None', audiences: [] },
-  ];
+  const [flags, setFlags] = useState(() => {
+    try {
+      const saved = localStorage.getItem('adaptive_lms_feature_flags');
+      return saved ? JSON.parse(saved) : DEFAULT_FLAGS;
+    } catch {
+      return DEFAULT_FLAGS;
+    }
+  });
+
+  const toggleFlag = (id) => {
+    const updated = flags.map(f => {
+      if (f.id === id) {
+        const nextStatus = f.status === 'disabled' ? 'enabled' : 'disabled';
+        toast.success(`Flag "${f.name}" set to ${nextStatus.toUpperCase()}`);
+        return { ...f, status: nextStatus };
+      }
+      return f;
+    });
+    setFlags(updated);
+    localStorage.setItem('adaptive_lms_feature_flags', JSON.stringify(updated));
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div className="glass-card" style={{ padding: 0 }}>
         <table className="table">
-          <thead><tr><th>Feature Flag</th><th>Rollout Status</th><th>Target Audience</th><th></th></tr></thead>
+          <thead><tr><th>Feature Flag</th><th>Rollout Status</th><th>Target Audience</th><th>Toggle</th></tr></thead>
           <tbody>
             {flags.map(f => (
               <tr key={f.id}>
@@ -254,7 +316,7 @@ function FeatureFlagsTab() {
                   <span style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.8125rem' }}>{f.rollout}</span>
                   {f.audiences.length > 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: 6 }}>({f.audiences.join(', ')})</span>}
                 </td>
-                <td><Toggle checked={f.status !== 'disabled'} onChange={() => {}} color={f.status === 'partial' ? '#d97706' : '#059669'} /></td>
+                <td><Toggle checked={f.status !== 'disabled'} onChange={() => toggleFlag(f.id)} color={f.status === 'partial' ? '#d97706' : '#059669'} /></td>
               </tr>
             ))}
           </tbody>
@@ -265,12 +327,25 @@ function FeatureFlagsTab() {
 }
 
 // ── Tab 4: Developer Webhooks ─────────────────────────────────────────────────
+const INITIAL_EVENTS = [
+  { id: 1, event: 'tenant.created', endpoint: 'https://api.internal.com/sync', status: 200, time: '2 mins ago' },
+  { id: 2, event: 'user.enrolled', endpoint: 'https://tenant12.custom.com/webhook', status: 500, time: '14 mins ago' },
+  { id: 3, event: 'payment.succeeded', endpoint: 'https://api.internal.com/billing', status: 200, time: '1 hr ago' },
+];
+
 function DeveloperWebhooksTab() {
-  const events = [
-    { id: 1, event: 'tenant.created', endpoint: 'https://api.internal.com/sync', status: 200, time: '2 mins ago' },
-    { id: 2, event: 'user.enrolled', endpoint: 'https://tenant12.custom.com/webhook', status: 500, time: '14 mins ago' },
-    { id: 3, event: 'payment.succeeded', endpoint: 'https://api.internal.com/billing', status: 200, time: '1 hr ago' },
-  ];
+  const [events, setEvents] = useState(INITIAL_EVENTS);
+  const [retryingId, setRetryingId] = useState(null);
+
+  const handleRetry = (id) => {
+    setRetryingId(id);
+    toast.loading('Re-dispatching webhook event payload...', { duration: 800 });
+    setTimeout(() => {
+      setEvents(evs => evs.map(e => e.id === id ? { ...e, status: 200, time: 'Just now' } : e));
+      setRetryingId(null);
+      toast.success('Webhook delivery succeeded (HTTP 200)');
+    }, 800);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -285,14 +360,16 @@ function DeveloperWebhooksTab() {
         </div>
         <div className="stat-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem' }}><div style={{ width: 40, height: 40, borderRadius: 12, background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e11d48' }}><ShieldAlert size={20} /></div><p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Failed Events</p></div>
-          <p style={{ fontSize: '2rem', fontWeight: 900, color: '#e11d48', lineHeight: 1 }}>42</p>
+          <p style={{ fontSize: '2rem', fontWeight: 900, color: events.some(e => e.status !== 200) ? '#e11d48' : '#059669', lineHeight: 1 }}>
+            {events.filter(e => e.status !== 200).length}
+          </p>
         </div>
       </div>
 
       <div className="glass-card" style={{ padding: 0 }}>
         <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--glass-border)', background: 'var(--surface-1)', borderTopLeftRadius: 'inherit', borderTopRightRadius: 'inherit' }}><h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Recent Event Deliveries</h3></div>
         <table className="table">
-          <thead><tr><th>Event Type</th><th>Endpoint URL</th><th>Delivery Status</th><th>Timestamp</th><th></th></tr></thead>
+          <thead><tr><th>Event Type</th><th>Endpoint URL</th><th>Delivery Status</th><th>Timestamp</th><th>Actions</th></tr></thead>
           <tbody>
             {events.map(e => (
               <tr key={e.id}>
@@ -300,7 +377,15 @@ function DeveloperWebhooksTab() {
                 <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{e.endpoint}</span></td>
                 <td><span style={{ fontSize: '0.75rem', fontWeight: 700, color: e.status === 200 ? '#059669' : '#e11d48', background: e.status === 200 ? '#ecfdf5' : '#fff1f2', border: `1px solid ${e.status === 200 ? '#a7f3d0' : '#fecdd3'}`, padding: '3px 8px', borderRadius: 6 }}>HTTP {e.status}</span></td>
                 <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{e.time}</td>
-                <td>{e.status !== 200 && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--brand-600)' }}><RotateCcw size={14} /> Retry</button>}</td>
+                <td>
+                  {e.status !== 200 ? (
+                    <button onClick={() => handleRetry(e.id)} disabled={retryingId === e.id} className="btn btn-ghost btn-sm" style={{ color: 'var(--brand-600)' }}>
+                      <RotateCcw size={14} /> {retryingId === e.id ? 'Retrying...' : 'Retry'}
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600 }}>Delivered</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -312,37 +397,86 @@ function DeveloperWebhooksTab() {
 
 // ── Tab 5: Platform Branding (White-Labeling) ─────────────────────────────────
 function BrandingTab() {
+  const [branding, setBranding] = useState(() => {
+    try {
+      const saved = localStorage.getItem('adaptive_lms_branding');
+      return saved ? JSON.parse(saved) : { color: '#4f46e5', logoUrl: '', customCss: '' };
+    } catch {
+      return { color: '#4f46e5', logoUrl: '', customCss: '' };
+    }
+  });
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    localStorage.setItem('adaptive_lms_branding', JSON.stringify(branding));
+    toast.success('Global white-labeling theme applied to all default tenants.');
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: 780 }}>
       <div className="glass-card" style={{ padding: '2rem' }}>
         <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}><Palette size={20} color="var(--brand-500)" /> Global White-Labeling</h2>
         <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Configure the default branding and themes for new tenants. Enterprise tenants can override these settings.</p>
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Global Primary Color</label>
             <div style={{ display: 'flex', gap: 12 }}>
-              <input type="color" defaultValue="#4f46e5" style={{ width: 40, height: 40, padding: 0, border: 'none', borderRadius: 8, cursor: 'pointer' }} />
-              <input value="#4f46e5" readOnly className="input-field" style={{ width: 120, fontFamily: 'monospace' }} />
+              <input type="color" value={branding.color} onChange={e => setBranding(b => ({ ...b, color: e.target.value }))} style={{ width: 40, height: 40, padding: 0, border: 'none', borderRadius: 8, cursor: 'pointer' }} />
+              <input value={branding.color} onChange={e => setBranding(b => ({ ...b, color: e.target.value }))} className="input-field" style={{ width: 120, fontFamily: 'monospace' }} />
             </div>
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Default Logo URL</label>
-            <input placeholder="https://cdn.example.com/logo.png" className="input-field" style={{ width: '100%' }} />
+            <input value={branding.logoUrl} onChange={e => setBranding(b => ({ ...b, logoUrl: e.target.value }))} placeholder="https://cdn.example.com/logo.png" className="input-field" style={{ width: '100%' }} />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Custom CSS Overrides</label>
-            <textarea placeholder=":root { --border-radius: 12px; }" rows={4} className="input-field" style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.8125rem' }} />
+            <textarea value={branding.customCss} onChange={e => setBranding(b => ({ ...b, customCss: e.target.value }))} placeholder=":root { --border-radius: 12px; }" rows={4} className="input-field" style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.8125rem' }} />
           </div>
-          <button className="btn btn-primary" style={{ width: 120 }}>Save Theme</button>
-        </div>
+          <button type="submit" className="btn btn-primary" style={{ width: 140 }}>Save Theme</button>
+        </form>
       </div>
     </div>
   );
 }
 
 // ── Tab 6: Legal & Compliance ─────────────────────────────────────────────────
+const DEFAULT_LEGAL_DOCS = [
+  { id: 'tos', name: 'Terms of Service', version: 'v2.4.1', date: 'Oct 12, 2025', rate: '100% (All Active Orgs)', status: 'active' },
+  { id: 'privacy', name: 'Privacy Policy (GDPR)', version: 'v3.0.0', date: 'Yesterday', rate: '42% (Pending)', status: 'pending' },
+];
+
 function LegalTab() {
+  const [docs, setDocs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('adaptive_lms_legal_docs');
+      return saved ? JSON.parse(saved) : DEFAULT_LEGAL_DOCS;
+    } catch {
+      return DEFAULT_LEGAL_DOCS;
+    }
+  });
+
+  const handleUploadNewVersion = () => {
+    const docName = prompt('Enter legal document name to publish (e.g. Terms of Service, Privacy Policy, DPA):');
+    if (!docName) return;
+    const version = prompt('Enter version string (e.g. v2.5.0):', 'v2.5.0');
+    if (!version) return;
+
+    const newDoc = {
+      id: `doc_${Date.now()}`,
+      name: docName.trim(),
+      version: version.trim(),
+      date: 'Just now',
+      rate: '0% (Queued for next tenant login)',
+      status: 'pending'
+    };
+    const updated = [newDoc, ...docs];
+    setDocs(updated);
+    localStorage.setItem('adaptive_lms_legal_docs', JSON.stringify(updated));
+    toast.success(`Published ${newDoc.name} (${newDoc.version}). Prompting users upon next login.`);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: 860 }}>
       <div className="glass-card" style={{ padding: '2rem' }}>
@@ -351,24 +485,20 @@ function LegalTab() {
             <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}><FileBadge size={20} color="var(--brand-500)" /> Legal Documents</h2>
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Manage global Terms of Service and Privacy Policies. Force tenants to re-accept upon next login when updated.</p>
           </div>
-          <button className="btn btn-primary" style={{ gap: 6 }}><FileText size={15} /> Upload New Version</button>
+          <button onClick={handleUploadNewVersion} className="btn btn-primary" style={{ gap: 6 }}><FileText size={15} /> Upload New Version</button>
         </div>
 
         <table className="table" style={{ marginTop: '1rem' }}>
           <thead><tr><th>Document</th><th>Current Version</th><th>Published Date</th><th>Acceptance Rate</th></tr></thead>
           <tbody>
-            <tr>
-              <td><span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Terms of Service</span></td>
-              <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 999 }}>v2.4.1</span></td>
-              <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Oct 12, 2025</span></td>
-              <td><span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#059669' }}>100% (All Active Orgs)</span></td>
-            </tr>
-            <tr>
-              <td><span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Privacy Policy (GDPR)</span></td>
-              <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 999 }}>v3.0.0</span></td>
-              <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Yesterday</span></td>
-              <td><span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#d97706' }}>42% (Pending)</span></td>
-            </tr>
+            {docs.map(doc => (
+              <tr key={doc.id}>
+                <td><span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{doc.name}</span></td>
+                <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 999 }}>{doc.version}</span></td>
+                <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{doc.date}</span></td>
+                <td><span style={{ fontSize: '0.8125rem', fontWeight: 700, color: doc.status === 'active' ? '#059669' : '#d97706' }}>{doc.rate}</span></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

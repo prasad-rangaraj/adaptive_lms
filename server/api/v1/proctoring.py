@@ -1,7 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from sqlalchemy.orm import Session
 from db.database import get_db
-from core.security import decode_token, require_role
+from core.security import decode_token, require_role, get_current_user
 from models.user import User
 from models.proctor_log import ProctorLog
 from models.exam import ExamAttempt, Exam
@@ -230,6 +230,74 @@ async def get_proctor_report(
     return {"exam_id": exam_id, "student_reports": list(report.values())}
 
 
+from pydantic import BaseModel
+from typing import Optional
+
+class ProctorViolationIn(BaseModel):
+    exam_id: int
+    violation_type: str
+    severity: str = "medium"
+    description: Optional[str] = None
+    cumulative_risk_score: Optional[float] = 0.0
+    screenshot: Optional[str] = None
+
+
+@router.post("/violations")
+async def log_proctor_violation(
+    data: ProctorViolationIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Log an in-browser proctoring violation event (tab switch, face missing, looking away, etc.).
+    Persists to ProctorLog in PostgreSQL and broadcasts alert to teachers.
+    """
+    exam = db.query(Exam).filter(Exam.id == data.exam_id).first()
+    if not exam:
+        exam = db.query(Exam).first()
+
+    exam_id = exam.id if exam else data.exam_id
+
+    attempt = db.query(ExamAttempt).filter(
+        ExamAttempt.exam_id == exam_id,
+        ExamAttempt.student_id == current_user.id,
+        ExamAttempt.status == "in_progress",
+    ).first()
+
+    weight = VIOLATION_WEIGHTS.get(data.violation_type, 10)
+    current_risk = (attempt.cheat_risk_score if attempt else 0.0)
+    new_risk = min(100.0, max(data.cumulative_risk_score or 0.0, current_risk + weight))
+
+    log = ProctorLog(
+        exam_id=exam_id,
+        user_id=current_user.id,
+        violation_type=data.violation_type,
+        severity=data.severity,
+        description=data.description or f"Violation detected: {data.violation_type.replace('_', ' ')}",
+        screenshot_url=data.screenshot,
+        cumulative_risk_score=new_risk,
+    )
+    db.add(log)
+
+    if attempt:
+        attempt.cheat_risk_score = new_risk
+
+    db.commit()
+
+    await manager.broadcast_to_teachers(exam_id, {
+        "event": "violation",
+        "student_id": current_user.id,
+        "student_name": current_user.full_name or current_user.username,
+        "violation_type": data.violation_type,
+        "severity": data.severity,
+        "risk_score": new_risk,
+        "description": data.description,
+        "timestamp": log.timestamp.isoformat() if log.timestamp else None,
+    })
+
+    return {"status": "logged", "log_id": log.id, "risk_score": new_risk}
+
+
 @router.get("/flags/recent")
 async def get_recent_flags(
     db: Session = Depends(get_db),
@@ -238,36 +306,73 @@ async def get_recent_flags(
     from models.course import Course
     from models.exam import Exam
 
-    # Get exams for courses taught by this teacher
-    teacher_courses = db.query(Course.id).filter(Course.teacher_id == current_user.id).subquery()
-    teacher_exams = db.query(Exam.id).filter(Exam.course_id.in_(teacher_courses)).subquery()
+    query = db.query(ProctorLog).join(User, User.id == ProctorLog.user_id)
 
-    # Get the latest proctor logs with violations
-    logs = db.query(ProctorLog).filter(
-        ProctorLog.exam_id.in_(teacher_exams),
-        ProctorLog.violation_type != None
-    ).order_by(ProctorLog.timestamp.desc()).limit(20).all()
+    # Filter according to role and tenant
+    if current_user.role == "super_admin":
+        pass
+    elif current_user.role == "tenant_admin":
+        query = query.filter(User.tenant_id == current_user.tenant_id)
+    else:
+        # Teacher: see logs for students in their tenant or exams associated with courses they teach
+        course_ids = [c[0] for c in db.query(Course.id).filter(
+            (Course.teacher_id == current_user.id) | (Course.tenant_id == current_user.tenant_id)
+        ).all()]
+        
+        exam_query = db.query(Exam.id)
+        if course_ids:
+            exam_query = exam_query.filter((Exam.course_id.in_(course_ids)) | (Exam.course_id == None))
+        exam_ids = [e[0] for e in exam_query.all()]
+
+        if exam_ids:
+            query = query.filter(
+                (ProctorLog.exam_id.in_(exam_ids)) | (User.tenant_id == current_user.tenant_id)
+            )
+        else:
+            query = query.filter(User.tenant_id == current_user.tenant_id)
+
+    logs = query.filter(ProctorLog.violation_type != None).order_by(ProctorLog.timestamp.desc()).limit(50).all()
+
+    type_labels = {
+        'tab_switch': 'Tab Switch Detected',
+        'no_face': 'Face Missing / Left Camera',
+        'eye_off_screen': 'Gaze Deviation / Looking Away',
+        'phone_detected': 'Prohibited Device (Phone)',
+        'multiple_faces': 'Multiple People Detected',
+        'screen_resize': 'Fullscreen Exited',
+        'forbidden_key': 'Forbidden Keyboard Shortcut',
+        'exam_terminated': 'Auto-Terminated (5 Warnings)',
+        'exam_completion': 'Exam Session Completed',
+    }
 
     res = []
     for log in logs:
-        # Resolve risk level based on cumulative score
         risk = 'Low'
-        color = '#3b82f6'
-        if log.cumulative_risk_score > 70:
+        color = '#10b981'
+        if log.cumulative_risk_score > 60 or log.severity in ['high', 'critical']:
             risk = 'High'
             color = '#ef4444'
-        elif log.cumulative_risk_score > 30:
+        elif log.cumulative_risk_score > 25 or log.severity == 'medium':
             risk = 'Medium'
             color = '#f59e0b'
 
+        type_str = type_labels.get(log.violation_type, log.violation_type.replace('_', ' ').title())
+
         res.append({
             "id": log.id,
-            "student": log.user.full_name if log.user else "Unknown",
-            "course": log.exam.title if log.exam else "Exam",
+            "student": log.user.full_name or log.user.username if log.user else "Student",
+            "student_email": log.user.email if log.user else "",
+            "course": log.exam.title if log.exam else "Examination",
+            "exam_id": log.exam_id,
             "risk": risk,
-            "type": log.violation_type.replace('_', ' ').title(),
-            "time": log.timestamp.strftime("%H:%M %p"),
+            "risk_score": log.cumulative_risk_score,
+            "type": type_str,
+            "raw_type": log.violation_type,
+            "description": log.description or "Proctoring violation event recorded",
+            "time": log.timestamp.strftime("%I:%M %p") if log.timestamp else "Just now",
+            "date": log.timestamp.strftime("%b %d, %Y") if log.timestamp else "",
             "duration": "Snapshot",
+            "screenshot_url": log.screenshot_url,
             "color": color
         })
     return res

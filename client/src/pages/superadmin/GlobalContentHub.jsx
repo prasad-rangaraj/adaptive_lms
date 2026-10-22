@@ -104,21 +104,87 @@ function SyndicatedCoursesTab() {
 }
 
 // ── Tab 2: Master Blueprints ───────────────────────────────────────────────────
+const DEFAULT_BLUEPRINTS = [
+  { id: 'bp_1', title: 'Cybersecurity Fundamentals (V2)', version: '2.1.0', syncedTenants: 14, lastSync: '2 hrs ago', status: 'active' },
+  { id: 'bp_2', title: 'Data Science Bootcamp', version: '1.4.3', syncedTenants: 8, lastSync: '1 day ago', status: 'active' },
+  { id: 'bp_3', title: 'Compliance & Ethics 2024', version: '3.0.0', syncedTenants: 42, lastSync: '12 mins ago', status: 'draft' },
+];
+
 function MasterBlueprintsTab() {
-  const blueprints = [
-    { id: 'bp_1', title: 'Cybersecurity Fundamentals (V2)', version: '2.1.0', syncedTenants: 14, lastSync: '2 hrs ago', status: 'active' },
-    { id: 'bp_2', title: 'Data Science Bootcamp', version: '1.4.3', syncedTenants: 8, lastSync: '1 day ago', status: 'active' },
-    { id: 'bp_3', title: 'Compliance & Ethics 2024', version: '3.0.0', syncedTenants: 42, lastSync: '12 mins ago', status: 'draft' },
-  ];
+  const [blueprints, setBlueprints] = useState(() => {
+    try {
+      const saved = localStorage.getItem('adaptive_lms_blueprints');
+      return saved ? JSON.parse(saved) : DEFAULT_BLUEPRINTS;
+    } catch {
+      return DEFAULT_BLUEPRINTS;
+    }
+  });
+  const [showModal, setShowModal] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newVersion, setNewVersion] = useState('1.0.0');
+
+  const saveBlueprints = (updated) => {
+    setBlueprints(updated);
+    localStorage.setItem('adaptive_lms_blueprints', JSON.stringify(updated));
+  };
+
+  const handleCreate = (e) => {
+    e.preventDefault();
+    if (!newTitle.trim()) {
+      toast.error('Please enter a blueprint title');
+      return;
+    }
+    const newBp = {
+      id: `bp_${Date.now()}`,
+      title: newTitle.trim(),
+      version: newVersion.trim() || '1.0.0',
+      syncedTenants: 1,
+      lastSync: 'Just now',
+      status: 'active'
+    };
+    const updated = [newBp, ...blueprints];
+    saveBlueprints(updated);
+    setShowModal(false);
+    setNewTitle('');
+    setNewVersion('1.0.0');
+    toast.success(`Created master blueprint "${newBp.title}"`);
+  };
+
+  const handleSync = (bp) => {
+    toast.loading(`Syndicating "${bp.title}" to ${bp.syncedTenants} organizations...`, { duration: 1200 });
+    setTimeout(() => {
+      const updated = blueprints.map(b => b.id === bp.id ? { ...b, lastSync: 'Just now' } : b);
+      saveBlueprints(updated);
+      toast.success(`Successfully syndicated "${bp.title}"`);
+    }, 1200);
+  };
+
+  const handleToggleStatus = (id) => {
+    const updated = blueprints.map(b => b.id === id ? { ...b, status: b.status === 'active' ? 'draft' : 'active' } : b);
+    saveBlueprints(updated);
+    toast.success('Blueprint status updated');
+  };
+
+  const handleDelete = (id) => {
+    const updated = blueprints.filter(b => b.id !== id);
+    saveBlueprints(updated);
+    toast.success('Blueprint removed');
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="btn btn-primary" style={{ gap: 8 }}><Plus size={16} /> New Blueprint</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+          Master blueprints are core curriculum templates syndicated across multiple enterprise and pro tenant instances.
+        </p>
+        <button onClick={() => setShowModal(true)} className="btn btn-primary" style={{ gap: 8, flexShrink: 0 }}>
+          <Plus size={16} /> New Blueprint
+        </button>
       </div>
+
       <div className="glass-card" style={{ padding: 0 }}>
         <table className="table">
-          <thead><tr><th>Master Blueprint</th><th>Version</th><th>Downstream Tenants</th><th>Last Sync</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Master Blueprint</th><th>Version</th><th>Downstream Tenants</th><th>Last Sync</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
             {blueprints.map(bp => (
               <tr key={bp.id}>
@@ -132,27 +198,128 @@ function MasterBlueprintsTab() {
                 <td><span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{bp.syncedTenants} orgs</span></td>
                 <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{bp.lastSync}</td>
                 <td>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.75rem', fontWeight: 700, color: bp.status === 'active' ? '#059669' : '#d97706', background: bp.status === 'active' ? '#ecfdf5' : '#fffbeb', border: `1px solid ${bp.status === 'active' ? '#a7f3d0' : '#fde68a'}`, padding: '3px 8px', borderRadius: 6 }}>
-                    {bp.status === 'active' ? 'Publishing Updates' : 'Draft Mode'}
-                  </span>
+                  <button onClick={() => handleToggleStatus(bp.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.75rem', fontWeight: 700, color: bp.status === 'active' ? '#059669' : '#d97706', background: bp.status === 'active' ? '#ecfdf5' : '#fffbeb', border: `1px solid ${bp.status === 'active' ? '#a7f3d0' : '#fde68a'}`, padding: '3px 8px', borderRadius: 6 }}>
+                      {bp.status === 'active' ? 'Publishing Updates' : 'Draft Mode'}
+                    </span>
+                  </button>
                 </td>
-                <td><button className="btn btn-ghost btn-icon btn-sm"><MoreVertical size={16} color="var(--text-muted)" /></button></td>
+                <td>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => handleSync(bp)} className="btn btn-secondary btn-sm" style={{ fontSize: '0.75rem', padding: '4px 8px' }}>Sync Now</button>
+                    <button onClick={() => handleDelete(bp.id)} className="btn btn-ghost btn-sm" style={{ color: '#e11d48', fontSize: '0.75rem', padding: '4px 8px' }}>Delete</button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {showModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: 480, background: 'var(--surface-0)', padding: '2rem', borderRadius: 16 }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 12 }}>Create Master Course Blueprint</h3>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+              Define a standardized blueprint syllabus that can be automatically syndicated to student cohorts in downstream organizations.
+            </p>
+            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: 4 }}>Blueprint Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Advanced Cloud Architecture 2026"
+                  value={newTitle}
+                  onChange={e => setNewTitle(e.target.value)}
+                  className="input-field"
+                  style={{ width: '100%' }}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: 4 }}>Initial Version</label>
+                <input
+                  type="text"
+                  placeholder="1.0.0"
+                  value={newVersion}
+                  onChange={e => setNewVersion(e.target.value)}
+                  className="input-field"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn btn-primary">Create Blueprint</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Tab 3: Global Asset Library ───────────────────────────────────────────────
+const DEFAULT_ASSETS = [
+  { id: 'a1', name: 'corporate_branding_kit.zip', type: 'archive', size: '14.2 MB', uploader: 'System Admin' },
+  { id: 'a2', name: 'welcome_video_v3.mp4', type: 'video', size: '240.5 MB', uploader: 'Content Team' },
+  { id: 'a3', name: 'compliance_framework_2024.pdf', type: 'pdf', size: '4.1 MB', uploader: 'System Admin' },
+];
+
 function GlobalAssetLibraryTab() {
-  const assets = [
-    { id: 'a1', name: 'corporate_branding_kit.zip', type: 'archive', size: '14.2 MB', uploader: 'System Admin' },
-    { id: 'a2', name: 'welcome_video_v3.mp4', type: 'video', size: '240.5 MB', uploader: 'Content Team' },
-    { id: 'a3', name: 'compliance_framework_2024.pdf', type: 'pdf', size: '4.1 MB', uploader: 'System Admin' },
-  ];
+  const [assets, setAssets] = useState(() => {
+    try {
+      const saved = localStorage.getItem('adaptive_lms_global_assets');
+      return saved ? JSON.parse(saved) : DEFAULT_ASSETS;
+    } catch {
+      return DEFAULT_ASSETS;
+    }
+  });
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [assetName, setAssetName] = useState('');
+  const [assetType, setAssetType] = useState('pdf');
+
+  const saveAssets = (updated) => {
+    setAssets(updated);
+    localStorage.setItem('adaptive_lms_global_assets', JSON.stringify(updated));
+  };
+
+  const handleUpload = (e) => {
+    e.preventDefault();
+    if (!assetName.trim()) {
+      toast.error('Please enter asset file name');
+      return;
+    }
+    const newAsset = {
+      id: `a_${Date.now()}`,
+      name: assetName.trim(),
+      type: assetType,
+      size: `${(Math.random() * 20 + 1).toFixed(1)} MB`,
+      uploader: 'Super Admin'
+    };
+    saveAssets([newAsset, ...assets]);
+    setShowUploadModal(false);
+    setAssetName('');
+    toast.success(`Uploaded "${newAsset.name}" to global asset library`);
+  };
+
+  const handleDelete = (id) => {
+    saveAssets(assets.filter(a => a.id !== id));
+    toast.success('Asset removed');
+  };
+
+  const handleDownload = (asset) => {
+    const blob = new Blob([`Adaptive LMS Global Media Asset: ${asset.name}\nSize: ${asset.size}\nType: ${asset.type}`], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = asset.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`Downloading ${asset.name}`);
+  };
 
   const getIcon = (type) => {
     if (type === 'video') return <FileVideo size={18} color="#e11d48" />;
@@ -162,12 +329,18 @@ function GlobalAssetLibraryTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="btn btn-secondary" style={{ gap: 8 }}><Upload size={16} /> Upload Asset</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+          Shared assets distributed globally via CDN to all authenticated tenant environments.
+        </p>
+        <button onClick={() => setShowUploadModal(true)} className="btn btn-secondary" style={{ gap: 8, flexShrink: 0 }}>
+          <Upload size={16} /> Upload Asset
+        </button>
       </div>
+
       <div className="glass-card" style={{ padding: 0 }}>
         <table className="table">
-          <thead><tr><th>Asset Name</th><th>Size</th><th>Uploaded By</th><th>Global Access</th><th></th></tr></thead>
+          <thead><tr><th>Asset Name</th><th>Size</th><th>Uploaded By</th><th>Global Access</th><th>Actions</th></tr></thead>
           <tbody>
             {assets.map(a => (
               <tr key={a.id}>
@@ -180,12 +353,59 @@ function GlobalAssetLibraryTab() {
                 <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{a.size}</td>
                 <td style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{a.uploader}</td>
                 <td><span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#16a34a', background: '#f0fdf4', padding: '3px 8px', borderRadius: 6, border: '1px solid #bbf7d0' }}>Public to all Tenants</span></td>
-                <td><button className="btn btn-ghost btn-icon btn-sm"><MoreVertical size={16} color="var(--text-muted)" /></button></td>
+                <td>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => handleDownload(a)} className="btn btn-ghost btn-sm" style={{ color: 'var(--brand-600)', fontSize: '0.75rem', padding: '4px 8px' }}>Download</button>
+                    <button onClick={() => handleDelete(a.id)} className="btn btn-ghost btn-sm" style={{ color: '#e11d48', fontSize: '0.75rem', padding: '4px 8px' }}>Delete</button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {showUploadModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: 480, background: 'var(--surface-0)', padding: '2rem', borderRadius: 16 }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 12 }}>Upload Global Asset</h3>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+              Upload media kits, PDFs, or videos to be globally available across tenant lesson builders.
+            </p>
+            <form onSubmit={handleUpload} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: 4 }}>Asset Filename</label>
+                <input
+                  type="text"
+                  placeholder="e.g. platform_security_whitepaper.pdf"
+                  value={assetName}
+                  onChange={e => setAssetName(e.target.value)}
+                  className="input-field"
+                  style={{ width: '100%' }}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: 4 }}>Asset Type</label>
+                <select
+                  value={assetType}
+                  onChange={e => setAssetType(e.target.value)}
+                  className="input-field"
+                  style={{ width: '100%' }}
+                >
+                  <option value="pdf">Document (PDF)</option>
+                  <option value="video">Video (MP4/WebM)</option>
+                  <option value="archive">Archive (ZIP/TAR)</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowUploadModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn btn-primary">Upload to CDN</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

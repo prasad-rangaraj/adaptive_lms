@@ -14,6 +14,7 @@ from schemas.schemas import (
     AssignmentCreateRequest, AssignmentResponse,
     EnrollResponse, EnrollmentStatusResponse,
     PlacementResultRequest, PlacementResultResponse,
+    LevelTestResultRequest, LevelTestResultResponse,
 )
 from tasks.ai_tasks import process_material_embeddings
 from typing import List
@@ -213,6 +214,12 @@ async def update_course(
         course.title = payload.title
     if payload.description is not None:
         course.description = payload.description
+    if payload.category is not None:
+        course.category = payload.category
+    if payload.is_published is not None:
+        course.is_published = payload.is_published
+    if payload.teacher_id is not None:
+        course.teacher_id = payload.teacher_id
         
     db.commit()
     db.refresh(course)
@@ -787,6 +794,78 @@ async def submit_placement_result(
         score=score,
         message=path_messages[assigned],
     )
+
+
+@router.post("/{course_id}/level-test-result", response_model=LevelTestResultResponse)
+async def submit_level_test_result(
+    course_id: int,
+    payload: LevelTestResultRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("student")),
+):
+    """
+    Submit test result for a completed course level.
+    Updates student's progress and unlocks subsequent levels/paths.
+    Level benchmarks:
+      - fundamentals: 25% progress minimum, unlocks beginner/basics
+      - beginner: 50% progress minimum, unlocks intermediate
+      - intermediate: 75% progress minimum, unlocks advanced
+      - advanced: 100% progress minimum, eligible for certification
+    """
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.student_id == current_user.id,
+        Enrollment.course_id == course_id,
+    ).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Not enrolled in this course")
+
+    level = payload.level.lower()
+    score = max(0.0, min(100.0, payload.score))
+    passed = payload.passed and score >= 60.0
+
+    current_prog = enrollment.progress_percentage or 0.0
+    unlocked_level = None
+
+    if passed:
+        if level == "fundamentals":
+            enrollment.progress_percentage = max(current_prog, 25.0)
+            unlocked_level = "beginner"
+            if enrollment.learning_path == "pending":
+                enrollment.learning_path = "basics"
+            msg = "Fundamentals level mastered! Beginner modules unlocked."
+        elif level in ["beginner", "basics"]:
+            enrollment.progress_percentage = max(current_prog, 50.0)
+            unlocked_level = "intermediate"
+            if enrollment.learning_path in ["pending", "basics"]:
+                enrollment.learning_path = "intermediate"
+            msg = "Beginner level mastered! Intermediate modules unlocked."
+        elif level == "intermediate":
+            enrollment.progress_percentage = max(current_prog, 75.0)
+            unlocked_level = "advanced"
+            if enrollment.learning_path in ["pending", "basics", "intermediate"]:
+                enrollment.learning_path = "advanced"
+            msg = "Intermediate level mastered! Advanced modules unlocked."
+        elif level == "advanced":
+            enrollment.progress_percentage = 100.0
+            unlocked_level = "completed"
+            msg = "Advanced level mastered! 100% course curriculum complete."
+        else:
+            enrollment.progress_percentage = max(current_prog, min(100.0, current_prog + 25.0))
+            msg = f"{level.capitalize()} level test passed!"
+    else:
+        msg = f"Level test score: {round(score)}%. Pass score is 60%. Review the topics and retake when ready."
+
+    db.commit()
+
+    return LevelTestResultResponse(
+        level=level,
+        score=score,
+        passed=passed,
+        unlocked_level=unlocked_level,
+        progress_percentage=int(enrollment.progress_percentage or 0),
+        message=msg,
+    )
+
 
 @router.post("/{course_id}/copilot")
 async def ask_studio_copilot(

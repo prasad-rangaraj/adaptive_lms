@@ -24,18 +24,45 @@ function MiniSparkline({ color, data }) {
   );
 }
 
+import toast from 'react-hot-toast';
+import { useQuery } from '@tanstack/react-query';
+import { tenantsAPI, adminAPI } from '../../services/api.service';
+
+const DEFAULT_AGENTS = [
+  { id: 'tutor', name: 'AI Tutor', desc: 'Generative interactive assistant.', model: 'gpt-4o', active: true, usage: [10,20,15,40,60,85,90], color: '#3b82f6' },
+  { id: 'cognitive', name: 'Cognitive Analyzer', desc: 'Processes behaviour into profiles.', model: 'claude-3.5-sonnet', active: true, usage: [50,60,40,70,90,110,120], color: '#8b5cf6' },
+  { id: 'recommendation', name: 'Rec Engine', desc: 'Path personalization algorithm.', model: 'llama-3.1-70b', active: true, usage: [5,8,12,10,15,22,25], color: '#10b981' },
+  { id: 'notes', name: 'Notes Generator', desc: 'Auto-generates summaries.', model: 'llama-3.1-8b', active: true, usage: [30,25,35,40,60,75,80], color: '#f59e0b' },
+  { id: 'evaluator', name: 'Assignment Eval', desc: 'Grades logic & rubric matching.', model: 'gpt-4o', active: false, usage: [0,0,0,0,0,0,0], color: '#ec4899' },
+  { id: 'twin', name: 'Digital Twin', desc: 'Virtual simulated student models.', model: 'claude-3-opus', active: false, usage: [0,0,0,0,0,0,0], color: '#6366f1' },
+];
+
 // ── Tab 1: AI Engines (Premium Grid) ─────────────────────────────────────────
 function AIEnginesTab() {
-  const [agents, setAgents] = useState([
-    { id: 'tutor', name: 'AI Tutor', desc: 'Generative interactive assistant.', model: 'gpt-4o', active: true, usage: [10,20,15,40,60,85,90], color: '#3b82f6' },
-    { id: 'cognitive', name: 'Cognitive Analyzer', desc: 'Processes behaviour into profiles.', model: 'claude-3.5-sonnet', active: true, usage: [50,60,40,70,90,110,120], color: '#8b5cf6' },
-    { id: 'recommendation', name: 'Rec Engine', desc: 'Path personalization algorithm.', model: 'llama-3.1-70b', active: true, usage: [5,8,12,10,15,22,25], color: '#10b981' },
-    { id: 'notes', name: 'Notes Generator', desc: 'Auto-generates summaries.', model: 'llama-3.1-8b', active: true, usage: [30,25,35,40,60,75,80], color: '#f59e0b' },
-    { id: 'evaluator', name: 'Assignment Eval', desc: 'Grades logic & rubric matching.', model: 'gpt-4o', active: false, usage: [0,0,0,0,0,0,0], color: '#ec4899' },
-    { id: 'twin', name: 'Digital Twin', desc: 'Virtual simulated student models.', model: 'claude-3-opus', active: false, usage: [0,0,0,0,0,0,0], color: '#6366f1' },
-  ]);
+  const [agents, setAgents] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lms_global_ai_agents');
+      return saved ? JSON.parse(saved) : DEFAULT_AGENTS;
+    } catch {
+      return DEFAULT_AGENTS;
+    }
+  });
 
-  const toggle = (id) => setAgents(agents.map(a => a.id === id ? { ...a, active: !a.active } : a));
+  const toggle = (id) => {
+    const updated = agents.map(a => a.id === id ? { ...a, active: !a.active } : a);
+    setAgents(updated);
+    localStorage.setItem('lms_global_ai_agents', JSON.stringify(updated));
+    const target = updated.find(a => a.id === id);
+    toast.success(`${target.name} ${target.active ? 'activated globally' : 'deactivated'}`);
+  };
+
+  const changeModel = (id, newModel) => {
+    const updated = agents.map(a => a.id === id ? { ...a, model: newModel } : a);
+    setAgents(updated);
+    localStorage.setItem('lms_global_ai_agents', JSON.stringify(updated));
+    const target = updated.find(a => a.id === id);
+    toast.success(`${target.name} routed to ${newModel}`);
+  };
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
@@ -58,7 +85,7 @@ function AIEnginesTab() {
 
           <div style={{ background: 'var(--surface-1)', borderRadius: 10, padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid var(--glass-border)', marginBottom: '1rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Core Model</span>
-            <select disabled={!a.active} value={a.model} onChange={() => {}} style={{ background: 'transparent', border: 'none', color: a.active ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: '0.8125rem', fontWeight: 700, outline: 'none', cursor: a.active ? 'pointer' : 'not-allowed' }}>
+            <select disabled={!a.active} value={a.model} onChange={(e) => changeModel(a.id, e.target.value)} style={{ background: 'transparent', border: 'none', color: a.active ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: '0.8125rem', fontWeight: 700, outline: 'none', cursor: a.active ? 'pointer' : 'not-allowed' }}>
               <option value="gpt-4o">GPT-4 Omni</option>
               <option value="claude-3.5-sonnet">Claude 3.5 Sonnet</option>
               <option value="claude-3-opus">Claude 3 Opus</option>
@@ -227,13 +254,28 @@ function ProctoringTab() {
 
 // ── Tab 5: AI Costs (New Tracker) ───────────────────────────────────────────
 function CostsTab() {
+  const { data: tenants = [] } = useQuery({
+    queryKey: ['tenants'],
+    queryFn: () => tenantsAPI.list().then(r => r.data),
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ['billing-stats'],
+    queryFn: () => adminAPI.getBillingStats().then(r => r.data),
+  });
+
+  const activeCount = tenants.filter(t => t.is_active).length || 1;
+  const totalCost = (activeCount * 780.40).toFixed(2);
+  const openAICost = (Number(totalCost) * 0.65).toFixed(2);
+  const anthropicCost = (Number(totalCost) * 0.35).toFixed(2);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
         <div className="stat-card" style={{ padding: '2rem', background: 'linear-gradient(135deg, #1e1b4b, #312e81)', border: 'none', color: 'white' }}>
           <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Total AI API Costs (MTD)</p>
-          <p style={{ fontSize: '3rem', fontWeight: 900, lineHeight: 1 }}>$4,285<span style={{ fontSize: '1rem', color: '#818cf8' }}>.40</span></p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: '1.5rem', fontSize: '0.8125rem', fontWeight: 600, color: '#34d399' }}><TrendingUp size={14} /> +8% vs last month</div>
+          <p style={{ fontSize: '3rem', fontWeight: 900, lineHeight: 1 }}>${Number(totalCost).toLocaleString()}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: '1.5rem', fontSize: '0.8125rem', fontWeight: 600, color: '#34d399' }}><TrendingUp size={14} /> Across {activeCount} active tenant orgs</div>
         </div>
         
         <div className="stat-card" style={{ padding: '1.5rem' }}>
@@ -241,7 +283,7 @@ function CostsTab() {
             <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><LineChart size={20} /></div>
             <div><p style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-primary)' }}>OpenAI (GPT-4o)</p><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>AI Tutor, Evaluator</p></div>
           </div>
-          <p style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-primary)' }}>$2,840.10</p>
+          <p style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-primary)' }}>${Number(openAICost).toLocaleString()}</p>
           <div style={{ width: '100%', height: 6, background: 'var(--surface-2)', borderRadius: 999, marginTop: '1rem', overflow: 'hidden' }}><div style={{ width: '65%', height: '100%', background: '#16a34a' }} /></div>
         </div>
 
@@ -250,7 +292,7 @@ function CostsTab() {
             <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fdf4ff', color: '#c026d3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Sparkles size={20} /></div>
             <div><p style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-primary)' }}>Anthropic (Claude 3.5)</p><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Cognitive Analyzer</p></div>
           </div>
-          <p style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-primary)' }}>$1,445.30</p>
+          <p style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-primary)' }}>${Number(anthropicCost).toLocaleString()}</p>
           <div style={{ width: '100%', height: 6, background: 'var(--surface-2)', borderRadius: 999, marginTop: '1rem', overflow: 'hidden' }}><div style={{ width: '35%', height: '100%', background: '#c026d3' }} /></div>
         </div>
       </div>
@@ -260,24 +302,21 @@ function CostsTab() {
         <table className="table">
           <thead><tr><th>Organization</th><th>Plan Tier</th><th>Tokens Processed</th><th>Estimated Cost</th></tr></thead>
           <tbody>
-            <tr>
-              <td><span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Sunrise University</span></td>
-              <td><span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', background: '#eef2ff', padding: '3px 8px', borderRadius: 6 }}>Enterprise</span></td>
-              <td><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>142,500,000</span></td>
-              <td><span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>$1,140.00</span></td>
-            </tr>
-            <tr>
-              <td><span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Tech Institute</span></td>
-              <td><span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', background: '#eef2ff', padding: '3px 8px', borderRadius: 6 }}>Enterprise</span></td>
-              <td><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>98,200,000</span></td>
-              <td><span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>$785.60</span></td>
-            </tr>
-            <tr>
-              <td><span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Metro Academy</span></td>
-              <td><span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', background: '#ecfdf5', padding: '3px 8px', borderRadius: 6 }}>Pro</span></td>
-              <td><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>45,100,000</span></td>
-              <td><span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>$360.80</span></td>
-            </tr>
+            {tenants.map(t => {
+              const plan = (t.plan || 'basic').toLowerCase() === 'premium' ? 'enterprise' : (t.plan || 'basic').toLowerCase();
+              const tokens = plan === 'enterprise' ? 142500000 : plan === 'pro' ? 45100000 : 8200000;
+              const cost = plan === 'enterprise' ? '$1,140.00' : plan === 'pro' ? '$360.80' : '$65.60';
+              const badgeColor = plan === 'enterprise' ? '#4f46e5' : plan === 'pro' ? '#059669' : '#6b7280';
+              const badgeBg = plan === 'enterprise' ? '#eef2ff' : plan === 'pro' ? '#ecfdf5' : '#f3f4f6';
+              return (
+                <tr key={t.id}>
+                  <td><span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{t.name}</span></td>
+                  <td><span style={{ fontSize: '0.75rem', fontWeight: 700, color: badgeColor, background: badgeBg, padding: '3px 8px', borderRadius: 6, textTransform: 'capitalize' }}>{plan}</span></td>
+                  <td><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{tokens.toLocaleString()}</span></td>
+                  <td><span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{cost}</span></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

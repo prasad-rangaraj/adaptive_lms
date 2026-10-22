@@ -5,7 +5,7 @@ import {
   BookOpen, Download, Search, Users, Loader2, Lock
 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { coursesAPI } from '../../services/api.service';
+import { coursesAPI, academicAPI } from '../../services/api.service';
 import toast from 'react-hot-toast';
 
 import PlacementAssessmentModal from './PlacementAssessmentModal';
@@ -77,7 +77,22 @@ export default function StudentLearningCanvas() {
   const [enrollment, setEnrollment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAssessment, setShowAssessment] = useState(false);
+  const [selectedLevelAssessment, setSelectedLevelAssessment] = useState(null);
   const [triggerFetch, setTriggerFetch] = useState(0); // to force refetch
+
+  // Weekly Tests for this course
+  const [weeklyTests, setWeeklyTests] = useState([]);
+  const [loadingWeekly, setLoadingWeekly] = useState(false);
+
+  useEffect(() => {
+    if (courseId) {
+      setLoadingWeekly(true);
+      academicAPI.getCourseWeeklyExams(courseId)
+        .then(res => setWeeklyTests(res.data || []))
+        .catch(err => console.error('Failed to load weekly tests for course:', err))
+        .finally(() => setLoadingWeekly(false));
+    }
+  }, [courseId, triggerFetch]);
   
   useEffect(() => {
     if (!courseId) return;
@@ -99,56 +114,92 @@ export default function StudentLearningCanvas() {
         const levelWeights = { fundamentals: 0, beginner: 1, basics: 1, intermediate: 2, advanced: 3 };
         const userWeight = levelWeights[userPath] ?? 0;
 
-        // If pending, only show fundamentals
-        if (isPending) {
-          rawModules = rawModules.filter(m => m.level === 'fundamentals');
-        }
-        
         setCourseModules(rawModules);
 
-        // Flatten modules into a list of items for the playlist
-        const playlistItems = [];
-        rawModules.forEach((mod, modIdx) => {
-          const modWeight = levelWeights[mod.level] ?? 0;
-          const isLocked = !isPending && modWeight > userWeight;
+        const levelOrder = ['fundamentals', 'beginner', 'intermediate', 'advanced'];
+        const levelDisplayNames = {
+          fundamentals: 'Fundamentals',
+          beginner: 'Beginner',
+          basics: 'Beginner',
+          intermediate: 'Intermediate',
+          advanced: 'Advanced'
+        };
 
-          mod.materials.forEach((m, matIdx) => {
-            playlistItems.push({
-              id: m.id,
-              moduleId: mod.id,
-              moduleTitle: mod.title,
-              title: m.title,
-              done: m.is_processed, // AI processing flag (not user completion)
-              active: modIdx === 0 && matIdx === 0,
-              type: m.material_type,
-              url: m.external_url || m.s3_url,
-              locked: isLocked
+        const passedLevels = (() => {
+          try {
+            return JSON.parse(localStorage.getItem(`adaptive_level_passed_${courseId}`) || '[]');
+          } catch {
+            return [];
+          }
+        })();
+
+        const prog = enrollRes.data?.progress_percentage || 0;
+        if (prog >= 25 && !passedLevels.includes('fundamentals')) passedLevels.push('fundamentals');
+        if (prog >= 50 && !passedLevels.includes('beginner')) passedLevels.push('beginner');
+        if (prog >= 75 && !passedLevels.includes('intermediate')) passedLevels.push('intermediate');
+        if (prog >= 100 && !passedLevels.includes('advanced')) passedLevels.push('advanced');
+
+        // Flatten modules into a list of items for the playlist grouped with level test checkpoints
+        const playlistItems = [];
+        
+        levelOrder.forEach((lvl, lvlIdx) => {
+          const lvlMods = rawModules.filter(m => m.level === lvl || (lvl === 'beginner' && m.level === 'basics'));
+          if (lvlMods.length === 0) return;
+
+          const modWeight = levelWeights[lvl] ?? 0;
+          const prevLvl = lvlIdx > 0 ? levelOrder[lvlIdx - 1] : null;
+          const isLevelLocked = isPending 
+            ? lvl !== 'fundamentals' 
+            : (modWeight > userWeight && (!prevLvl || !passedLevels.includes(prevLvl)));
+
+          const lvlTopics = lvlMods.map(m => m.title.replace(/^Module\s+\d+:\s*/i, ''));
+
+          // Add materials for modules in this level
+          lvlMods.forEach((mod) => {
+            mod.materials.forEach((m) => {
+              playlistItems.push({
+                id: m.id,
+                moduleId: mod.id,
+                moduleTitle: mod.title,
+                title: m.title,
+                done: m.is_processed,
+                type: m.material_type,
+                url: m.external_url || m.s3_url,
+                locked: isLevelLocked,
+                level: lvl
+              });
             });
+          });
+
+          // Inject Level Test Checkpoint
+          const isLvlPassed = passedLevels.includes(lvl);
+          playlistItems.push({
+            id: `checkpoint-${lvl}`,
+            moduleId: `checkpoint-${lvl}`,
+            moduleTitle: `${levelDisplayNames[lvl]} Level`,
+            title: isLvlPassed
+              ? `✅ Level ${lvlIdx + 1} Test: ${levelDisplayNames[lvl]} (Passed)`
+              : `🎯 Level ${lvlIdx + 1} Test: ${levelDisplayNames[lvl]} Mastery`,
+            done: isLvlPassed,
+            active: false,
+            type: 'quiz',
+            isCheckpoint: true,
+            checkpointLevel: lvl,
+            checkpointIndex: lvlIdx + 1,
+            checkpointTopics: lvlTopics,
+            locked: isLevelLocked,
+            isPassed: isLvlPassed,
           });
         });
 
-        // Inject Assessment Checkpoint
-        if (isPending) {
-           playlistItems.push({
-              id: 'assessment-checkpoint',
-              moduleTitle: 'Assessment Checkpoint',
-              title: '🎯 Placement Assessment',
-              done: false,
-              active: false,
-              type: 'quiz',
-              isCheckpoint: true,
-              locked: false
-           });
-        }
-
         setModules(playlistItems);
-        // Set initial active item — prefer ?module= query param
+        // Set initial active item — prefer ?module= query param, ignore checkpoints
         const preferModuleId = parseInt(searchParams.get('module'));
         if (playlistItems.length > 0) {
           const preferred = preferModuleId
-            ? playlistItems.find(x => x.moduleId === preferModuleId)
+            ? playlistItems.find(x => x.moduleId === preferModuleId && !x.isCheckpoint)
             : null;
-          setActiveItem(preferred || null);
+          setActiveItem(preferred || playlistItems.find(x => !x.isCheckpoint) || null);
         }
       } catch (err) {
         console.error(err);
@@ -396,13 +447,14 @@ export default function StudentLearningCanvas() {
         {showPanel && !showAI && (
           <div style={{ width: '340px', background: 'var(--surface-0)', borderLeft: '1px solid var(--surface-3)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
             {/* Tabs Header */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--surface-3)' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--surface-3)', overflowX: 'auto' }} className="hide-scrollbar">
               {[
                 { id: 'playlist', label: 'Playlist' },
+                { id: 'weekly', label: `Weekly Tests (${weeklyTests.length})` },
                 { id: 'transcript', label: 'Transcript' },
                 { id: 'resources', label: 'Resources' }
               ].map(t => (
-                <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, padding: '1.25rem 0 1rem', background: 'transparent', border: 'none', borderBottom: activeTab === t.id ? '2px solid var(--text-primary)' : '2px solid transparent', color: activeTab === t.id ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }}>
+                <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, padding: '1.25rem 0.5rem 1rem', background: 'transparent', border: 'none', borderBottom: activeTab === t.id ? '2px solid var(--text-primary)' : '2px solid transparent', color: activeTab === t.id ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
                   {t.label}
                 </button>
               ))}
@@ -421,8 +473,17 @@ export default function StudentLearningCanvas() {
                     <div 
                       key={m.id} 
                       onClick={() => {
-                        if (m.locked) return;
+                        if (m.locked) {
+                          toast.error('Complete the previous level assessment to unlock this section!');
+                          return;
+                        }
                         if (m.isCheckpoint) {
+                          setSelectedLevelAssessment({
+                            level: m.checkpointLevel,
+                            levelTitle: m.title.replace(/^([🎯✅]\s*)/, ''),
+                            topics: m.checkpointTopics || [],
+                            levelIndex: m.checkpointIndex || 1,
+                          });
                           setShowAssessment(true);
                         } else {
                           setActiveItem(m);
@@ -430,22 +491,29 @@ export default function StudentLearningCanvas() {
                       }}
                       style={{ 
                         padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', 
-                        background: activeItem?.id === m.id ? 'var(--brand-50)' : 'transparent', 
-                        borderLeft: activeItem?.id === m.id ? '3px solid var(--brand-500)' : '3px solid transparent', 
+                        background: activeItem?.id === m.id ? 'var(--brand-50)' : m.isCheckpoint ? (m.isPassed ? 'rgba(16,185,129,0.04)' : 'rgba(245,158,11,0.06)') : 'transparent', 
+                        borderLeft: activeItem?.id === m.id ? '3px solid var(--brand-500)' : m.isCheckpoint ? (m.isPassed ? '3px solid #10b981' : '3px solid #f59e0b') : '3px solid transparent', 
                         cursor: m.locked ? 'not-allowed' : 'pointer', 
                         transition: 'all 0.2s',
-                        opacity: m.locked ? 0.5 : 1
+                        opacity: m.locked ? 0.45 : 1
                       }}
                     >
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: m.locked ? 'var(--surface-3)' : isDone ? '#10b981' : activeItem?.id === m.id ? 'var(--brand-500)' : m.isCheckpoint ? '#8b5cf6' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: m.locked ? 'var(--text-muted)' : isDone || activeItem?.id === m.id || m.isCheckpoint ? 'white' : 'var(--text-muted)', fontSize: '0.875rem', fontWeight: 800 }}>
-                        {m.locked ? <Lock size={14} /> : isDone ? <CheckCircle2 size={16} /> : m.isCheckpoint ? '🎯' : (m.type === 'youtube' || m.type === 'video') ? <Play size={12} fill="currentColor" /> : m.type === 'pdf' ? '📄' : m.type === 'article' ? '📝' : i + 1}
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: m.locked ? 'var(--surface-3)' : m.isPassed ? '#10b981' : activeItem?.id === m.id ? 'var(--brand-500)' : m.isCheckpoint ? '#f59e0b' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: m.locked ? 'var(--text-muted)' : m.isPassed || activeItem?.id === m.id || m.isCheckpoint ? 'white' : 'var(--text-muted)', fontSize: '0.875rem', fontWeight: 800 }}>
+                        {m.locked ? <Lock size={14} /> : m.isPassed ? <CheckCircle2 size={16} /> : isDone ? <CheckCircle2 size={16} /> : m.isCheckpoint ? '🎯' : (m.type === 'youtube' || m.type === 'video') ? <Play size={12} fill="currentColor" /> : m.type === 'pdf' ? '📄' : m.type === 'article' ? '📝' : i + 1}
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ fontSize: '0.875rem', fontWeight: m.active ? 800 : 600, color: m.active ? 'var(--brand-700)' : isDone ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: isDone ? 'line-through' : 'none' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: m.active || m.isCheckpoint ? 800 : 600, color: m.isCheckpoint ? (m.isPassed ? '#059669' : '#d97706') : m.active ? 'var(--brand-700)' : isDone ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: isDone && !m.isCheckpoint ? 'line-through' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {m.title}
                         </p>
-                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{m.moduleTitle} • {m.type}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                          {m.isCheckpoint ? (m.checkpointTopics?.length ? `${m.checkpointTopics.length} Topics Evaluated • Test Checkpoint` : 'Level Test Checkpoint') : `${m.moduleTitle} • ${m.type}`}
+                        </p>
                       </div>
+                      {m.isCheckpoint && !m.locked && (
+                        <span style={{ fontSize: '0.6875rem', fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: m.isPassed ? 'rgba(16,185,129,0.1)' : 'linear-gradient(135deg, #f59e0b, #d97706)', color: m.isPassed ? '#10b981' : 'white', flexShrink: 0 }}>
+                          {m.isPassed ? 'Passed' : 'Take Test'}
+                        </span>
+                      )}
                     </div>
                   )})}
                   {!loading && modules.length === 0 && (
@@ -502,20 +570,126 @@ export default function StudentLearningCanvas() {
                 </div>
               )}
 
+              {/* WEEKLY TESTS */}
+              {activeTab === 'weekly' && (
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '0 1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3 style={{ fontSize: '0.9375rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>
+                      Weekly Assessments
+                    </h3>
+                    <span style={{ fontSize: '0.6875rem', fontWeight: 800, background: 'rgba(245,158,11,0.1)', color: '#d97706', padding: '2px 8px', borderRadius: 6, textTransform: 'uppercase' }}>
+                      Mandatory
+                    </span>
+                  </div>
+
+                  {loadingWeekly ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <Loader2 className="animate-spin text-muted" size={20} style={{ margin: '0 auto 8px' }} />
+                      <p style={{ fontSize: '0.8125rem' }}>Loading weekly tests...</p>
+                    </div>
+                  ) : weeklyTests.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '2.5rem 1rem', background: 'var(--surface-1)', borderRadius: 14, border: '1px dashed var(--surface-3)' }}>
+                      <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: 0 }}>
+                        No weekly tests published yet for this course.
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+                      {weeklyTests.map(exam => {
+                        const isAttended = exam.has_attended;
+                        return (
+                          <div
+                            key={exam.id}
+                            style={{
+                              background: 'var(--surface-1)',
+                              border: isAttended ? '1px solid var(--surface-3)' : '1px solid rgba(245,158,11,0.4)',
+                              borderRadius: 14,
+                              padding: '1rem',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.75rem',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <span style={{ fontSize: '0.6875rem', fontWeight: 900, textTransform: 'uppercase', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', padding: '2px 6px', borderRadius: 4 }}>
+                                Week {exam.week_number}
+                              </span>
+                              {isAttended ? (
+                                <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <CheckCircle2 size={12} /> Attended
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#ef4444' }}>
+                                  Required
+                                </span>
+                              )}
+                            </div>
+
+                            <div>
+                              <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                {exam.title}
+                              </p>
+                              <p style={{ margin: '3px 0 0', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                                {exam.duration_minutes} Mins • {exam.question_count} Questions • {exam.total_marks} Marks
+                              </p>
+                            </div>
+
+                            {isAttended ? (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px solid var(--surface-2)' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981' }}>
+                                  Score: {exam.student_score} / {exam.total_marks}
+                                </span>
+                                <button
+                                  onClick={() => navigate(`/student/exam/${exam.id}`)}
+                                  style={{ padding: '5px 10px', borderRadius: 8, background: 'var(--surface-2)', border: 'none', color: 'var(--text-primary)', fontWeight: 800, fontSize: '0.6875rem', cursor: 'pointer' }}
+                                >
+                                  Review
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => navigate(`/student/exam/${exam.id}`)}
+                                style={{ width: '100%', padding: '8px', borderRadius: 8, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', fontWeight: 900, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 2px 8px rgba(217,119,6,0.3)' }}
+                              >
+                                Take Assessment <ChevronRight size={14} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           </div>
         )}
       </div>
-      {/* Placement Assessment Modal */}
+      {/* Level / Placement Assessment Modal */}
       {showAssessment && (
         <PlacementAssessmentModal 
           course={course}
-          startAtPhase={1}
+          startAtPhase={2}
+          assessmentType={selectedLevelAssessment ? 'level' : 'placement'}
+          level={selectedLevelAssessment?.level || 'fundamentals'}
+          levelTitle={selectedLevelAssessment?.levelTitle}
+          topics={selectedLevelAssessment?.topics || []}
+          onLevelTestPass={(lvl, scr) => {
+            setShowAssessment(false);
+            setSelectedLevelAssessment(null);
+            setTriggerFetch(f => f + 1);
+          }}
           onPlacementComplete={(assignedPath) => {
              setShowAssessment(false);
+             setSelectedLevelAssessment(null);
              setTriggerFetch(f => f + 1);
           }}
-          onClose={() => setShowAssessment(false)}
+          onClose={() => {
+            setShowAssessment(false);
+            setSelectedLevelAssessment(null);
+          }}
         />
       )}
 

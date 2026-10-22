@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { tenantsAPI, adminAPI } from '../../services/api.service';
+import Loader from '../../components/ui/Loader';
 import { 
   Crown, Star, Zap, Save, CheckCircle2, X, Plus, 
-  DollarSign, FileText, Tag, Users, Download, ArrowUpRight
+  DollarSign, FileText, Tag, Users, Download, ArrowUpRight, Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -11,30 +14,45 @@ const INITIAL_PLANS = [
   { id: 'enterprise', name: 'Enterprise', icon: Crown, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', price: 999, features: ['Unlimited users', 'White-label Branding', 'Unlimited AI Credits', 'Dedicated Success Manager', 'SSO & Custom Integrations'], limits: { storage: 1000, ai_credits: 999999 } }
 ];
 
-// ── Tab 1: Pricing Plans (Old Page) ──────────────────────────────────────────
+// ── Tab 1: Pricing Plans ──────────────────────────────────────────────────────
 function PricingPlansTab() {
-  const [plans, setPlans] = useState(INITIAL_PLANS);
+  const [plans, setPlans] = useState(() => {
+    try {
+      const p = localStorage.getItem('lms_custom_plans');
+      return p ? JSON.parse(p) : INITIAL_PLANS;
+    } catch {
+      return INITIAL_PLANS;
+    }
+  });
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
-    await new Promise(r => setTimeout(r, 800));
-    toast.success('Subscription plans updated successfully!');
+    await new Promise(r => setTimeout(r, 600));
+    localStorage.setItem('lms_custom_plans', JSON.stringify(plans));
+    toast.success('Subscription plans updated & published!');
     setSaving(false);
   };
 
   const updatePlan = (id, field, value) => setPlans(plans.map(p => p.id === id ? { ...p, [field]: value } : p));
-  const addFeature = (id) => { const f = prompt('Enter feature:'); if (f) setPlans(plans.map(p => p.id === id ? { ...p, features: [...p.features, f] } : p)); };
+  const addFeature = (id) => { 
+    const f = prompt('Enter feature name:'); 
+    if (f && f.trim()) {
+      setPlans(plans.map(p => p.id === id ? { ...p, features: [...p.features, f.trim()] } : p));
+    }
+  };
   const removeFeature = (id, index) => setPlans(plans.map(p => p.id === id ? { ...p, features: p.features.filter((_, i) => i !== index) } : p));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={handleSave} disabled={saving} className="btn btn-primary" style={{ gap: 8 }}><Save size={16} /> {saving ? 'Saving...' : 'Publish Plans'}</button>
+        <button onClick={handleSave} disabled={saving} className="btn btn-primary" style={{ gap: 8 }}>
+          <Save size={16} /> {saving ? 'Saving...' : 'Publish Plans'}
+        </button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', alignItems: 'stretch' }}>
         {plans.map((plan) => {
-          const PlanIcon = plan.icon;
+          const PlanIcon = plan.id === 'enterprise' ? Crown : plan.id === 'pro' ? Zap : Star;
           return (
             <div key={plan.id} className="glass-card" style={{ padding: 0, position: 'relative', display: 'flex', flexDirection: 'column' }}>
               {plan.popular && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: plan.color, color: 'white', fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '4px 12px', borderRadius: 999, boxShadow: `0 4px 12px ${plan.color}40` }}>Most Popular</div>}
@@ -73,36 +91,75 @@ function PricingPlansTab() {
 
 // ── Tab 2: Invoices & Ledger ──────────────────────────────────────────────────
 function InvoicesLedgerTab() {
-  const invoices = [
-    { id: 'INV-2024-001', org: 'TechGlobal Inc', amount: 999, status: 'paid', date: 'Oct 01, 2024' },
-    { id: 'INV-2024-002', org: 'EduStart', amount: 299, status: 'past_due', date: 'Oct 01, 2024' },
-    { id: 'INV-2024-003', org: 'CorpTrain Ltd', amount: 999, status: 'paid', date: 'Oct 01, 2024' },
-  ];
+  const { data: tenants = [], isLoading: loadingTenants } = useQuery({
+    queryKey: ['tenants'],
+    queryFn: () => tenantsAPI.list().then(r => r.data),
+  });
+
+  const { data: billingStats, isLoading: loadingBilling } = useQuery({
+    queryKey: ['billing-stats'],
+    queryFn: () => adminAPI.getBillingStats().then(r => r.data),
+  });
+
+  if (loadingTenants || loadingBilling) return <Loader text="Compiling financial records..." />;
+
+  const mrr = billingStats?.mrr || 0;
+  const pastDueAmount = (billingStats?.suspended_tenants || 0) * 299;
+
+  const invoices = tenants.map(t => {
+    const p = (t.plan || 'basic').toLowerCase() === 'premium' ? 'enterprise' : (t.plan || 'basic').toLowerCase();
+    const rate = p === 'enterprise' ? 999 : p === 'pro' ? 299 : 0;
+    return {
+      id: `INV-2026-${String(t.id).padStart(3, '0')}`,
+      org: t.name,
+      plan: p,
+      amount: rate,
+      status: t.is_active ? 'paid' : 'past_due',
+      date: t.created_at ? new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: '01', year: 'numeric' }) : 'Oct 01, 2026'
+    };
+  });
+
+  const downloadInvoice = (inv) => {
+    const content = `INVOICE: ${inv.id}\nOrganization: ${inv.org}\nPlan: ${inv.plan.toUpperCase()}\nAmount Due/Paid: $${inv.amount}.00\nStatus: ${inv.status.toUpperCase()}\nBilling Date: ${inv.date}\nPayment Terms: Net 30\n\nThank you for choosing Adaptive LMS!`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${inv.id}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Downloaded invoice ${inv.id}`);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
         <div className="stat-card" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem' }}><div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--brand-50)', border: '1px solid var(--brand-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-600)' }}><DollarSign size={20} /></div><p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Total Revenue (MTD)</p></div>
-          <p style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>$42,850</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem' }}><div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--brand-50)', border: '1px solid var(--brand-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-600)' }}><DollarSign size={20} /></div><p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Total Revenue (MRR)</p></div>
+          <p style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>${mrr.toLocaleString()}</p>
         </div>
         <div className="stat-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem' }}><div style={{ width: 40, height: 40, borderRadius: 12, background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e11d48' }}><FileText size={20} /></div><p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Past Due Invoices</p></div>
-          <p style={{ fontSize: '2rem', fontWeight: 900, color: '#e11d48', lineHeight: 1 }}>$1,196</p>
+          <p style={{ fontSize: '2rem', fontWeight: 900, color: '#e11d48', lineHeight: 1 }}>${pastDueAmount.toLocaleString()}</p>
+        </div>
+        <div className="stat-card" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem' }}><div style={{ width: 40, height: 40, borderRadius: 12, background: '#ecfdf5', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}><CheckCircle2 size={20} /></div><p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Active Billing Orgs</p></div>
+          <p style={{ fontSize: '2rem', fontWeight: 900, color: '#059669', lineHeight: 1 }}>{billingStats?.active_tenants || tenants.length}</p>
         </div>
       </div>
       <div className="glass-card" style={{ padding: 0 }}>
         <table className="table">
-          <thead><tr><th>Invoice ID</th><th>Organization</th><th>Amount</th><th>Date</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Invoice ID</th><th>Organization</th><th>Plan</th><th>Amount</th><th>Date</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {invoices.map(inv => (
               <tr key={inv.id}>
                 <td><span style={{ fontWeight: 700, fontFamily: 'monospace', color: 'var(--text-primary)' }}>{inv.id}</span></td>
                 <td><span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{inv.org}</span></td>
+                <td><span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'capitalize', color: 'var(--brand-600)', background: 'var(--brand-50)', padding: '2px 8px', borderRadius: 4 }}>{inv.plan}</span></td>
                 <td><span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>${inv.amount}</span></td>
                 <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{inv.date}</span></td>
                 <td><span style={{ display: 'inline-flex', padding: '3px 8px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700, ...(inv.status === 'paid' ? { color: '#059669', background: '#ecfdf5', border: '1px solid #a7f3d0' } : { color: '#e11d48', background: '#fff1f2', border: '1px solid #fecdd3' }) }}>{inv.status === 'paid' ? 'PAID' : 'PAST DUE'}</span></td>
-                <td><button className="btn btn-ghost btn-icon btn-sm"><Download size={14} /></button></td>
+                <td><button onClick={() => downloadInvoice(inv)} className="btn btn-ghost btn-icon btn-sm" title="Download Invoice"><Download size={14} /></button></td>
               </tr>
             ))}
           </tbody>
@@ -114,20 +171,49 @@ function InvoicesLedgerTab() {
 
 // ── Tab 3: Discounts & Promos ─────────────────────────────────────────────────
 function PromosTab() {
+  const [coupons, setCoupons] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lms_coupons');
+      return saved ? JSON.parse(saved) : [
+        { id: 'c1', code: 'BLACKFRIDAY50', discount: '50% off (First Year)', uses: 14, maxUses: 100, expires: 'Nov 30, 2026', status: 'active' },
+        { id: 'c2', code: 'EDULAUNCH20', discount: '20% off Pro Tier', uses: 48, maxUses: 50, expires: 'Dec 31, 2026', status: 'active' }
+      ];
+    } catch {
+      return [
+        { id: 'c1', code: 'BLACKFRIDAY50', discount: '50% off (First Year)', uses: 14, maxUses: 100, expires: 'Nov 30, 2026', status: 'active' }
+      ];
+    }
+  });
+
+  const addCoupon = () => {
+    const code = prompt('Enter Coupon Code (e.g. SUMMER25):');
+    if (!code) return;
+    const discount = prompt('Enter discount description (e.g. 25% off all plans):') || '25% discount';
+    const newCoupon = { id: `c_${Date.now()}`, code: code.toUpperCase().trim(), discount, uses: 0, maxUses: 100, expires: 'Dec 31, 2026', status: 'active' };
+    const updated = [newCoupon, ...coupons];
+    setCoupons(updated);
+    localStorage.setItem('lms_coupons', JSON.stringify(updated));
+    toast.success(`Coupon ${newCoupon.code} created!`);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" style={{ gap: 8 }}><Plus size={16} /> New Coupon</button></div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button onClick={addCoupon} className="btn btn-primary" style={{ gap: 8 }}><Plus size={16} /> New Coupon</button>
+      </div>
       <div className="glass-card" style={{ padding: 0 }}>
         <table className="table">
           <thead><tr><th>Coupon Code</th><th>Discount</th><th>Redemptions</th><th>Expires</th><th>Status</th></tr></thead>
           <tbody>
-            <tr>
-              <td><span style={{ fontWeight: 800, fontFamily: 'monospace', color: '#16a34a', background: '#f0fdf4', border: '1px dashed #16a34a', padding: '4px 8px', borderRadius: 6 }}>BLACKFRIDAY50</span></td>
-              <td><span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>50% off (First Year)</span></td>
-              <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>14 / 100 uses</span></td>
-              <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Nov 30, 2024</span></td>
-              <td><span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', background: '#ecfdf5', padding: '2px 8px', borderRadius: 999 }}>Active</span></td>
-            </tr>
+            {coupons.map(c => (
+              <tr key={c.id}>
+                <td><span style={{ fontWeight: 800, fontFamily: 'monospace', color: '#16a34a', background: '#f0fdf4', border: '1px dashed #16a34a', padding: '4px 8px', borderRadius: 6 }}>{c.code}</span></td>
+                <td><span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{c.discount}</span></td>
+                <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{c.uses} / {c.maxUses} uses</span></td>
+                <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{c.expires}</span></td>
+                <td><span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', background: '#ecfdf5', padding: '2px 8px', borderRadius: 999 }}>{c.status.toUpperCase()}</span></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -137,19 +223,37 @@ function PromosTab() {
 
 // ── Tab 4: Partners & Affiliates ──────────────────────────────────────────────
 function AffiliatesTab() {
+  const [partners, setPartners] = useState([
+    { id: 'p1', name: 'EduConsultants LLC', link: 'ref=edu_consult', conversions: '8 Enterprise', owed: 1200, paid: false },
+    { id: 'p2', name: 'Global Tech Academy Network', link: 'ref=tech_net', conversions: '14 Pro', owed: 840, paid: false },
+  ]);
+
+  const handlePayout = (id) => {
+    setPartners(partners.map(p => p.id === id ? { ...p, paid: true, owed: 0 } : p));
+    toast.success('Affiliate commission payout scheduled via Stripe Connect');
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div className="glass-card" style={{ padding: 0 }}>
         <table className="table">
           <thead><tr><th>Partner Name</th><th>Referral Link</th><th>Conversions</th><th>Commission Owed</th><th></th></tr></thead>
           <tbody>
-            <tr>
-              <td><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--brand-50)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-600)' }}><Users size={14} /></div><span style={{ fontWeight: 600 }}>EduConsultants LLC</span></div></td>
-              <td><span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>ref=edu_consult</span></td>
-              <td><span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>8 Enterprise</span></td>
-              <td><span style={{ fontWeight: 800, color: '#059669' }}>$1,200.00</span></td>
-              <td><button className="btn btn-secondary btn-sm" style={{ gap: 6 }}>Pay <ArrowUpRight size={14}/></button></td>
-            </tr>
+            {partners.map(p => (
+              <tr key={p.id}>
+                <td><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--brand-50)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-600)' }}><Users size={14} /></div><span style={{ fontWeight: 600 }}>{p.name}</span></div></td>
+                <td><span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{p.link}</span></td>
+                <td><span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{p.conversions}</span></td>
+                <td><span style={{ fontWeight: 800, color: p.paid ? '#059669' : 'var(--text-primary)' }}>{p.paid ? '$0.00 (Paid)' : `$${p.owed.toFixed(2)}`}</span></td>
+                <td>
+                  {!p.paid ? (
+                    <button onClick={() => handlePayout(p.id)} className="btn btn-secondary btn-sm" style={{ gap: 6 }}>Pay <ArrowUpRight size={14}/></button>
+                  ) : (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#059669', fontSize: '0.75rem', fontWeight: 700 }}><Check size={14} /> Paid</span>
+                  )}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

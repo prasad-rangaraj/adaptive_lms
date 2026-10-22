@@ -30,16 +30,38 @@ const MONTHLY_DATA = [
 function AnalyticsTab() {
   const [metric, setMetric] = useState('users');
 
-  const { data: tenants, isLoading } = useQuery({
+  const { data: tenants, isLoading: loadingTenants } = useQuery({
     queryKey: ['tenants'],
     queryFn: () => tenantsAPI.list().then(r => r.data),
   });
 
-  if (isLoading) return <Loader text="Compiling analytics..." />;
+  const { data: stats, isLoading: loadingStats } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => adminAPI.getDashboardStats().then(r => r.data),
+  });
+
+  if (loadingTenants || loadingStats) return <Loader text="Compiling analytics..." />;
 
   const activeTenants = tenants?.filter(t => t.is_active).length || 0;
-  const planCounts = tenants?.reduce((acc, t) => { acc[t.plan] = (acc[t.plan] || 0) + 1; return acc; }, {}) || {};
-  const maxBar = Math.max(...MONTHLY_DATA.map(d => d[metric]));
+  const planCounts = tenants?.reduce((acc, t) => { 
+    const p = (t.plan || 'basic').toLowerCase() === 'premium' ? 'enterprise' : (t.plan || 'basic').toLowerCase();
+    acc[p] = (acc[p] || 0) + 1; 
+    return acc; 
+  }, {}) || {};
+
+  const dynamicMonthlyData = MONTHLY_DATA.map((d, i) => {
+    if (i === MONTHLY_DATA.length - 1) {
+      return {
+        ...d,
+        tenants: stats?.total_tenants || tenants?.length || d.tenants,
+        users: stats?.total_users || d.users,
+        courses: stats?.total_courses || d.courses
+      };
+    }
+    return d;
+  });
+
+  const maxBar = Math.max(...dynamicMonthlyData.map(d => d[metric]), 1);
 
   const metricColors = { users: 'var(--brand-500)', tenants: '#7c3aed', courses: '#059669' };
   const currentColor = metricColors[metric];
@@ -49,9 +71,9 @@ function AnalyticsTab() {
       {/* Top KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem' }}>
         {[
-          { label: 'Total Organizations', value: tenants?.length || 0, sub: `${activeTenants} active`, icon: Building2, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' },
-          { label: 'Estimated Users', value: '4,821', sub: '+384 this month', icon: Users, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
-          { label: 'Total Courses', value: '167', sub: '+33 this month', icon: BookOpen, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
+          { label: 'Total Organizations', value: stats?.total_tenants || tenants?.length || 0, sub: `${activeTenants} active`, icon: Building2, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' },
+          { label: 'Platform Users', value: stats?.total_users ?? 0, sub: '+100% active', icon: Users, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+          { label: 'Total Courses', value: stats?.total_courses ?? 0, sub: 'syndicated', icon: BookOpen, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
           { label: 'Completions', value: '89.2%', sub: 'avg completion rate', icon: GraduationCap, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
         ].map(({ label, value, sub, icon: Icon, color, bg, border }) => (
           <div key={label} className="stat-card" style={{ padding: '1.5rem' }}>
@@ -87,7 +109,7 @@ function AnalyticsTab() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', height: 160 }}>
-            {MONTHLY_DATA.map((d, i) => {
+            {dynamicMonthlyData.map((d, i) => {
               const val = d[metric];
               const pct = maxBar > 0 ? (val / maxBar) * 100 : 0;
               const isLatest = i === MONTHLY_DATA.length - 1;

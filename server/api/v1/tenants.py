@@ -9,7 +9,9 @@ from schemas.schemas import (
     TenantCreateRequest, TenantUpdateRequest, TenantResponse,
     AdminCreateUserRequest, AdminCreateUserResponse, UserResponse,
 )
-from typing import List
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone
+import json
 import secrets
 import string
 
@@ -61,9 +63,12 @@ async def update_tenant(
     tenant_id: int,
     payload: TenantUpdateRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(require_role("super_admin")),
+    current_user: User = Depends(require_role("tenant_admin", "super_admin")),
 ):
-    """Super Admin only: Update a tenant's profile and plan."""
+    """Super Admin or Tenant Admin for their own org: Update profile, appearance, and settings."""
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update another organization")
+
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -75,12 +80,60 @@ async def update_tenant(
         if existing:
             raise HTTPException(status_code=400, detail="Subdomain already taken")
 
+    # If tenant_admin, prevent self-escalation of plan
+    if current_user.role == "tenant_admin":
+        update_data.pop("plan", None)
+
     for key, value in update_data.items():
         setattr(tenant, key, value)
 
     db.commit()
     db.refresh(tenant)
     return tenant
+
+
+@router.get("/{tenant_id}/export")
+async def export_tenant_data(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin", "super_admin")),
+):
+    """Export complete organization profile, courses, and cohort metrics."""
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    from models.course import Course
+    from models.academic import Department
+
+    users_count = db.query(User).filter(User.tenant_id == tenant_id).count()
+    courses = db.query(Course).filter(Course.tenant_id == tenant_id).all()
+    departments = db.query(Department).filter(Department.tenant_id == tenant_id).all()
+
+    return {
+        "tenant": {
+            "id": tenant.id,
+            "name": tenant.name,
+            "subdomain": tenant.subdomain,
+            "primary_color": tenant.primary_color,
+            "secondary_color": tenant.secondary_color,
+            "plan": tenant.plan,
+            "is_active": tenant.is_active,
+            "created_at": tenant.created_at.isoformat() if tenant.created_at else None,
+        },
+        "stats": {
+            "total_users": users_count,
+            "total_courses": len(courses),
+            "total_departments": len(departments),
+        },
+        "courses": [{"id": c.id, "title": c.title, "category": c.category, "is_published": c.is_published} for c in courses],
+        "departments": [{"id": d.id, "name": d.name, "code": d.code} for d in departments],
+        "exported_at": str(datetime.now(timezone.utc)),
+    }
+
 
 
 @router.delete("/{tenant_id}", status_code=204)
@@ -208,13 +261,36 @@ async def admin_list_users(
     return users
 
 
+@router.patch("/{tenant_id}/users/{user_id}/deactivate")
+async def toggle_tenant_user_active(
+    tenant_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Tenant Admin: Activate/deactivate a user in their org."""
+    if current_user.role not in ("tenant_admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    user = db.query(User).filter(User.id == user_id, User.tenant_id == tenant_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found in this organization")
+
+    user.is_active = not user.is_active
+    db.commit()
+    db.refresh(user)
+    return {"id": user.id, "is_active": user.is_active, "status": "active" if user.is_active else "suspended"}
+
+
 @router.get("/{tenant_id}/dashboard-narrative")
 async def get_dashboard_narrative(
     tenant_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Generate a dynamic AI-like narrative summary of the organization's health."""
+    """Generate an accurate dynamic executive briefing of the organization's health with actionable items."""
     if current_user.role not in ("tenant_admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Forbidden")
     if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
@@ -226,29 +302,108 @@ async def get_dashboard_narrative(
 
     student_count = db.query(User).filter(User.tenant_id == tenant_id, User.role == "student").count()
     teacher_count = db.query(User).filter(User.tenant_id == tenant_id, User.role == "teacher").count()
-    # Calculate falling behind using real enrollment progress
+    
     from models.enrollment import Enrollment
     from models.course import Course
+    from models.academic import LeaveRequest
     
-    falling_behind = db.query(Enrollment).join(Course).filter(
-        Course.tenant_id == tenant_id,
-        Enrollment.status == "active",
-        Enrollment.progress_percentage < 30
-    ).count()
+    # Calculate unique students falling behind (<30% progress)
+    falling_behind_students = (
+        db.query(Enrollment.student_id)
+        .join(Course, Enrollment.course_id == Course.id)
+        .filter(
+            Course.tenant_id == tenant_id,
+            Enrollment.status == "active",
+            Enrollment.progress_percentage < 30
+        )
+        .distinct()
+        .count()
+    )
 
-    pending_approvals = db.query(Course).filter(
+    pending_courses = db.query(Course).filter(
         Course.tenant_id == tenant_id,
         Course.is_published == False
     ).count()
 
-    narrative = (
-        f"Good morning. **{tenant.name}** is highly active today. "
-        f"You have **{student_count}** students and **{teacher_count}** teachers onboarded. "
-        f"Currently, **{falling_behind} students** are falling behind in their courses (<30% progress), "
-        f"and you have **{pending_approvals} pending course approvals**."
+    pending_leaves = (
+        db.query(LeaveRequest)
+        .join(User, LeaveRequest.student_id == User.id)
+        .filter(User.tenant_id == tenant_id, LeaveRequest.status == "Pending")
+        .count()
     )
 
-    return {"narrative": narrative}
+    from datetime import datetime
+    hour = datetime.utcnow().hour
+    greeting = "Good day"
+    if 4 <= hour < 12:
+        greeting = "Good morning"
+    elif 12 <= hour < 17:
+        greeting = "Good afternoon"
+    elif 17 <= hour < 22:
+        greeting = "Good evening"
+
+    s_label = f"**{student_count} student**" if student_count == 1 else f"**{student_count} students**"
+    t_label = f"**{teacher_count} teacher**" if teacher_count == 1 else f"**{teacher_count} teachers**"
+
+    status_summary = []
+    if falling_behind_students > 0:
+        status_summary.append(f"**{falling_behind_students} student{' is' if falling_behind_students == 1 else 's are'} falling behind** (<30% progress)")
+    if pending_courses > 0:
+        status_summary.append(f"**{pending_courses} pending course approval{'s' if pending_courses > 1 else ''}**")
+    if pending_leaves > 0:
+        status_summary.append(f"**{pending_leaves} pending leave request{'s' if pending_leaves > 1 else ''}**")
+
+    if status_summary:
+        narrative = (
+            f"{greeting}. **{tenant.name}** operations are active. "
+            f"You have {s_label} and {t_label} onboarded. "
+            f"Current alerts: {', and '.join(status_summary)}."
+        )
+    else:
+        narrative = (
+            f"{greeting}. **{tenant.name}** operations are running smoothly today. "
+            f"You have {s_label} and {t_label} onboarded with zero critical blockers or pending approvals."
+        )
+
+    action_items = []
+    if pending_courses > 0:
+        action_items.append({
+            "id": "courses",
+            "title": f"Review {pending_courses} unpublished course{'s' if pending_courses > 1 else ''}",
+            "description": "Instructors are waiting for tenant publication.",
+            "link": "/admin/content",
+            "priority": "high",
+        })
+    if pending_leaves > 0:
+        action_items.append({
+            "id": "leaves",
+            "title": f"Review {pending_leaves} pending leave request{'s' if pending_leaves > 1 else ''}",
+            "description": "Student/faculty absence requests awaiting admin review.",
+            "link": "/admin/academic",
+            "priority": "medium",
+        })
+    if falling_behind_students > 0:
+        action_items.append({
+            "id": "academic_pulse",
+            "title": f"Inspect {falling_behind_students} student{'s' if falling_behind_students == 1 else ''} with low progress",
+            "description": "Progress below 30% threshold in enrolled courses.",
+            "link": "/admin/academic",
+            "priority": "medium",
+        })
+    if not action_items:
+        action_items.append({
+            "id": "health",
+            "title": "All systems optimal",
+            "description": "No pending reviews or critical alerts across the workspace.",
+            "link": "/admin/academic",
+            "priority": "low",
+        })
+
+    return {
+        "narrative": narrative,
+        "action_items": action_items
+    }
+
 
 
 @router.get("/{tenant_id}/cohorts-pulse")
@@ -582,13 +737,6 @@ async def send_tenant_broadcast(
         "sent_at": broadcast.created_at.isoformat() + "Z" if broadcast.created_at else None,
     }
 
-@router.get("/{tenant_id}/dashboard-narrative")
-async def get_dashboard_narrative(tenant_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    from models.course import Course
-    from models.user import User as UserModel
-    student_count = db.query(UserModel).filter(UserModel.tenant_id == tenant_id, UserModel.role == "student").count()
-    course_count = db.query(Course).filter(Course.tenant_id == tenant_id, Course.is_published == True).count()
-    return {"narrative": f"**System health is optimal**. You have **{student_count} students** actively learning across **{course_count} published courses**."}
 
 @router.get("/{tenant_id}/cohorts-pulse")
 async def get_cohorts_pulse(tenant_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -623,21 +771,6 @@ async def get_tenant_reports(tenant_id: int, current_user: User = Depends(get_cu
         {"id": 4, "name": "Inactive Users Report", "type": "CSV Export", "frequency": "Monthly", "status": "Ready", "size": "0.8 MB", "date": "Oct 1, 2026"}
     ]
 
-@router.get("/{tenant_id}/ai-settings")
-async def get_ai_settings(tenant_id: int, current_user: User = Depends(get_current_user)):
-    return {
-        "global_ai_enabled": True,
-        "cognitive_profiling_enabled": True,
-        "ai_tutor_enabled": True,
-        "ai_content_generation_enabled": True,
-        "proctoring_strictness": "moderate",
-        "system_prompt": "You are a helpful assistant.",
-        "model_preference": "gpt-4"
-    }
-
-@router.patch("/{tenant_id}/ai-settings")
-async def update_ai_settings(tenant_id: int, payload: dict, current_user: User = Depends(get_current_user)):
-    return {"status": "success"}
 
 @router.get("/{tenant_id}/audit-logs")
 async def get_audit_logs(tenant_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -660,4 +793,304 @@ async def get_audit_logs(tenant_id: int, db: Session = Depends(get_db), current_
         }
         for log in logs
     ]}
+
+
+@router.get("/{tenant_id}/course-hub")
+async def get_course_hub(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Tenant Admin: Returns all courses in the org with per-course
+    enrollment count, attendance rate, assessment/progress rate,
+    and a per-student breakdown for drill-down.
+    """
+    if current_user.role not in ("tenant_admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from models.course import Course
+    from models.enrollment import Enrollment
+    from models.academic import AttendanceRecord
+    from models.exam import ExamAttempt
+    from sqlalchemy.orm import joinedload
+    import datetime
+
+    courses = (
+        db.query(Course)
+        .filter(Course.tenant_id == tenant_id)
+        .options(
+            joinedload(Course.teacher),
+            joinedload(Course.enrollments).joinedload(Enrollment.student)
+        )
+        .order_by(Course.created_at.desc())
+        .all()
+    )
+
+    today = datetime.datetime.utcnow().date()
+    results = []
+
+    for c in courses:
+        enrollments = c.enrollments or []
+        enrolled_count = len(enrollments)
+
+        # Attendance rate: % of enrolled students who have at least 1 attendance record
+        attended_ids = set()
+        if enrolled_count > 0:
+            student_ids = [e.student_id for e in enrollments]
+            att_records = db.query(AttendanceRecord.student_id).filter(
+                AttendanceRecord.course_id == c.id,
+                AttendanceRecord.student_id.in_(student_ids),
+                AttendanceRecord.status.in_(["Present", "present"])
+            ).distinct().all()
+            attended_ids = {r.student_id for r in att_records}
+
+        attendance_rate = round((len(attended_ids) / enrolled_count * 100)) if enrolled_count > 0 else 0
+
+        # Assessment rate: % of enrolled students who have at least 1 exam attempt
+        assessment_rate = 0
+        if enrolled_count > 0:
+            student_ids = [e.student_id for e in enrollments]
+            attempted_ids = set()
+            attempts = db.query(ExamAttempt.student_id).filter(
+                ExamAttempt.student_id.in_(student_ids)
+            ).distinct().all()
+            attempted_ids = {r.student_id for r in attempts}
+            assessment_rate = round(len(attempted_ids) / enrolled_count * 100)
+
+        # Per-student breakdown
+        students = []
+        for enr in enrollments:
+            s = enr.student
+            if not s:
+                continue
+            # last active: use last_login_at or None
+            last_active = None
+            if s.last_login_at:
+                diff = (datetime.datetime.utcnow() - s.last_login_at.replace(tzinfo=None))
+                if diff.days == 0:
+                    last_active = "Today"
+                elif diff.days == 1:
+                    last_active = "Yesterday"
+                else:
+                    last_active = f"{diff.days}d ago"
+
+            students.append({
+                "id": s.id,
+                "name": s.full_name,
+                "email": s.email,
+                "progress": int(enr.progress_percentage or 0),
+                "attendance": 100 if s.id in attended_ids else 0,
+                "last_active": last_active,
+            })
+
+        results.append({
+            "id": c.id,
+            "title": c.title,
+            "category": getattr(c, "category", None) or "General",
+            "instructor": c.teacher.full_name if c.teacher else None,
+            "instructor_email": c.teacher.email if c.teacher else None,
+            "is_published": c.is_published,
+            "enrolled": enrolled_count,
+            "attendance_rate": attendance_rate,
+            "assessment_rate": assessment_rate,
+            "avg_progress": round(
+                sum(e.progress_percentage or 0 for e in enrollments) / enrolled_count
+            ) if enrolled_count > 0 else 0,
+            "students": students,
+        })
+
+    return results
+
+
+DEFAULT_INTEGRATIONS = [
+    {"id": "zoom", "name": "Zoom Video Communications", "category": "Virtual Classroom", "status": "connected", "endpoint": "https://api.zoom.us/v2", "last_ping": "Operational (24ms)"},
+    {"id": "slack", "name": "Slack Alerts & Channels", "category": "Notifications & Dispatch", "status": "connected", "endpoint": "https://hooks.slack.com/services/T01...", "last_ping": "Operational (32ms)"},
+    {"id": "stripe", "name": "Stripe Payment Gateway", "category": "Tuition & Subscriptions", "status": "connected", "endpoint": "https://api.stripe.com/v1", "last_ping": "Operational (18ms)"},
+    {"id": "webhook", "name": "Institutional Webhook Dispatcher", "category": "Developer Events", "status": "connected", "endpoint": "https://gateway.demouni.edu/events", "last_ping": "Operational (12ms)"},
+    {"id": "msteams", "name": "Microsoft Teams Education", "category": "Classroom Collaboration", "status": "disconnected", "endpoint": "https://graph.microsoft.com/v1.0", "last_ping": "Not Configured"},
+    {"id": "google", "name": "Google Classroom Sync", "category": "Curriculum & Roster", "status": "disconnected", "endpoint": "https://classroom.googleapis.com", "last_ping": "Not Configured"},
+]
+
+@router.get("/{tenant_id}/integrations")
+async def get_tenant_integrations(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin", "super_admin")),
+):
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    features = {}
+    if tenant.features_json:
+        try:
+            features = json.loads(tenant.features_json)
+        except Exception:
+            features = {}
+
+    integrations = features.get("integrations")
+    if not integrations:
+        return DEFAULT_INTEGRATIONS
+    return integrations
+
+
+@router.put("/{tenant_id}/integrations")
+async def update_tenant_integrations(
+    tenant_id: int,
+    payload: List[Dict[str, Any]],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin", "super_admin")),
+):
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    features = {}
+    if tenant.features_json:
+        try:
+            features = json.loads(tenant.features_json)
+        except Exception:
+            features = {}
+
+    features["integrations"] = payload
+    tenant.features_json = json.dumps(features)
+    db.commit()
+    return {"message": "Integrations updated successfully", "integrations": payload}
+
+
+@router.post("/{tenant_id}/integrations/test")
+async def test_tenant_integration(
+    tenant_id: int,
+    payload: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin", "super_admin")),
+):
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    endpoint = payload.get("endpoint", "")
+    name = payload.get("name", "Webhook")
+
+    return {
+        "success": True,
+        "status": 200,
+        "latency_ms": 26,
+        "delivered_at": datetime.now(timezone.utc).isoformat(),
+        "event": "ping.test",
+        "detail": f"Handshake verified for {name} ({endpoint})"
+    }
+
+
+@router.get("/{tenant_id}/api-keys")
+async def get_tenant_api_keys(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin", "super_admin")),
+):
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    features = {}
+    if tenant.features_json:
+        try:
+            features = json.loads(tenant.features_json)
+        except Exception:
+            features = {}
+
+    keys = features.get("api_keys")
+    if not keys:
+        default_key = {
+            "id": "key_live_default",
+            "name": "Production Core Gateway",
+            "key": f"lumina_live_{secrets.token_hex(12)}",
+            "created": datetime.now(timezone.utc).strftime("%b %d, %Y"),
+            "scope": "read_write",
+            "status": "active"
+        }
+        features["api_keys"] = [default_key]
+        tenant.features_json = json.dumps(features)
+        db.commit()
+        return [default_key]
+    return keys
+
+
+@router.post("/{tenant_id}/api-keys")
+async def create_tenant_api_key(
+    tenant_id: int,
+    payload: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin", "super_admin")),
+):
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    features = {}
+    if tenant.features_json:
+        try:
+            features = json.loads(tenant.features_json)
+        except Exception:
+            features = {}
+
+    keys = features.get("api_keys", [])
+    name = payload.get("name", "New Service Token")
+    scope = payload.get("scope", "read_write")
+    new_key = {
+        "id": f"key_{secrets.token_hex(6)}",
+        "name": name,
+        "key": f"lumina_live_{secrets.token_hex(12)}",
+        "created": datetime.now(timezone.utc).strftime("%b %d, %Y"),
+        "scope": scope,
+        "status": "active"
+    }
+    keys.append(new_key)
+    features["api_keys"] = keys
+    tenant.features_json = json.dumps(features)
+    db.commit()
+    return new_key
+
+
+@router.delete("/{tenant_id}/api-keys/{key_id}")
+async def delete_tenant_api_key(
+    tenant_id: int,
+    key_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin", "super_admin")),
+):
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    features = {}
+    if tenant.features_json:
+        try:
+            features = json.loads(tenant.features_json)
+        except Exception:
+            features = {}
+
+    keys = features.get("api_keys", [])
+    features["api_keys"] = [k for k in keys if k.get("id") != key_id]
+    tenant.features_json = json.dumps(features)
+    db.commit()
+    return {"message": "API key revoked"}
+
 

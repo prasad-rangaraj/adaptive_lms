@@ -28,8 +28,8 @@ class BountyCreateRequest(BaseModel):
     subject: str
     title: str
     body: str
-    reward_amount: int
-    tags: str
+    reward_amount: Optional[int] = 50
+    tags: Optional[str] = ""
 
 router = APIRouter()
 
@@ -191,7 +191,7 @@ def get_message_recipients(
     from models.user import User as UserModel
     query = db.query(UserModel).filter(UserModel.tenant_id == current_user.tenant_id, UserModel.id != current_user.id)
     if current_user.role == "student":
-        query = query.filter(UserModel.role.in_(["teacher", "admin", "super_admin"]))
+        query = query.filter(UserModel.role.in_(["teacher", "admin", "super_admin", "tenant_admin"]))
     users = query.all()
     return [{"id": u.id, "name": u.full_name, "role": u.role} for u in users]
 
@@ -261,18 +261,20 @@ def create_bounty(
     current_user: User = Depends(get_current_user)
 ):
     from models.community import Bounty
+    tenant_id = current_user.tenant_id or 1
     b = Bounty(
-        tenant_id=current_user.tenant_id,
+        tenant_id=tenant_id,
         author_id=current_user.id,
         subject=payload.subject,
         title=payload.title,
         body=payload.body,
-        reward_amount=payload.reward_amount,
-        tags=payload.tags
+        reward_amount=payload.reward_amount or 50,
+        tags=payload.tags or payload.subject
     )
     db.add(b)
     db.commit()
-    return {"status": "success"}
+    db.refresh(b)
+    return {"status": "success", "id": b.id}
 
 @router.post("/bounties/{bounty_id}/endorse")
 def endorse_bounty(

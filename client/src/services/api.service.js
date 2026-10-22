@@ -69,6 +69,11 @@ export const adminAPI = {
   // Support
   getSupportTickets: () => api.get('/api/admin/tickets'),
   replyToTicket: (ticketId, message) => api.post(`/api/admin/tickets/${ticketId}/reply`, { message }),
+  updateTicketStatus: (ticketId, status) => api.patch(`/api/admin/tickets/${ticketId}/status`, { status }),
+
+  // Broadcasts / Communication
+  listBroadcasts: () => api.get('/api/admin/broadcasts'),
+  sendBroadcast: (data) => api.post('/api/admin/broadcasts', data),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -96,7 +101,9 @@ export const tenantsAPI = {
 
   // Courses / Content
   getCourses: (id) => api.get(`/api/tenants/${id}/courses`),
+  getCourseHub: (id) => api.get(`/api/tenants/${id}/course-hub`),
   toggleCoursePublish: (tenantId, courseId) => api.patch(`/api/tenants/${tenantId}/courses/${courseId}/toggle-publish`),
+
 
   // Audit / Security
   getAuditLogs: (id) => api.get(`/api/tenants/${id}/audit-logs`),
@@ -105,6 +112,19 @@ export const tenantsAPI = {
   getBroadcasts: (id) => api.get(`/api/tenants/${id}/broadcasts`),
   sendBroadcast: (id, data) => api.post(`/api/tenants/${id}/broadcasts`, data),
   getAnnouncements: (id) => api.get(`/api/tenants/${id}/broadcasts`), // alias
+
+  // Export
+  exportData: (id) => api.get(`/api/tenants/${id}/export`),
+
+  // Integrations & Webhooks
+  getIntegrations: (tenantId) => api.get(`/api/tenants/${tenantId}/integrations`),
+  updateIntegrations: (tenantId, payload) => api.put(`/api/tenants/${tenantId}/integrations`, payload),
+  testIntegration: (tenantId, payload) => api.post(`/api/tenants/${tenantId}/integrations/test`, payload),
+
+  // API Keys
+  getApiKeys: (tenantId) => api.get(`/api/tenants/${tenantId}/api-keys`),
+  createApiKey: (tenantId, payload) => api.post(`/api/tenants/${tenantId}/api-keys`, payload),
+  deleteApiKey: (tenantId, keyId) => api.delete(`/api/tenants/${tenantId}/api-keys/${keyId}`),
 };
 
 export const orgAIAPI = {
@@ -148,6 +168,8 @@ export const coursesAPI = {
   getEnrollmentStatus: (courseId) => api.get(`/api/courses/${courseId}/enrollment-status`),
   submitPlacementResult: (courseId, score, overrideToBasics = false) =>
     api.post(`/api/courses/${courseId}/placement-result`, { score, override_to_basics: overrideToBasics }),
+  submitLevelTestResult: (courseId, { level, score, passed }) =>
+    api.post(`/api/courses/${courseId}/level-test-result`, { level, score, passed }),
   getStudents: (courseId) => api.get(`/api/courses/${courseId}/students`),
   getCourseDetail: (courseId) => api.get(`/api/courses/${courseId}/course-detail`),
 };
@@ -191,6 +213,7 @@ export const assignmentsAPI = {
 export const proctoringAPI = {
   getReport: (examId) => api.get(`/api/proctoring/reports/${examId}`),
   getRecentFlags: () => api.get(`/api/proctoring/flags/recent`),
+  logViolation: (data) => api.post('/api/proctoring/violations', data),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -205,7 +228,8 @@ export const liveAPI = {
   joinSession: (id) => api.post(`/api/live/sessions/${id}/join`),
   endSession: (id) => api.post(`/api/live/sessions/${id}/end`),
   getParticipants: (id) => api.get(`/api/live/sessions/${id}/participants`),
-  createOrGetRoom: (roomName) => api.post(`/api/live/rooms?room_name=${roomName}`),
+  createOrGetRoom: (roomName, shadow = false) => api.post(`/api/live/rooms?room_name=${roomName}&shadow=${shadow}`),
+  shadowSession: (id) => api.post(`/api/live/sessions/${id}/shadow`),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -231,10 +255,19 @@ export const academicAPI = {
   getLeaveRequests: () => api.get('/api/academic/leave-requests'),
   submitLeaveRequest: (data) => api.post('/api/academic/leave-requests', data),
   
-  // Exams
+  // Exams & Assessments
   createExam: (data) => api.post('/api/academic/exams', data),
   getPublishedExam: () => api.get('/api/academic/exams/published'),
   submitExam: (examId, data) => api.post(`/api/academic/exams/${examId}/submit`, data),
+  getExamById: (examId) => api.get(`/api/academic/exams/${examId}`),
+
+  // Weekly Assessments
+  createWeeklyExam: (data) => api.post('/api/academic/exams/weekly', data),
+  getTeacherWeeklyExams: () => api.get('/api/academic/exams/teacher/weekly'),
+  getWeeklyExamRoster: (examId) => api.get(`/api/academic/exams/weekly/${examId}/roster`),
+  getStudentWeeklyExams: () => api.get('/api/academic/exams/student/weekly'),
+  getCourseWeeklyExams: (courseId) => api.get(`/api/academic/exams/course/${courseId}/weekly`),
+  getAdminWeeklyMonitor: () => api.get('/api/academic/exams/admin/weekly-monitor'),
   getAssignments: () => api.get('/api/academic/assignments'),
   getPYQs: () => api.get('/api/academic/pyqs'),
   getMarks: () => api.get('/api/academic/marks'),
@@ -249,6 +282,7 @@ export const academicAPI = {
   getAdminAttendance: () => api.get('/api/academic/admin/attendance'),
   getAdminLeaveRequests: () => api.get('/api/academic/admin/leave-requests'),
   getAdminLiveExams: () => api.get('/api/academic/admin/exams/live'),
+  getAdminGradingAudit: (params) => api.get('/api/academic/admin/grading-audit', { params }),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

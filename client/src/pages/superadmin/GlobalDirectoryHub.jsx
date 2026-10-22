@@ -180,6 +180,12 @@ function GlobalUsersTab() {
     queryFn: () => adminAPI.listGlobalUsers().then(r => r.data),
   });
 
+  const { data: tenants } = useQuery({
+    queryKey: ['tenants'],
+    queryFn: () => tenantsAPI.list().then(r => r.data),
+  });
+  const tenantMap = tenants?.reduce((acc, t) => { acc[t.id] = t.name; return acc; }, {}) || {};
+
   const toggleStatus = useMutation({
     mutationFn: (userId) => adminAPI.suspendUser(userId),
     onSuccess: (data) => {
@@ -256,7 +262,7 @@ function GlobalUsersTab() {
                       <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.75rem', fontWeight: 700, color: role.color, background: role.bg, border: `1px solid ${role.border}`, padding: '3px 8px', borderRadius: 6 }}><RoleIcon size={11} /> {role.label}</span></td>
                       <td>
                         {u.tenant_id ? (
-                          <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}><Building2 size={12} color="var(--text-muted)" /> Org #{u.tenant_id}</span>
+                          <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}><Building2 size={12} color="var(--text-muted)" /> {tenantMap[u.tenant_id] || `Org #${u.tenant_id}`}</span>
                         ) : (
                           <span style={{ fontSize: '0.75rem', color: 'var(--brand-600)', fontWeight: 700, background: 'var(--brand-50)', padding: '2px 7px', borderRadius: 4 }}>Platform</span>
                         )}
@@ -270,7 +276,7 @@ function GlobalUsersTab() {
                       </td>
                       <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{new Date(u.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                       <td>
-                        <button onClick={() => toggleStatus.mutate(u.id)} className="btn btn-ghost btn-icon btn-sm" title={u.is_active ? "Suspend User" : "Activate User"} disabled={toggleStatus.isLoading || u.role === 'super_admin'}>
+                        <button onClick={() => toggleStatus.mutate(u.id)} className="btn btn-ghost btn-icon btn-sm" title={u.is_active ? "Suspend User" : "Activate User"} disabled={toggleStatus.isPending || u.role === 'super_admin'}>
                           {u.is_active ? <Ban size={16} color="var(--text-muted)" /> : <CheckCircle size={16} color="var(--text-muted)" />}
                         </button>
                       </td>

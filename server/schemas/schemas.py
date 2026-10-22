@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -86,8 +86,10 @@ class TenantUpdateRequest(BaseModel):
     name: Optional[str] = None
     subdomain: Optional[str] = None
     plan: Optional[str] = None
+    logo_url: Optional[str] = None
     primary_color: Optional[str] = None
     secondary_color: Optional[str] = None
+    features_json: Optional[str] = None
     is_active: Optional[bool] = None
 
 
@@ -99,6 +101,7 @@ class TenantResponse(BaseModel):
     logo_url: Optional[str]
     primary_color: str
     secondary_color: str
+    features_json: Optional[str] = None
     is_active: bool
     created_at: datetime
 
@@ -134,6 +137,9 @@ class CourseMaterialResponse(BaseModel):
 class CourseUpdateRequest(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    category: Optional[str] = None
+    is_published: Optional[bool] = None
+    teacher_id: Optional[int] = None
 
 class CourseModuleUpdateRequest(BaseModel):
     title: Optional[str] = None
@@ -215,13 +221,23 @@ class PlacementResultResponse(BaseModel):
     score: float
     message: str            # Human-friendly message
 
+class LevelTestResultRequest(BaseModel):
+    level: str  # fundamentals | beginner | intermediate | advanced
+    score: float
+    passed: bool
+
+
+class LevelTestResultResponse(BaseModel):
+    level: str
+    score: float
+    passed: bool
+    unlocked_level: Optional[str] = None
+    progress_percentage: float
+    message: str
+
     class Config:
         from_attributes = True
 
-
-
-
-class AiTutorMessageRequest(BaseModel):
     course_id: int
     message: str
     persona: str = "tutor"
@@ -455,8 +471,8 @@ class BountyCreateRequest(BaseModel):
     subject: str
     title: str
     body: str
-    reward_amount: int
-    tags: str
+    reward_amount: Optional[int] = 50
+    tags: Optional[str] = ""
 
 class BountyResponse(BaseModel):
     id: int
@@ -498,3 +514,28 @@ class EventResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+# --- AI Tutor Schemas ---
+class AiTutorMessageRequest(BaseModel):
+    course_id: int
+    message: str
+
+class AiTutorMessageResponse(BaseModel):
+    answer: str
+    sources: List[str] = []
+    response_type: str = "explanation"
+
+# --- Level Assessment Schemas ---
+class LevelTestResultRequest(BaseModel):
+    level: str  # fundamentals, beginner, intermediate, advanced
+    score: float
+    passed: bool
+
+class LevelTestResultResponse(BaseModel):
+    level: str
+    score: float
+    passed: bool
+    unlocked_level: Optional[str] = None
+    progress_percentage: int
+    message: str
+

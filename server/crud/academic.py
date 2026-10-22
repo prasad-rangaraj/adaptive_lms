@@ -6,7 +6,27 @@ from models.course import Course
 from datetime import datetime
 
 def get_departments(db: Session, tenant_id: int):
-    return db.query(Department).filter(Department.tenant_id == tenant_id).all()
+    t_id = tenant_id or 1
+    depts = db.query(Department).filter((Department.tenant_id == t_id) | (Department.tenant_id == 1)).all()
+    if not depts:
+        defaults = [
+            {"name": "Computer Science & Engineering", "code": "CSE"},
+            {"name": "Information Technology", "code": "IT"},
+            {"name": "Electronics & Communication", "code": "ECE"},
+            {"name": "Business & Finance", "code": "BAF"},
+        ]
+        created = []
+        for d in defaults:
+            new_dept = Department(tenant_id=t_id, name=d["name"], code=d["code"])
+            db.add(new_dept)
+            db.commit()
+            db.refresh(new_dept)
+            for yr in range(1, 5):
+                db.add(Cohort(department_id=new_dept.id, name=f"Year {yr} - Sec A"))
+            db.commit()
+            created.append(new_dept)
+        return created
+    return depts
 
 def get_cohorts(db: Session, department_id: int):
     return db.query(Cohort).filter(Cohort.department_id == department_id).all()

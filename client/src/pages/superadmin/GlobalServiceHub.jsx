@@ -1,11 +1,10 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminAPI } from '../../services/api.service';
 import Loader from '../../components/ui/Loader';
 import {
   LifeBuoy, Search, Clock, MessageSquare, AlertTriangle, CheckCircle, 
   Circle, AlertOctagon, User, ChevronRight, ArrowLeft, Send, Tag,
-  FileText, Activity, Lightbulb, Plus, ThumbsUp, MoreVertical, LayoutGrid
+  FileText, Activity, Lightbulb, Plus, ThumbsUp, MoreVertical, LayoutGrid, Loader2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -23,6 +22,7 @@ const STATUS_META = {
 };
 
 function timeAgo(iso) {
+  if (!iso) return 'Just now';
   const diff = Date.now() - new Date(iso).getTime();
   const h = Math.floor(diff / 3600000);
   const d = Math.floor(diff / 86400000);
@@ -31,48 +31,64 @@ function timeAgo(iso) {
   return `${d}d ago`;
 }
 
-// ── Tab 1: Ticket Inbox (Old Page) ───────────────────────────────────────────
+// ── Tab 1: Ticket Inbox ───────────────────────────────────────────────────────
 function TicketInboxTab() {
-  const [tickets, setTickets] = useState([
-    { id: 'TKT-104', subject: 'Database sync failure', org: 'TechGlobal Inc', category: 'Infrastructure', priority: 'critical', status: 'open', createdAt: new Date(Date.now() - 3600000).toISOString(), replies: 1 },
-    { id: 'TKT-105', subject: 'How to add co-teachers?', org: 'EduStart', category: 'General', priority: 'low', status: 'resolved', createdAt: new Date(Date.now() - 86400000).toISOString(), replies: 4 },
-  ]);
+  const qc = useQueryClient();
+  const { data: tickets = [], isLoading } = useQuery({
+    queryKey: ['supportTickets'],
+    queryFn: () => adminAPI.getSupportTickets().then(r => r.data),
+  });
 
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [reply, setReply] = useState('');
-  const [sending, setSending] = useState(false);
+
+  const replyMutation = useMutation({
+    mutationFn: ({ ticketId, message }) => adminAPI.replyToTicket(ticketId, message),
+    onSuccess: (res) => {
+      qc.invalidateQueries(['supportTickets']);
+      setSelected(prev => prev ? { ...prev, status: res.data.status, replies: res.data.replies } : null);
+      setReply('');
+      toast.success(res.data.message || 'Reply dispatched');
+    },
+    onError: () => toast.error('Failed to dispatch reply')
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ ticketId, status }) => adminAPI.updateTicketStatus(ticketId, status),
+    onSuccess: (res) => {
+      qc.invalidateQueries(['supportTickets']);
+      setSelected(prev => prev ? { ...prev, status: res.data.status } : null);
+      toast.success(res.data.message || 'Status updated');
+    },
+    onError: () => toast.error('Failed to update status')
+  });
 
   const filtered = tickets.filter(t => {
-    const matchSearch = t.subject.toLowerCase().includes(search.toLowerCase()) || t.org.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = (t.subject || '').toLowerCase().includes(search.toLowerCase()) || (t.org || '').toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || t.status === statusFilter;
     return matchSearch && matchStatus;
   });
 
   const counts = tickets.reduce((acc, t) => { acc[t.status] = (acc[t.status] || 0) + 1; return acc; }, {});
 
-  const handleReply = async (e) => {
+  const handleReply = (e) => {
     e.preventDefault();
-    if (!reply.trim()) return;
-    setSending(true);
-    await new Promise(r => setTimeout(r, 600));
-    setTickets(prev => prev.map(t => t.id === selected.id ? { ...t, status: 'in_progress', replies: t.replies + 1 } : t));
-    setSelected(prev => ({ ...prev, status: 'in_progress', replies: prev.replies + 1 }));
-    setReply('');
-    setSending(false);
-    toast.success('Reply sent');
+    if (!reply.trim() || !selected) return;
+    replyMutation.mutate({ ticketId: selected.id, message: reply });
   };
 
   const handleResolve = () => {
-    setTickets(prev => prev.map(t => t.id === selected.id ? { ...t, status: 'resolved' } : t));
-    setSelected(prev => ({ ...prev, status: 'resolved' }));
-    toast.success('Ticket marked as resolved');
+    if (!selected) return;
+    statusMutation.mutate({ ticketId: selected.id, status: 'resolved' });
   };
 
+  if (isLoading) return <Loader text="Loading support tickets..." />;
+
   if (selected) {
-    const priority = PRIORITY_META[selected.priority];
-    const status = STATUS_META[selected.status];
+    const priority = PRIORITY_META[selected.priority] || PRIORITY_META.medium;
+    const status = STATUS_META[selected.status] || STATUS_META.open;
     const PriorityIcon = priority.icon;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -92,14 +108,20 @@ function TicketInboxTab() {
                 </div>
               </div>
               <div style={{ background: 'var(--surface-1)', borderRadius: 12, padding: '1.25rem', marginBottom: '1.25rem', border: '1px solid var(--glass-border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}><div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-100)', color: 'var(--brand-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>T</div><span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)' }}>Tenant Admin</span><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>· {timeAgo(selected.createdAt)}</span></div>
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.65 }}>We are experiencing issues with <strong>{selected.category}</strong>. Our users are reporting problems. Please advise urgently.</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}><div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-100)', color: 'var(--brand-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>{selected.raised_by?.[0] || 'T'}</div><span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)' }}>{selected.raised_by || 'Tenant Admin'}</span><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>· {timeAgo(selected.createdAt)}</span></div>
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.65 }}>{selected.description || `Issue relating to ${selected.category}. Needs administrator attention.`}</p>
               </div>
               <form onSubmit={handleReply} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <textarea value={reply} onChange={e => setReply(e.target.value)} placeholder="Write your reply..." rows={4} className="input-field" style={{ width: '100%', resize: 'vertical', lineHeight: 1.65 }} />
+                <textarea value={reply} onChange={e => setReply(e.target.value)} placeholder="Write your reply to this ticket..." rows={4} className="input-field" style={{ width: '100%', resize: 'vertical', lineHeight: 1.65 }} />
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="submit" disabled={sending || !reply.trim()} className="btn btn-primary" style={{ gap: 6 }}><Send size={14} /> {sending ? 'Sending...' : 'Send Reply'}</button>
-                  {selected.status !== 'resolved' && <button type="button" onClick={handleResolve} className="btn btn-secondary" style={{ gap: 6, color: '#059669', borderColor: '#a7f3d0' }}><CheckCircle size={14} /> Mark Resolved</button>}
+                  <button type="submit" disabled={replyMutation.isPending || !reply.trim()} className="btn btn-primary" style={{ gap: 6 }}>
+                    {replyMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} {replyMutation.isPending ? 'Sending...' : 'Send Reply'}
+                  </button>
+                  {selected.status !== 'resolved' && (
+                    <button type="button" onClick={handleResolve} disabled={statusMutation.isPending} className="btn btn-secondary" style={{ gap: 6, color: '#059669', borderColor: '#a7f3d0' }}>
+                      <CheckCircle size={14} /> {statusMutation.isPending ? 'Resolving...' : 'Mark Resolved'}
+                    </button>
+                  )}
                 </div>
               </form>
             </div>
@@ -107,7 +129,7 @@ function TicketInboxTab() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="glass-card" style={{ padding: '1.5rem' }}>
               <h3 style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.875rem', marginBottom: '1rem' }}>Ticket Details</h3>
-              {[ ['Organization', selected.org], ['Category', selected.category], ['Opened', new Date(selected.createdAt).toLocaleDateString()], ['Replies', selected.replies] ].map(([k, v]) => (
+              {[ ['Organization', selected.org], ['Category', selected.category], ['Opened', selected.createdAt ? new Date(selected.createdAt).toLocaleDateString() : '—'], ['Replies', selected.replies] ].map(([k, v]) => (
                 <div key={k} style={{ marginBottom: '0.875rem' }}><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 3 }}>{k}</p><p style={{ fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 600 }}>{v}</p></div>
               ))}
             </div>
@@ -185,6 +207,14 @@ function TicketInboxTab() {
 
 // ── Tab 2: SLA Monitor ────────────────────────────────────────────────────────
 function SLAMonitorTab() {
+  const { data: tickets = [] } = useQuery({
+    queryKey: ['supportTickets'],
+    queryFn: () => adminAPI.getSupportTickets().then(r => r.data),
+  });
+
+  const activeTickets = tickets.filter(t => t.status !== 'resolved' && t.status !== 'closed');
+  const criticalCount = activeTickets.filter(t => t.priority === 'critical' || t.priority === 'high').length;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
@@ -196,25 +226,35 @@ function SLAMonitorTab() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem' }}><div style={{ width: 40, height: 40, borderRadius: 12, background: '#ecfdf5', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}><CheckCircle size={20} /></div><p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>SLA Compliance</p></div>
           <p style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>98.2%</p>
         </div>
-        <div className="stat-card" style={{ padding: '1.5rem', background: '#fff1f2', borderColor: '#fecaca' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem' }}><div style={{ width: 40, height: 40, borderRadius: 12, background: '#fef2f2', border: '1px solid #fecdd3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e11d48' }}><AlertOctagon size={20} /></div><p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#e11d48' }}>SLA Breaches (VIP)</p></div>
-          <p style={{ fontSize: '2rem', fontWeight: 900, color: '#e11d48', lineHeight: 1 }}>1 Active</p>
+        <div className="stat-card" style={{ padding: '1.5rem', background: criticalCount > 0 ? '#fff1f2' : '#f0fdf4', borderColor: criticalCount > 0 ? '#fecaca' : '#bbf7d0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem' }}><div style={{ width: 40, height: 40, borderRadius: 12, background: criticalCount > 0 ? '#fef2f2' : '#ecfdf5', border: `1px solid ${criticalCount > 0 ? '#fecdd3' : '#a7f3d0'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: criticalCount > 0 ? '#e11d48' : '#059669' }}><AlertOctagon size={20} /></div><p style={{ fontSize: '0.875rem', fontWeight: 600, color: criticalCount > 0 ? '#e11d48' : '#059669' }}>Active Urgent Tickets</p></div>
+          <p style={{ fontSize: '2rem', fontWeight: 900, color: criticalCount > 0 ? '#e11d48' : '#059669', lineHeight: 1 }}>{criticalCount} Active</p>
         </div>
       </div>
       <div className="glass-card" style={{ padding: 0 }}>
-        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--glass-border)', background: 'var(--surface-1)' }}><h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Priority Accounts at Risk</h3></div>
-        <table className="table">
-          <thead><tr><th>Organization</th><th>Plan Tier</th><th>Ticket ID</th><th>Time Elapsed</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr>
-              <td><span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>TechGlobal Inc</span></td>
-              <td><span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', background: '#eef2ff', padding: '2px 8px', borderRadius: 999 }}>Enterprise</span></td>
-              <td><span style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>TKT-104</span></td>
-              <td><span style={{ fontWeight: 800, color: '#e11d48' }}>26.4 hrs</span> <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>(SLA: 24h)</span></td>
-              <td><span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#e11d48', background: '#fff1f2', border: '1px solid #fecdd3', padding: '2px 8px', borderRadius: 999 }}>BREACHED</span></td>
-            </tr>
-          </tbody>
-        </table>
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--glass-border)', background: 'var(--surface-1)' }}><h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Priority Accounts & Live Tickets</h3></div>
+        {!activeTickets.length ? (
+          <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <CheckCircle size={24} color="#16a34a" style={{ margin: '0 auto 0.5rem' }} />
+            <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>All tickets resolved within SLA targets.</p>
+          </div>
+        ) : (
+          <table className="table">
+            <thead><tr><th>Organization</th><th>Ticket ID</th><th>Subject</th><th>Priority</th><th>Opened</th><th>Status</th></tr></thead>
+            <tbody>
+              {activeTickets.map(t => (
+                <tr key={t.id}>
+                  <td><span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{t.org}</span></td>
+                  <td><span style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>{t.id}</span></td>
+                  <td><span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{t.subject}</span></td>
+                  <td><span style={{ fontSize: '0.75rem', fontWeight: 700, color: PRIORITY_META[t.priority]?.color || '#d97706', textTransform: 'uppercase' }}>{t.priority}</span></td>
+                  <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{timeAgo(t.createdAt)}</span></td>
+                  <td><span style={{ fontSize: '0.75rem', fontWeight: 700, color: STATUS_META[t.status]?.color || '#d97706', background: STATUS_META[t.status]?.bg || '#fffbeb', border: '1px solid var(--glass-border)', padding: '2px 8px', borderRadius: 999 }}>{t.status.toUpperCase()}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

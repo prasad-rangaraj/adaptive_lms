@@ -622,7 +622,7 @@ function OrgAdminView() {
           <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search all courses in this organization..." style={{ width: '100%', padding: '0.625rem 1rem 0.625rem 2.5rem', borderRadius: 10, border: '1px solid var(--glass-border)', background: 'var(--surface-1)', color: 'var(--text-primary)', fontSize: '0.875rem', outline: 'none' }} />
         </div>
-        <button onClick={() => navigate('/teacher/courses/builder')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', borderRadius: 10, border: 'none', background: 'var(--brand-500)', color: 'white', fontWeight: 800, fontSize: '0.875rem', cursor: 'pointer' }}>
+        <button onClick={() => navigate('/teacher/studio')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', borderRadius: 10, border: 'none', background: 'var(--brand-500)', color: 'white', fontWeight: 800, fontSize: '0.875rem', cursor: 'pointer' }}>
           <Plus size={16} /> Create Course
         </button>
       </div>

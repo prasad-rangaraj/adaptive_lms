@@ -36,10 +36,11 @@ function formatDateDivider(ts) {
    keeps unique tones for other roles
 ════════════════════════════════════════════ */
 const ROLE_CFG = {
-  teacher:     { color: '#0e7490', bg: '#ecfeff', border: '#a5f3fc', label: 'Teacher' },
-  admin:       { color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', label: 'Admin'   },
-  super_admin: { color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', label: 'Super Admin' },
-  student:     { color: '#155e75', bg: '#cffafe', border: '#67e8f9', label: 'Student' },
+  teacher:      { color: '#0e7490', bg: '#ecfeff', border: '#a5f3fc', label: 'Teacher' },
+  admin:        { color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', label: 'Admin'   },
+  tenant_admin: { color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', label: 'Admin'   },
+  super_admin:  { color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', label: 'Super Admin' },
+  student:      { color: '#155e75', bg: '#cffafe', border: '#67e8f9', label: 'Student' },
 };
 function getRC(role) {
   return ROLE_CFG[role] || { color: '#64748b', bg: '#f1f5f9', border: '#e2e8f0', label: role };

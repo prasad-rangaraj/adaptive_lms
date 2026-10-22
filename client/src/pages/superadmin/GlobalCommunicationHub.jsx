@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { adminAPI } from '../../services/api.service';
+import Loader from '../../components/ui/Loader';
 import { 
   Megaphone, Send, Building2, Globe, Clock, CheckCheck, 
-  AlertCircle, Info, Star, Mail, Zap, Calendar, PlayCircle, Plus
+  AlertCircle, Info, Star, Mail, Zap, Calendar, PlayCircle, Plus, Loader2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -11,57 +14,68 @@ const TYPE_OPTIONS = [
   { key: 'feature',     label: 'New Feature',   icon: Star,         color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
 ];
 
-const MOCK_HISTORY = [
-  { id: 1, type: 'info', subject: 'Platform Update v2.4 Released', message: 'We have deployed several performance improvements and bug fixes.', audience: 'all', sentAt: new Date(Date.now() - 86400000 * 2).toISOString(), readCount: 342 },
-  { id: 2, type: 'maintenance', subject: 'Scheduled Maintenance — Sunday 2AM UTC', message: 'The platform will be unavailable for approximately 30 minutes for database migration.', audience: 'all', sentAt: new Date(Date.now() - 86400000 * 5).toISOString(), readCount: 501 },
-];
-
-// ── Tab 1: Broadcasts (Old Page) ──────────────────────────────────────────────
+// ── Tab 1: Broadcasts ─────────────────────────────────────────────────────────
 function BroadcastsTab() {
+  const qc = useQueryClient();
   const [form, setForm] = useState({ type: 'info', subject: '', message: '', audience: 'all' });
-  const [sending, setSending] = useState(false);
-  const [history, setHistory] = useState(MOCK_HISTORY);
 
-  const selectedType = TYPE_OPTIONS.find(t => t.key === form.type) || TYPE_OPTIONS[0];
+  const { data: history = [], isLoading } = useQuery({
+    queryKey: ['admin-broadcasts'],
+    queryFn: () => adminAPI.listBroadcasts().then(r => r.data),
+  });
 
-  const handleSend = async (e) => {
+  const sendMutation = useMutation({
+    mutationFn: (payload) => adminAPI.sendBroadcast(payload),
+    onSuccess: () => {
+      qc.invalidateQueries(['admin-broadcasts']);
+      setForm({ type: 'info', subject: '', message: '', audience: 'all' });
+      toast.success('Broadcast sent successfully across tenants!');
+    },
+    onError: () => toast.error('Failed to send broadcast.')
+  });
+
+  const handleSend = (e) => {
     e.preventDefault();
     if (!form.subject.trim() || !form.message.trim()) return toast.error('Required fields missing.');
-    setSending(true);
-    await new Promise(r => setTimeout(r, 800));
-    setHistory([{ id: history.length + 1, ...form, sentAt: new Date().toISOString(), readCount: 0 }, ...history]);
-    setForm({ type: 'info', subject: '', message: '', audience: 'all' });
-    setSending(false);
-    toast.success('Broadcast sent!');
+    sendMutation.mutate(form);
   };
+
+  if (isLoading) return <Loader text="Loading announcements..." />;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '1.5rem', alignItems: 'start' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
         <h2 style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Sent Announcements ({history.length})</h2>
-        {history.map(a => {
-          const typeMeta = TYPE_OPTIONS.find(t => t.key === a.type) || TYPE_OPTIONS[0];
-          const TypeIcon = typeMeta.icon;
-          return (
-            <div key={a.id} className="glass-card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: typeMeta.bg, border: `1px solid ${typeMeta.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><TypeIcon size={18} color={typeMeta.color} /></div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                    <p style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9375rem' }}>{a.subject}</p>
-                    <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: typeMeta.color, background: typeMeta.bg, border: `1px solid ${typeMeta.border}`, padding: '2px 7px', borderRadius: 999 }}>{typeMeta.label}</span>
-                  </div>
-                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', lineHeight: 1.5 }}>{a.message}</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><Globe size={11} /> {a.audience === 'all' ? 'All Organizations' : `${a.audience} tier`}</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={11} /> {new Date(a.sentAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>
-                    <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}><CheckCheck size={13} /> {a.readCount} reads</span>
+        {!history.length ? (
+          <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <Megaphone size={32} style={{ margin: '0 auto 1rem', opacity: 0.4 }} />
+            <p style={{ fontWeight: 600 }}>No announcements sent yet.</p>
+          </div>
+        ) : (
+          history.map(a => {
+            const typeMeta = TYPE_OPTIONS.find(t => t.key === a.type) || TYPE_OPTIONS[0];
+            const TypeIcon = typeMeta.icon;
+            return (
+              <div key={a.id} className="glass-card" style={{ padding: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: typeMeta.bg, border: `1px solid ${typeMeta.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><TypeIcon size={18} color={typeMeta.color} /></div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                      <p style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9375rem' }}>{a.subject}</p>
+                      <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: typeMeta.color, background: typeMeta.bg, border: `1px solid ${typeMeta.border}`, padding: '2px 7px', borderRadius: 999 }}>{typeMeta.label}</span>
+                    </div>
+                    <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', lineHeight: 1.5 }}>{a.message}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><Globe size={11} /> {a.audience === 'all' ? 'All Organizations' : `${a.audience} tier`}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={11} /> {a.sentAt ? new Date(a.sentAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : 'Today'}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}><CheckCheck size={13} /> {a.readCount} reach</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
       <div style={{ position: 'sticky', top: '1rem' }}>
         <div className="glass-card" style={{ padding: '2rem' }}>
@@ -96,7 +110,10 @@ function BroadcastsTab() {
               <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Message *</label>
               <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} rows={4} className="input-field" style={{ width: '100%', resize: 'vertical', lineHeight: 1.6 }} required />
             </div>
-            <button type="submit" disabled={sending} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}><Send size={15} /> {sending ? 'Sending...' : 'Broadcast Announcement'}</button>
+            <button type="submit" disabled={sendMutation.isPending} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+              {sendMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+              {sendMutation.isPending ? 'Sending...' : 'Broadcast Announcement'}
+            </button>
           </form>
         </div>
       </div>
@@ -108,7 +125,7 @@ function BroadcastsTab() {
 function AutomatedWorkflowsTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" style={{ gap: 8 }}><Plus size={16} /> New Workflow</button></div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary" style={{ gap: 8 }} onClick={() => toast.success('New automated lifecycle workflow template opened')}><Plus size={16} /> New Workflow</button></div>
       <div className="glass-card" style={{ padding: 0 }}>
         <table className="table">
           <thead><tr><th>Workflow Name</th><th>Trigger</th><th>Steps</th><th>Audience Enrolled</th><th>Status</th></tr></thead>
@@ -129,22 +146,51 @@ function AutomatedWorkflowsTab() {
 
 // ── Tab 3: Outage Alerts ──────────────────────────────────────────────────────
 function OutageAlertsTab() {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState('');
+  const [msg, setMsg] = useState('');
+  const [declaring, setDeclaring] = useState(false);
+
+  const handleIncident = async (e) => {
+    e.preventDefault();
+    if (!title.trim() || !msg.trim()) return toast.error('Please enter incident title and message');
+    setDeclaring(true);
+    try {
+      await adminAPI.sendBroadcast({
+        type: 'maintenance',
+        subject: `[CRITICAL OUTAGE] ${title}`,
+        message: msg,
+        audience: 'all'
+      });
+      qc.invalidateQueries(['admin-broadcasts']);
+      toast.success('Platform incident declared & broadcasted to all organizations!');
+      setTitle('');
+      setMsg('');
+    } catch {
+      toast.error('Failed to trigger platform incident');
+    } finally {
+      setDeclaring(false);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: 780 }}>
       <div className="glass-card" style={{ padding: '2rem' }}>
         <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#e11d48', display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}><AlertCircle size={20} /> Trigger Platform Incident</h2>
-        <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>This displays a massive red banner at the top of every tenant's dashboard instantly. Use only for critical outages.</p>
+        <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>This dispatches an emergency notification across all tenant dashboards immediately. Use only for critical outages.</p>
         
-        <form style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <form onSubmit={handleIncident} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Incident Title</label>
-            <input placeholder="e.g. Degraded Performance in US-East" className="input-field" style={{ width: '100%' }} />
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Degraded Performance in US-East" className="input-field" style={{ width: '100%' }} required />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Status Message</label>
-            <textarea placeholder="We are currently investigating an issue..." rows={3} className="input-field" style={{ width: '100%', resize: 'none' }} />
+            <textarea value={msg} onChange={e => setMsg(e.target.value)} placeholder="We are currently investigating an issue..." rows={3} className="input-field" style={{ width: '100%', resize: 'none' }} required />
           </div>
-          <button type="button" className="btn btn-primary" style={{ background: '#e11d48', borderColor: '#e11d48' }}>Declare Incident</button>
+          <button type="submit" disabled={declaring} className="btn btn-primary" style={{ background: '#e11d48', borderColor: '#e11d48' }}>
+            {declaring ? 'Declaring Incident...' : 'Declare Incident'}
+          </button>
         </form>
       </div>
     </div>

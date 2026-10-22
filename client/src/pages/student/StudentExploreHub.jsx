@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Compass, Target, GraduationCap, ArrowRight, Play, Star, ChevronRight, Zap, X, Clock, BookOpen, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { coursesAPI } from '../../services/api.service';
@@ -19,8 +20,8 @@ function EnrollModal({ course, onConfirm, onClose }) {
     setEnrolling(false);
   };
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+  const modalContent = (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', overflowY: 'auto' }}>
       <div style={{ width: '100%', maxWidth: 600, background: 'var(--surface-0)', borderRadius: 24, overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s ease', boxShadow: '0 32px 80px rgba(0,0,0,0.3)' }}>
         
         {/* Header Image */}
@@ -110,6 +111,8 @@ function EnrollModal({ course, onConfirm, onClose }) {
       `}</style>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 }
 
 export default function StudentExploreHub() {
