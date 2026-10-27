@@ -203,10 +203,10 @@ async def update_course(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
 ):
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.tenant_id == current_user.tenant_id,
-    ).first()
+    query = db.query(Course).filter(Course.id == course_id)
+    if current_user.role != "super_admin":
+        query = query.filter(Course.tenant_id == current_user.tenant_id)
+    course = query.first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
         
@@ -232,10 +232,10 @@ async def list_course_modules(
     current_user: User = Depends(get_current_user),
 ):
     """List all modules (and their materials) for a course, including level."""
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.tenant_id == current_user.tenant_id,
-    ).first()
+    query = db.query(Course).filter(Course.id == course_id)
+    if current_user.role != "super_admin":
+        query = query.filter(Course.tenant_id == current_user.tenant_id)
+    course = query.first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -264,10 +264,10 @@ async def get_course_detail(
     """Teacher: Get course modules grouped by level + enrolled students in one request."""
     from models.enrollment import Enrollment
 
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.tenant_id == current_user.tenant_id,
-    ).first()
+    query = db.query(Course).filter(Course.id == course_id)
+    if current_user.role != "super_admin":
+        query = query.filter(Course.tenant_id == current_user.tenant_id)
+    course = query.first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -366,10 +366,10 @@ async def get_material_transcript(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.tenant_id == current_user.tenant_id,
-    ).first()
+    query = db.query(Course).filter(Course.id == course_id)
+    if current_user.role != "super_admin":
+        query = query.filter(Course.tenant_id == current_user.tenant_id)
+    course = query.first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -388,10 +388,10 @@ async def create_course_module(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("teacher", "tenant_admin")),
 ):
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.tenant_id == current_user.tenant_id,
-    ).first()
+    query = db.query(Course).filter(Course.id == course_id)
+    if current_user.role != "super_admin":
+        query = query.filter(Course.tenant_id == current_user.tenant_id)
+    course = query.first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -418,10 +418,10 @@ async def update_course_module(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
 ):
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.tenant_id == current_user.tenant_id,
-    ).first()
+    query = db.query(Course).filter(Course.id == course_id)
+    if current_user.role != "super_admin":
+        query = query.filter(Course.tenant_id == current_user.tenant_id)
+    course = query.first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -445,10 +445,10 @@ async def delete_course_module(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
 ):
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.tenant_id == current_user.tenant_id,
-    ).first()
+    query = db.query(Course).filter(Course.id == course_id)
+    if current_user.role != "super_admin":
+        query = query.filter(Course.tenant_id == current_user.tenant_id)
+    course = query.first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -493,10 +493,10 @@ async def update_course_material(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("teacher", "tenant_admin", "super_admin")),
 ):
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.tenant_id == current_user.tenant_id,
-    ).first()
+    query = db.query(Course).filter(Course.id == course_id)
+    if current_user.role != "super_admin":
+        query = query.filter(Course.tenant_id == current_user.tenant_id)
+    course = query.first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -554,10 +554,10 @@ async def upload_material(
     """
     Upload a course material file to a module.
     """
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.tenant_id == current_user.tenant_id,
-    ).first()
+    query = db.query(Course).filter(Course.id == course_id)
+    if current_user.role != "super_admin":
+        query = query.filter(Course.tenant_id == current_user.tenant_id)
+    course = query.first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -608,10 +608,10 @@ async def list_course_assignments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.tenant_id == current_user.tenant_id,
-    ).first()
+    query = db.query(Course).filter(Course.id == course_id)
+    if current_user.role != "super_admin":
+        query = query.filter(Course.tenant_id == current_user.tenant_id)
+    course = query.first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -625,10 +625,10 @@ async def create_course_assignment(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("teacher", "tenant_admin")),
 ):
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.tenant_id == current_user.tenant_id,
-    ).first()
+    query = db.query(Course).filter(Course.id == course_id)
+    if current_user.role != "super_admin":
+        query = query.filter(Course.tenant_id == current_user.tenant_id)
+    course = query.first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -648,10 +648,10 @@ async def publish_course(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("teacher", "tenant_admin")),
 ):
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.tenant_id == current_user.tenant_id,
-    ).first()
+    query = db.query(Course).filter(Course.id == course_id)
+    if current_user.role != "super_admin":
+        query = query.filter(Course.tenant_id == current_user.tenant_id)
+    course = query.first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     course.is_published = True

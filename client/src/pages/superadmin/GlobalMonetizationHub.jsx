@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { tenantsAPI, adminAPI } from '../../services/api.service';
-import Loader from '../../components/ui/Loader';
+import { tenantsAPI, adminAPI } from '../../services/api.service';import Loader from '../../components/ui/Loader';
 import { 
   Crown, Star, Zap, Save, CheckCircle2, X, Plus, 
   DollarSign, FileText, Tag, Users, Download, ArrowUpRight, Check
@@ -28,10 +27,17 @@ function PricingPlansTab() {
 
   const handleSave = async () => {
     setSaving(true);
-    await new Promise(r => setTimeout(r, 600));
-    localStorage.setItem('lms_custom_plans', JSON.stringify(plans));
-    toast.success('Subscription plans updated & published!');
-    setSaving(false);
+    try {
+      // Serialize plans (strip icon refs which can't be JSON'd)
+      const serializable = plans.map(({ icon, ...rest }) => rest);
+      const res = await adminAPI.publishPlans(serializable);
+      toast.success(res.data.message || 'Subscription plans published!');
+      localStorage.setItem('lms_custom_plans', JSON.stringify(plans));
+    } catch {
+      toast.error('Failed to publish plans. Try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const updatePlan = (id, field, value) => setPlans(plans.map(p => p.id === id ? { ...p, [field]: value } : p));

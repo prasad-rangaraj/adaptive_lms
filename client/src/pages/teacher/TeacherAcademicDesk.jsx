@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, XCircle, Calendar, Search, Filter, UserCheck,
-  Radio, Wifi, Sparkles, X, Activity, CheckCircle
+  Radio, Wifi, Sparkles, X, Activity, CheckCircle, Video, VideoOff
 } from 'lucide-react';
 import { academicAPI } from '../../services/api.service';
 import toast from 'react-hot-toast';
@@ -20,17 +21,16 @@ function AutoCaptureModal({ results, onClose }) {
               <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 0 3px rgba(16,185,129,0.2)' }} />
               <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Scan Complete</span>
             </div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>AI Attendance Capture</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Live Class Attendance Capture</h2>
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-              {results.captured_count} student(s) verified &amp; marked Present
+              {results.session_title ? `Class: "${results.session_title}" • ` : ''}
+              {results.captured_count} attendee(s) verified &amp; marked Present
             </p>
-            {results.mode && (
-              <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, background: results.mode === 'live_session_participants' ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${results.mode === 'live_session_participants' ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`, borderRadius: 999, padding: '3px 10px' }}>
-                <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: results.mode === 'live_session_participants' ? '#10b981' : '#f59e0b' }}>
-                  {results.mode === 'live_session_participants' ? '🔴 Live Session Participants Only' : '⚠️ Fallback: No live session — all enrolled students marked'}
-                </span>
-              </div>
-            )}
+            <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 999, padding: '3px 10px' }}>
+              <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#10b981' }}>
+                🔴 Active Live Session Attendees Only
+              </span>
+            </div>
           </div>
           <button onClick={onClose} style={{ background: 'var(--surface-2)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
             <X size={16} />
@@ -40,8 +40,8 @@ function AutoCaptureModal({ results, onClose }) {
         {/* Stats Bar */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
           {[
-            { label: 'Captured', value: results.captured_count, icon: <CheckCircle size={14} />, color: '#10b981' },
-            { label: 'Method', value: 'BLE + AI Vision', icon: <Wifi size={14} />, color: 'var(--brand-500)' },
+            { label: 'Attended', value: results.captured_count, icon: <CheckCircle size={14} />, color: '#10b981' },
+            { label: 'Method', value: 'Live Call + BLE', icon: <Wifi size={14} />, color: 'var(--brand-500)' },
             { label: 'Time', value: new Date(results.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), icon: <Activity size={14} />, color: 'var(--text-muted)' },
           ].map(s => (
             <div key={s.label} style={{ background: 'var(--surface-1)', borderRadius: 12, padding: '0.875rem', textAlign: 'center' }}>
@@ -55,9 +55,9 @@ function AutoCaptureModal({ results, onClose }) {
         </div>
 
         {/* Student Telemetry List */}
-        {results.students.length > 0 && (
+        {results.students && results.students.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-            <div style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Beacon Telemetry</div>
+            <div style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Attendees Logged</div>
             {results.students.map((s, i) => (
               <div key={i} style={{ display: 'grid', gridTemplateColumns: '36px 1fr auto', gap: '0.75rem', alignItems: 'center', background: 'var(--surface-1)', borderRadius: 12, padding: '0.75rem 1rem' }}>
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, var(--brand-500), #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: '0.875rem', flexShrink: 0 }}>
@@ -67,7 +67,7 @@ function AutoCaptureModal({ results, onClose }) {
                   <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-primary)' }}>{s.name}</div>
                   <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: '0.875rem', flexWrap: 'wrap' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Radio size={10} /> {s.beacon_node} &middot; {s.rssi}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Sparkles size={10} /> {s.confidence} facial match</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Sparkles size={10} /> {s.confidence} match</span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 999, padding: '3px 10px', flexShrink: 0 }}>
@@ -76,6 +76,10 @@ function AutoCaptureModal({ results, onClose }) {
                 </div>
               </div>
             ))}
+          </div>
+        ) : (
+          <div style={{ padding: '1.5rem', textAlign: 'center', background: 'var(--surface-1)', borderRadius: 12, color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+            No students have joined this live session yet. As students join the call, their attendance will be captured.
           </div>
         )}
 
@@ -90,23 +94,53 @@ function AutoCaptureModal({ results, onClose }) {
 
 // ── Tab: Attendance Operations ─────────────────────────────────────────────
 function AttendanceTab({ students = [], loading = false, refetch }) {
+  const navigate = useNavigate();
   const [filterCourse, setFilterCourse] = useState('all');
   const [scanning, setScanning] = useState(false);
   const [scanResults, setScanResults] = useState(null);
+  const [activeSession, setActiveSession] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const uniqueCourses = Array.from(new Map(students.map(s => [s.course_id, { id: s.course_id, title: s.course }])).values());
-  const filteredStudents = filterCourse === 'all' ? students : students.filter(s => s.course_id === parseInt(filterCourse));
+  const filteredStudents = students.filter(s => {
+    const matchesCourse = filterCourse === 'all' || s.course_id === parseInt(filterCourse);
+    const matchesSearch = !searchQuery.trim() ||
+      s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.roll?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCourse && matchesSearch;
+  });
   const activeCourseTitle = filterCourse === 'all' ? 'All Active Classes' : uniqueCourses.find(c => c.id === parseInt(filterCourse))?.title;
+
+  const checkLiveSession = async () => {
+    try {
+      const res = await academicAPI.getTeacherActiveSession(filterCourse);
+      setActiveSession(res.data?.active ? res.data.session : null);
+    } catch (e) {
+      setActiveSession(null);
+    }
+  };
+
+  useEffect(() => {
+    checkLiveSession();
+    // Poll every 5 seconds so live session state automatically updates
+    const interval = setInterval(checkLiveSession, 5000);
+    return () => clearInterval(interval);
+  }, [filterCourse]);
 
   const handleAutoCapture = async () => {
     setScanning(true);
     try {
       const res = await academicAPI.runAutoCapture(filterCourse);
       setScanResults(res.data);
-      toast.success(`Auto-Capture complete — ${res.data.captured_count} student(s) marked Present`);
+      if (res.data.captured_count > 0) {
+        toast.success(`Auto-Capture complete — ${res.data.captured_count} attendee(s) marked Present`);
+      } else {
+        toast('No students have joined this live session yet.', { icon: 'ℹ️' });
+      }
       refetch();
+      checkLiveSession();
     } catch (e) {
-      toast.error('Auto-Capture failed. Please try again.');
+      toast.error(e.response?.data?.detail || 'Auto-Capture failed. Please try again.');
     } finally {
       setScanning(false);
     }
@@ -138,7 +172,12 @@ function AttendanceTab({ students = [], loading = false, refetch }) {
               </select>
               <div style={{ position: 'relative' }}>
                 <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-                <input placeholder="Search Roll No..." style={{ padding: '8px 12px 8px 36px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-0)', fontSize: '0.875rem' }} />
+                <input
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search Roll or Name..."
+                  style={{ padding: '8px 12px 8px 36px', borderRadius: 8, border: '1px solid var(--surface-3)', background: 'var(--surface-0)', fontSize: '0.875rem' }}
+                />
               </div>
               <button style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-3)', padding: '8px 12px', borderRadius: 8, cursor: 'pointer' }}><Filter size={16} /></button>
             </div>
@@ -211,28 +250,65 @@ function AttendanceTab({ students = [], loading = false, refetch }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
           <div style={{ background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 20, padding: '1.5rem', textAlign: 'center' }}>
-            {/* Radar animation when scanning */}
-            {scanning && (
-              <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
-                <div style={{ position: 'relative', width: 72, height: 72 }}>
-                  <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2px solid var(--brand-500)', opacity: 0.15 }} />
-                  <div style={{ position: 'absolute', inset: 8, borderRadius: '50%', border: '2px solid var(--brand-500)', opacity: 0.3 }} />
-                  <div style={{ position: 'absolute', inset: 16, borderRadius: '50%', border: '2px solid var(--brand-500)', opacity: 0.6 }} />
-                  <div style={{ position: 'absolute', inset: '50%', transform: 'translate(-50%,-50%)', width: 16, height: 16, borderRadius: '50%', background: 'var(--brand-500)', animation: 'pulse 1s infinite' }} />
+            
+            {activeSession ? (
+              <>
+                {/* Radar animation when scanning */}
+                {scanning && (
+                  <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ position: 'relative', width: 72, height: 72 }}>
+                      <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2px solid var(--brand-500)', opacity: 0.15 }} />
+                      <div style={{ position: 'absolute', inset: 8, borderRadius: '50%', border: '2px solid var(--brand-500)', opacity: 0.3 }} />
+                      <div style={{ position: 'absolute', inset: 16, borderRadius: '50%', border: '2px solid var(--brand-500)', opacity: 0.6 }} />
+                      <div style={{ position: 'absolute', inset: '50%', transform: 'translate(-50%,-50%)', width: 16, height: 16, borderRadius: '50%', background: 'var(--brand-500)', animation: 'pulse 1s infinite' }} />
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: 999, padding: '4px 12px', marginBottom: '0.75rem' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Live Class Active
+                  </span>
                 </div>
-              </div>
+
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+                  {activeSession.title}
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                  {activeSession.course_title || 'Active Course'} &bull; {activeSession.participants_count || 0} student(s) joined
+                </p>
+
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.4 }}>
+                  {scanning ? 'Scanning attendees in this live class and verifying via AI…' : 'Capture attendance for only the students who have actually joined this active live session.'}
+                </p>
+
+                <button
+                  onClick={handleAutoCapture}
+                  disabled={scanning}
+                  style={{ width: '100%', background: scanning ? 'var(--surface-2)' : '#10b981', color: 'white', border: 'none', padding: '12px', borderRadius: 12, fontSize: '0.9375rem', fontWeight: 800, cursor: scanning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s', boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)' }}
+                >
+                  <UserCheck size={18} /> {scanning ? 'Scanning Live Class…' : 'Run Auto-Capture'}
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', color: 'var(--text-muted)' }}>
+                  <VideoOff size={22} />
+                </div>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Auto-Capture Inactive</h3>
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+                  Auto-Capture only appears and logs attendance when you have an ongoing live class. Start a live session to enable one-click attendance verification.
+                </p>
+                <button
+                  onClick={() => navigate('/teacher/live')}
+                  style={{ width: '100%', background: 'var(--surface-2)', color: 'var(--text-primary)', border: '1px solid var(--surface-3)', padding: '10px 14px', borderRadius: 12, fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' }}
+                >
+                  <Video size={16} color="var(--brand-500)" /> Go to Live Sessions
+                </button>
+              </>
             )}
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Auto-Capture</h3>
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-              {scanning ? 'Scanning classroom beacons and verifying faces via AI…' : "Use the live session's AI or classroom beacons to automatically log attendance."}
-            </p>
-            <button
-              onClick={handleAutoCapture}
-              disabled={scanning}
-              style={{ width: '100%', background: scanning ? 'var(--surface-2)' : 'var(--text-primary)', color: scanning ? 'var(--text-muted)' : 'white', border: 'none', padding: '12px', borderRadius: 12, fontSize: '0.9375rem', fontWeight: 800, cursor: scanning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' }}
-            >
-              <UserCheck size={18} /> {scanning ? 'Scanning…' : 'Run Auto-Capture'}
-            </button>
+
           </div>
 
         </div>

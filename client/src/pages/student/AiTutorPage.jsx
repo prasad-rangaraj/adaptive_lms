@@ -5,6 +5,7 @@ import { Send, Sparkles, Lightbulb, Hash, FileText, Layers, BookOpen, Paperclip,
 import toast from 'react-hot-toast';
 
 import { coursesAPI } from '../../services/api.service';
+import FormattedChatMessage from '../../components/common/FormattedChatMessage';
 
 const getWelcomeMessage = (persona, courseTitle) => {
   const courseContext = courseTitle ? ` for **${courseTitle}**` : '';
@@ -243,13 +244,34 @@ export default function AiTutorPage() {
                 border: msg.role === 'ai' ? '1px solid rgba(255, 255, 255, 0.5)' : 'none',
                 boxShadow: msg.role === 'ai' ? '0 8px 32px rgba(0,0,0,0.03)' : '0 8px 24px rgba(79,70,229,0.25)',
               }}>
-                <p style={{ fontSize: '0.9375rem', lineHeight: 1.65, whiteSpace: 'pre-wrap', color: msg.role === 'user' ? 'white' : 'var(--text-primary)', margin: 0 }}>
-                  {msg.content}
-                </p>
+                <FormattedChatMessage content={msg.content} isUser={msg.role === 'user'} />
                 {msg.sources?.length > 0 && (
-                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: msg.role === 'user' ? '1px solid rgba(255,255,255,0.2)' : '1px solid var(--surface-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <BookOpen size={12} color={msg.role === 'user' ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)'} />
-                    <p style={{ fontSize: '0.75rem', color: msg.role === 'user' ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }}>Sources: {msg.sources.join(', ')}</p>
+                  <div style={{ marginTop: '0.875rem', paddingTop: '0.75rem', borderTop: msg.role === 'user' ? '1px solid rgba(255,255,255,0.2)' : '1px solid var(--surface-3)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', fontWeight: 700, color: msg.role === 'user' ? 'rgba(255,255,255,0.85)' : 'var(--text-muted)' }}>
+                      <BookOpen size={13} />
+                      <span>Referenced Sources</span>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {msg.sources.map((src, sIdx) => (
+                        <span
+                          key={sIdx}
+                          style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            background: msg.role === 'user' ? 'rgba(255,255,255,0.15)' : 'var(--surface-1)',
+                            border: msg.role === 'user' ? '1px solid rgba(255,255,255,0.25)' : '1px solid var(--surface-3)',
+                            color: msg.role === 'user' ? 'white' : 'var(--brand-600, #4f46e5)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          📚 {src}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

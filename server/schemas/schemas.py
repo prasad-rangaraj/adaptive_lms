@@ -520,6 +520,7 @@ class EventResponse(BaseModel):
 class AiTutorMessageRequest(BaseModel):
     course_id: int
     message: str
+    persona: Optional[str] = "tutor"
 
 class AiTutorMessageResponse(BaseModel):
     answer: str

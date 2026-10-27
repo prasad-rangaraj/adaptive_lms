@@ -225,30 +225,109 @@ export default function StudentNexus() {
           </div>
         </div>
 
-        {/* ── Academic Pulse Strip ── */}
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '2.5rem', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 12, padding: '0.875rem 1.25rem', background: 'var(--surface-0)', border: '1px solid var(--surface-3)', borderRadius: 14 }}>
-            <Calendar size={18} color="var(--brand-500)" />
-            <div>
-              <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Next Class</p>
-              <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-primary)' }}>OS Theory · 10:00 AM</p>
+        {/* ── Academic Pulse Strip (Live Dynamic Data from PostgreSQL) ── */}
+        {(() => {
+          const pulse = data?.pulse;
+          const nextClass = pulse?.nextClass;
+          const deadline = pulse?.urgentDeadline;
+          const att = pulse?.attendance;
+
+          // Attendance styling based on severity
+          const attIsDanger = att?.severity === 'danger';
+          const attIsWarning = att?.severity === 'warning';
+          const attBg = attIsDanger ? '#fef2f2' : attIsWarning ? '#fffbeb' : '#ecfdf5';
+          const attBorder = attIsDanger ? '1px solid #fecaca' : attIsWarning ? '1px solid #fde68a' : '1px solid #a7f3d0';
+          const attColor = attIsDanger ? '#991b1b' : attIsWarning ? '#92400e' : '#065f46';
+          const attTitleColor = attIsDanger ? '#ef4444' : attIsWarning ? '#d97706' : '#10b981';
+
+          return (
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2.5rem', flexWrap: 'wrap' }}>
+              {/* 1. Next Class Card */}
+              <div
+                onClick={() => navigate(nextClass?.link || '/student/academic')}
+                style={{
+                  flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '0.875rem 1.25rem',
+                  background: nextClass?.is_live ? 'rgba(239,68,68,0.06)' : 'var(--surface-0)',
+                  border: nextClass?.is_live ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--surface-3)',
+                  borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s',
+                  boxShadow: nextClass?.is_live ? '0 0 12px rgba(239,68,68,0.15)' : 'none'
+                }}
+              >
+                {nextClass?.is_live ? (
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20 }}>
+                    <span style={{ position: 'absolute', width: 14, height: 14, borderRadius: '50%', background: '#ef4444', opacity: 0.6, animation: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite' }} />
+                    <span style={{ position: 'relative', width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
+                  </div>
+                ) : (
+                  <Calendar size={18} color="var(--brand-500)" />
+                )}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: nextClass?.is_live ? '#ef4444' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {nextClass?.subtitle || 'Next Class'}
+                  </p>
+                  <p style={{ fontSize: '0.875rem', fontWeight: 800, color: nextClass?.is_live ? '#b91c1c' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {nextClass?.title || 'No Classes Scheduled'}
+                  </p>
+                </div>
+              </div>
+
+              {/* 2. Urgent Deadline Card */}
+              <div
+                onClick={() => navigate(deadline?.link || '/student/course')}
+                style={{
+                  flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '0.875rem 1.25rem',
+                  background: deadline?.is_urgent ? '#fffbeb' : 'var(--surface-0)',
+                  border: deadline?.is_urgent ? '1px solid #fde68a' : '1px solid var(--surface-3)',
+                  borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s'
+                }}
+              >
+                {deadline?.is_urgent ? (
+                  <Clock size={18} color="#d97706" />
+                ) : (
+                  <CheckCircle2 size={18} color="#10b981" />
+                )}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: deadline?.is_urgent ? '#d97706' : '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {deadline?.subtitle || 'Deadlines'}
+                  </p>
+                  <p style={{ fontSize: '0.875rem', fontWeight: 800, color: deadline?.is_urgent ? '#92400e' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {deadline?.title || 'All caught up!'}
+                  </p>
+                </div>
+              </div>
+
+              {/* 3. Attendance Warning / Standing Card */}
+              <div
+                onClick={() => navigate(att?.link || '/student/academic')}
+                style={{
+                  flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '0.875rem 1.25rem',
+                  background: attBg,
+                  border: attBorder,
+                  borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s'
+                }}
+              >
+                {attIsDanger ? (
+                  <AlertCircle size={18} color="#ef4444" />
+                ) : attIsWarning ? (
+                  <AlertCircle size={18} color="#d97706" />
+                ) : (
+                  <CheckCircle2 size={18} color="#10b981" />
+                )}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: attTitleColor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {att?.subtitle || 'Attendance Status'}
+                  </p>
+                  <p style={{ fontSize: '0.875rem', fontWeight: 800, color: attColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {att?.title || 'Good Standing'}
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
-          <div style={{ flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 12, padding: '0.875rem 1.25rem', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 14 }}>
-            <Clock size={18} color="#d97706" />
-            <div>
-              <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Urgent Deadline</p>
-              <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#92400e' }}>DBMS Project · Due Today</p>
-            </div>
-          </div>
-          <div style={{ flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 12, padding: '0.875rem 1.25rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 14 }}>
-            <AlertCircle size={18} color="#ef4444" />
-            <div>
-              <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attendance Warning</p>
-              <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#991b1b' }}>Maths III · 72% (Danger)</p>
-            </div>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* ── Main 2-Column Layout ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '3rem', alignItems: 'start' }}>

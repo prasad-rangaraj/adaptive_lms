@@ -77,6 +77,12 @@ export const adminAPI = {
   // Broadcasts / Communication
   listBroadcasts: () => api.get('/api/admin/broadcasts'),
   sendBroadcast: (data) => api.post('/api/admin/broadcasts', data),
+
+  // Platform Plans
+  publishPlans: (plans) => api.post('/api/admin/plans/publish', { plans }),
+  getCurrentPlans: () => api.get('/api/admin/plans/current'),
+  getPlanNotifications: () => api.get('/api/admin/plans/notifications'),
+  markPlanNotificationRead: (id) => api.patch(`/api/admin/plans/notifications/${id}/read`),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -279,7 +285,10 @@ export const academicAPI = {
   getAssignments: () => api.get('/api/academic/assignments'),
   getPYQs: () => api.get('/api/academic/pyqs'),
   getMarks: () => api.get('/api/academic/marks'),
-  getTeacherActiveSession: () => api.get('/api/academic/teacher/active-session'),
+  getTeacherActiveSession: (courseId) =>
+    api.get('/api/academic/teacher/active-session', {
+      params: courseId && courseId !== 'all' ? { course_id: courseId } : {},
+    }),
   getTeacherAttendance: () => api.get('/api/academic/teacher/attendance'),
   updateTeacherAttendance: (payload) => api.post('/api/academic/teacher/attendance', payload),
   runAutoCapture: (courseId) =>

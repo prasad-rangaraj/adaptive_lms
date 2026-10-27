@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { tenantsAPI, authAPI } from '../../services/api.service';
+import { tenantsAPI, authAPI, adminAPI } from '../../services/api.service';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -787,22 +787,43 @@ function BillingTab({ tenantId }) {
     enabled: !!tenantId 
   });
 
+  const { data: publishedConfig } = useQuery({
+    queryKey: ['platform-current-plans'],
+    queryFn: () => adminAPI.getCurrentPlans().then(r => r.data),
+  });
+
   const { data: members = [] } = useQuery({
     queryKey: ['tenantMembersCount', tenantId],
     queryFn: () => tenantsAPI.getMembers(tenantId).then(r => r.data),
     enabled: !!tenantId
   });
 
+  const publishedPlans = publishedConfig?.plans;
+  const tierList = (publishedPlans && publishedPlans.length > 0)
+    ? publishedPlans.map(p => ({
+        id: p.id,
+        name: p.name || p.id,
+        price: `$${p.price}`,
+        seats: p.limits?.storage ? `${p.limits.storage} GB Storage · ${p.limits.ai_credits >= 999999 ? 'Unlimited' : p.limits.ai_credits} AI Credits` : 'Full Platform Access',
+        features: p.features || []
+      }))
+    : [
+        { id: 'basic', name: 'Basic', price: '$0', seats: 'Up to 50 active users', features: ['Core LMS Features', 'Weekly Assessments', 'Standard Support'] },
+        { id: 'pro', name: 'Professional', price: '$299', seats: 'Up to 500 active users', features: ['AI Proctoring CV', 'Live Virtual Rooms', 'Priority SLAs'] },
+        { id: 'enterprise', name: 'Enterprise', price: '$999', seats: 'Unlimited users', features: ['Custom White-Label', 'End-to-End Encryption', 'Dedicated Concierge'] },
+      ];
+
   const currentPlan = tenant?.plan ? (tenant.plan.charAt(0).toUpperCase() + tenant.plan.slice(1)) : 'Enterprise';
   const memberCount = Array.isArray(members) ? members.length : 1;
-  const maxLimit = currentPlan === 'Starter' ? 500 : currentPlan === 'Pro' ? 2500 : 10000;
+  const maxLimit = currentPlan.toLowerCase() === 'basic' ? 50 : currentPlan.toLowerCase() === 'pro' ? 500 : 10000;
 
-  const handleSelectPlan = async (newPlan) => {
+  const handleSelectPlan = async (newPlanId) => {
     try {
-      await tenantsAPI.update(tenantId, { plan: newPlan.toLowerCase() });
+      await tenantsAPI.update(tenantId, { plan: newPlanId.toLowerCase() });
       qc.invalidateQueries(['tenant', tenantId]);
+      qc.invalidateQueries(['tenant-branding-active', tenantId]);
       setShowUpgradeModal(false);
-      toast.success(`Institutional subscription updated to ${newPlan} Tier!`);
+      toast.success(`Institutional subscription updated to ${newPlanId.toUpperCase()} Tier!`);
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed to update plan");
     }
@@ -969,15 +990,11 @@ Thank you for powering your academic operations with Lumina.`;
               <button onClick={() => setShowUpgradeModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
-              {[
-                { name: 'Starter', price: '$99', seats: 'Up to 500 students', features: ['Core LMS Features', 'Weekly Assessments', 'Standard Support'] },
-                { name: 'Pro', price: '$249', seats: 'Up to 2,500 students', features: ['AI Proctoring CV', 'Live Virtual Rooms', 'Priority SLAs'] },
-                { name: 'Enterprise', price: '$499', seats: 'Unlimited students', features: ['Custom White-Label', 'End-to-End Encryption', 'Dedicated Concierge'] },
-              ].map(tier => {
-                const isSelected = currentPlan.toLowerCase() === tier.name.toLowerCase();
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(tierList.length, 3)}, 1fr)`, gap: '1.25rem' }}>
+              {tierList.map(tier => {
+                const isSelected = (tenant?.plan || 'basic').toLowerCase() === (tier.id || tier.name).toLowerCase();
                 return (
-                  <div key={tier.name} style={{ border: `2px solid ${isSelected ? 'var(--brand-600)' : 'var(--glass-border)'}`, borderRadius: 16, padding: '1.5rem', background: 'var(--surface-1)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div key={tier.id || tier.name} style={{ border: `2px solid ${isSelected ? 'var(--brand-600)' : 'var(--glass-border)'}`, borderRadius: 16, padding: '1.5rem', background: 'var(--surface-1)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <h4 style={{ margin: '0 0 6px', fontWeight: 900, color: 'var(--text-primary)', fontSize: '1.125rem' }}>{tier.name}</h4>
                       <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--brand-600)', margin: '0 0 4px' }}>{tier.price}<span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/mo</span></p>
@@ -991,7 +1008,7 @@ Thank you for powering your academic operations with Lumina.`;
                       </div>
                     </div>
                     <button 
-                      onClick={() => handleSelectPlan(tier.name)}
+                      onClick={() => handleSelectPlan(tier.id || tier.name)}
                       disabled={isSelected}
                       className={isSelected ? "btn btn-secondary" : "btn btn-primary"}
                       style={{ width: '100%', marginTop: '1.5rem', fontSize: '0.8125rem' }}

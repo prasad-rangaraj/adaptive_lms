@@ -18,3 +18,4 @@ from models.community import Bounty, LeaderboardEntry, Event, TeamRequest, Club,
 from models.ai_tutor_session import AITutorSession  # noqa: F401
 from models.organization import TenantAISettings, BroadcastMessage  # noqa: F401
 from models.system import SupportTicket  # noqa: F401
+from models.platform import PlatformPlanConfig, PlanNotification  # noqa: F401

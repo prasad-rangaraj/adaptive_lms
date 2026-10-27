@@ -433,3 +433,136 @@ async def suspend_user(
     db.commit()
     
     return {"message": "User status updated", "is_active": user.is_active}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Platform Plan Config  (Super Admin → publish; Org Admin → read notifications)
+# ─────────────────────────────────────────────────────────────────────────────
+import json
+from datetime import datetime, timezone
+from models.platform import PlatformPlanConfig, PlanNotification
+from models.tenant import Tenant
+from core.security import get_current_user
+
+
+class PublishPlansRequest(BaseModel):
+    plans: list  # list of plan dicts
+
+
+@router.get("/plans/current")
+async def get_current_plans(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Any authenticated user: get the latest published plan config."""
+    latest = (
+        db.query(PlatformPlanConfig)
+        .order_by(PlatformPlanConfig.version.desc())
+        .first()
+    )
+    if not latest:
+        return {"plans": None, "version": 0, "published_at": None}
+    return {
+        "plans": json.loads(latest.plans_json),
+        "version": latest.version,
+        "published_at": latest.published_at.isoformat(),
+    }
+
+
+@router.post("/plans/publish")
+async def publish_plans(
+    payload: PublishPlansRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("super_admin")),
+):
+    """Super Admin only: publish new plan config and notify all org admins."""
+    # Find the latest version number
+    latest = (
+        db.query(PlatformPlanConfig)
+        .order_by(PlatformPlanConfig.version.desc())
+        .first()
+    )
+    new_version = (latest.version + 1) if latest else 1
+
+    # Save new config
+    config = PlatformPlanConfig(
+        plans_json=json.dumps(payload.plans),
+        published_by=current_user.id,
+        version=new_version,
+    )
+    db.add(config)
+    db.flush()  # get config.id before commit
+
+    # Create one notification per active tenant
+    tenants = db.query(Tenant).filter(Tenant.is_active == True).all()
+    for tenant in tenants:
+        notif = PlanNotification(
+            tenant_id=tenant.id,
+            plan_config_id=config.id,
+            is_read=False,
+        )
+        db.add(notif)
+
+    db.commit()
+    return {
+        "message": f"Plans published (v{new_version}) and {len(tenants)} org(s) notified.",
+        "version": new_version,
+        "notified_tenants": len(tenants),
+    }
+
+
+@router.get("/plans/notifications")
+async def get_plan_notifications(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin")),
+):
+    """Org Admin only: list all plan update notifications for their tenant."""
+    if not current_user.tenant_id:
+        return []
+    notifications = (
+        db.query(PlanNotification)
+        .filter(PlanNotification.tenant_id == current_user.tenant_id)
+        .order_by(PlanNotification.created_at.desc())
+        .all()
+    )
+    result = []
+    for n in notifications:
+        cfg = n.plan_config
+        if not cfg:
+            continue
+        result.append({
+            "id": n.id,
+            "is_read": n.is_read,
+            "read_at": n.read_at.isoformat() if n.read_at else None,
+            "created_at": n.created_at.isoformat(),
+            "plan_config": {
+                "version": cfg.version,
+                "plans": json.loads(cfg.plans_json),
+                "published_at": cfg.published_at.isoformat() if cfg.published_at else None,
+            },
+        })
+    return result
+
+
+@router.patch("/plans/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin")),
+):
+    """Org Admin only: mark a plan notification as read."""
+    notif = (
+        db.query(PlanNotification)
+        .filter(
+            PlanNotification.id == notification_id,
+            PlanNotification.tenant_id == current_user.tenant_id,
+        )
+        .first()
+    )
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    notif.is_read = True
+    notif.read_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": "Marked as read"}

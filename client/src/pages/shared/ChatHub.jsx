@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { communityAPI } from '../../services/api.service';
+import FormattedChatMessage from '../../components/common/FormattedChatMessage';
 import {
   Search, Send, MoreVertical,
   Paperclip, CheckCheck, MessageSquare, X,
@@ -277,7 +278,7 @@ function Bubble({ msg, isMine, showAvatar, senderName, senderRole }) {
           boxShadow: isMine ? 'var(--shadow-brand)' : 'var(--shadow-sm)',
           border: isMine ? 'none' : '1px solid var(--surface-2)',
         }}>
-          <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.55, wordBreak: 'break-word' }}>{msg.content}</p>
+          <FormattedChatMessage content={msg.content} isUser={isMine} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 3 }}>
             <span style={{ fontSize: '0.6rem', opacity: 0.75 }}>
               {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

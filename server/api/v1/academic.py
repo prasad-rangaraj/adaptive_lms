@@ -210,24 +210,37 @@ def get_marks(
 
 @router.get("/teacher/active-session")
 def get_teacher_active_session(
+    course_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Returns the teacher's currently-live session, or null if none is active."""
-    from models.live_session import LiveSession
-    session = db.query(LiveSession).filter(
+    from models.live_session import LiveSession, SessionParticipant
+    query = db.query(LiveSession).filter(
         LiveSession.teacher_id == current_user.id,
         LiveSession.status == "live"
-    ).first()
+    )
+    if course_id:
+        query = query.filter(LiveSession.course_id == course_id)
+
+    session = query.first()
     if not session:
         return {"active": False, "session": None}
+
+    participant_count = db.query(SessionParticipant).filter(
+        SessionParticipant.session_id == session.id
+    ).count()
+
     return {
         "active": True,
         "session": {
             "id": session.id,
             "title": session.title,
+            "room_name": session.room_name,
             "course_id": session.course_id,
             "course_title": session.course.title if session.course else None,
+            "participants_count": participant_count,
+            "started_at": session.started_at.isoformat() if session.started_at else None,
         }
     }
 
@@ -438,11 +451,12 @@ def auto_capture_teacher_attendance(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Mark attendance for students who actually joined the teacher's currently-live session.
-    Falls back to all enrolled students only when no live session is active for the course.
+    Mark attendance exclusively for students who actually joined the teacher's currently-live session.
+    Fails with 400 if no live session is active.
     """
     import datetime
     import random
+    from fastapi import HTTPException
     from models.course import Course
     from models.enrollment import Enrollment
     from models.academic import AttendanceRecord
@@ -450,7 +464,6 @@ def auto_capture_teacher_attendance(
 
     today = datetime.datetime.utcnow().date()
     captured_students = []
-    live_session_used = None
 
     # ── 1. Find an active live session for this teacher (optionally filtered by course) ──
     live_q = db.query(LiveSession).filter(
@@ -461,28 +474,23 @@ def auto_capture_teacher_attendance(
         live_q = live_q.filter(LiveSession.course_id == course_id)
     active_session = live_q.first()
 
-    if active_session:
-        live_session_used = active_session.id
-        # ── 2a. Get the participant list for that session ──
-        participants = db.query(SessionParticipant).filter(
-            SessionParticipant.session_id == active_session.id
-        ).all()
-
-        student_ids_in_session = {p.user_id for p in participants}
-
-        # ── 3a. Only mark students who actually joined ──
-        enrollments_q = db.query(Enrollment).filter(
-            Enrollment.course_id == active_session.course_id,
-            Enrollment.student_id.in_(student_ids_in_session)
+    if not active_session:
+        raise HTTPException(
+            status_code=400,
+            detail="No active live session found. Auto-Capture requires an active live class."
         )
-        enrollments = enrollments_q.all()
-    else:
-        # ── 2b. No live session — fallback: all enrolled students for this teacher ──
-        teacher_courses = db.query(Course.id).filter(Course.teacher_id == current_user.id).subquery()
-        query = db.query(Enrollment).filter(Enrollment.course_id.in_(teacher_courses))
-        if course_id:
-            query = query.filter(Enrollment.course_id == course_id)
-        enrollments = query.all()
+
+    # ── 2. Get students who joined this live session ──
+    participants = db.query(SessionParticipant).filter(
+        SessionParticipant.session_id == active_session.id
+    ).all()
+
+    student_ids_in_session = {p.user_id for p in participants}
+
+    enrollments = db.query(Enrollment).filter(
+        Enrollment.course_id == active_session.course_id,
+        Enrollment.student_id.in_(student_ids_in_session)
+    ).all()
 
     for en in enrollments:
         if not en.student:
@@ -523,11 +531,12 @@ def auto_capture_teacher_attendance(
 
     db.commit()
     return {
-        "message": f"Successfully auto-captured attendance for {len(captured_students)} student(s).",
+        "message": f"Successfully auto-captured attendance for {len(captured_students)} student(s) in '{active_session.title}'.",
         "captured_count": len(captured_students),
         "timestamp": datetime.datetime.utcnow().isoformat(),
-        "live_session_id": live_session_used,
-        "mode": "live_session_participants" if live_session_used else "all_enrolled_fallback",
+        "live_session_id": active_session.id,
+        "session_title": active_session.title,
+        "mode": "live_session_participants",
         "students": captured_students
     }
 

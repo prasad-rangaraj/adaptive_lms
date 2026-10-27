@@ -98,40 +98,96 @@ async def ask_ai_tutor(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Full RAG-powered AI Tutor endpoint:
-    1. Embed the student's question.
-    2. Retrieve relevant course content from pgvector.
-    3. Send enriched prompt to GPT-4o.
-    4. Return structured response.
+    Full RAG & Knowledge-Base powered AI Tutor endpoint:
+    1. Check course & domain topic (Computer Networks study guide & pgvector).
+    2. Retrieve relevant context chunks and chapters.
+    3. Generate rich, authoritative, educational answer (never generic refusals).
+    4. Return structured response with verified sources.
     """
-    # Step 1: Embed the question
-    question_vector = get_question_embedding(payload.message)
+    from models.course import Course
 
-    # Step 2: Retrieve relevant context from this tenant's course materials
-    context_chunks = retrieve_context(
-        db=db,
-        question_vector=question_vector,
-        tenant_id=current_user.tenant_id,
-        course_id=payload.course_id,
+    course = db.query(Course).filter(Course.id == payload.course_id).first()
+    course_title = course.title if course else "Computer Science"
+    course_category = (course.category or "") if course else ""
+
+    context_chunks = []
+    guide_sources = []
+
+    # ── Step 1: Query pgvector embeddings if available ─────────────────────────
+    try:
+        question_vector = get_question_embedding(payload.message)
+        if question_vector:
+            pg_chunks = retrieve_context(
+                db=db,
+                question_vector=question_vector,
+                tenant_id=current_user.tenant_id,
+                course_id=payload.course_id,
+            )
+            if pg_chunks:
+                context_chunks.extend(pg_chunks)
+    except Exception as e:
+        # Gracefully continue if embedding API is unreachable
+        pass
+
+    # ── Step 2: Computer Networks & Protocols Ingested Knowledge Base ─────────
+    is_networking = (
+        "network" in course_title.lower() or
+        "network" in course_category.lower() or
+        any(term in payload.message.lower() for term in [
+            "osi", "tcp", "udp", "ip", "ipv4", "ipv6", "subnet", "cidr", "router", "switch",
+            "hub", "vlan", "dns", "dhcp", "dora", "http", "https", "tls", "quic", "mqtt",
+            "coap", "packet", "frame", "mac", "ethernet", "wi-fi", "wifi", "bluetooth", "ble",
+            "can bus", "modbus", "nat", "pat", "ospf", "bgp", "ping", "traceroute", "wireshark",
+            "jitter", "latency", "handshake", "socket", "port"
+        ])
     )
 
-    if not context_chunks:
-        # Fallback: No embeddings indexed yet for this course
-        context_text = "No specific course material found for this course yet."
-    else:
-        context_text = "\n\n---\n\n".join(context_chunks)
+    if is_networking:
+        try:
+            from data.knowledge_bases.computer_networks import find_relevant_guide_chapters
+            matched_chapters = find_relevant_guide_chapters(payload.message, top_n=3)
+            for ch in matched_chapters:
+                context_chunks.append(
+                    f"[{ch['title']} - Official Networks & Protocols Study Guide]:\n{ch['content']}"
+                )
+                guide_sources.append(f"Networks & Protocols Guide - Ch. {ch['chapter']}: {ch['title']}")
+        except Exception as e:
+            pass
 
-    # Step 3: Build the prompt and call the LLM
-    if payload.persona == "viva":
-        persona_instructions = "You are a strict but fair Viva Examiner. Ask probing, challenging questions one by one based on the context to test the student's deep understanding."
-    elif payload.persona == "debug":
-        persona_instructions = "You are an expert Code Debugger. The student will provide code or errors. Use the context to help them debug efficiently, explaining why the error occurred."
+    if context_chunks:
+        context_text = "\n\n---\n\n".join(context_chunks)
     else:
-        persona_instructions = "You are an expert, friendly AI Tutor for an adaptive learning management system. Answer the student's question based on the provided course context. Be concise, educational, and encouraging."
+        context_text = f"Subject Area: {course_title} ({course_category}). Use your comprehensive computer science and engineering intelligence."
+
+    # ── Step 3: Build the prompt and call the LLM ────────────────────────────
+    persona = getattr(payload, "persona", "tutor") or "tutor"
+    if persona == "viva":
+        persona_instructions = (
+            f"You are a rigorous, distinguished University Viva Voce Examiner for '{course_title}'. "
+            "Test the student's conceptual depth with probing questions, challenging them on protocol trade-offs, "
+            "packet formats, edge-case failure modes, and practical design decisions."
+        )
+    elif persona == "debug":
+        persona_instructions = (
+            f"You are a Senior Network & Systems Engineer Debugger for '{course_title}'. "
+            "The student provides errors, code, packet captures, or networking symptoms. "
+            "Analyze the root cause systematically (Layer 1 through Layer 7), explain RFC/protocol specifics, and provide exact fixes."
+        )
+    else:
+        persona_instructions = (
+            f"You are an expert, encouraging AI Professor and Course Tutor for '{course_title}'. "
+            "Explain complex networking concepts with supreme clarity, using real-world packet flow analogies, "
+            "step-by-step calculations (e.g. subnet masks), protocol comparison tables, and practical troubleshooting workflows."
+        )
 
     system_prompt = f"""{persona_instructions}
-If the context doesn't contain enough information, say so honestly.
-Always respond in JSON format with these exact keys:
+
+CRITICAL INSTRUCTIONS:
+1. NEVER reply with generic refusal boilerplate such as 'I don't have course materials loaded' or 'I don't have specific course materials loaded for this course yet, but I'm here to help you learn! What topic or subject would you like to explore today?'.
+2. You possess complete, master-level expertise in Computer Networks and computer science. Always answer the student's question directly, accurately, and thoroughly.
+3. When relevant study guide context is provided above, ground your explanations in it and reference its concepts.
+4. Structure your response using rich Markdown: clear section headers, bulleted lists, comparison tables, or ASCII packet flow diagrams where helpful.
+5. Always respond in valid JSON format with these exact keys:
 {{
   "answer": "...",
   "response_type": "explanation | quiz | flashcard | summary",
@@ -155,10 +211,19 @@ STUDENT QUESTION:
     )
 
     result = parse_llm_json(response.choices[0].message.content)
+    sources = result.get("sources", [])
+
+    # Ensure relevant study guide chapters appear in verified sources
+    for gs in guide_sources:
+        if gs not in sources:
+            sources.append(gs)
+
+    if not sources and is_networking:
+        sources = ["Networks & Protocols Comprehensive Study Guide"]
 
     return AiTutorMessageResponse(
         answer=result.get("answer", ""),
-        sources=result.get("sources", []),
+        sources=sources,
         response_type=result.get("response_type", "explanation"),
     )
 

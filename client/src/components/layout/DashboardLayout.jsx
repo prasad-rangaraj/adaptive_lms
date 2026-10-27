@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { tenantsAPI, authAPI } from '../../services/api.service';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { tenantsAPI, authAPI, adminAPI } from '../../services/api.service';
 import { useAuthStore } from '../../store/authStore';
+import { PlanModal } from '../common/PlanNotificationBell';
 import {
   LayoutDashboard, BookOpen, Bot, Shield, Building2,
   LogOut, GraduationCap, Brain,
@@ -174,7 +175,35 @@ export default function DashboardLayout({ role }) {
     ]
   };
 
-  const notifications = mockNotifs[role] || mockNotifs.student;
+  const qc = useQueryClient();
+  const [selectedPlanNotif, setSelectedPlanNotif] = useState(null);
+
+  const { data: planNotifs = [] } = useQuery({
+    queryKey: ['plan-notifications'],
+    queryFn: () => adminAPI.getPlanNotifications().then(r => r.data),
+    enabled: role === 'admin' && !!authStore.isAuthenticated,
+    refetchInterval: 30000,
+  });
+
+  const markPlanNotifRead = useMutation({
+    mutationFn: (id) => adminAPI.markPlanNotificationRead(id),
+    onSuccess: () => qc.invalidateQueries(['plan-notifications']),
+  });
+
+  const baseNotifications = mockNotifs[role] || mockNotifs.student;
+  const planNotificationItems = role === 'admin'
+    ? planNotifs.map(pn => ({
+        id: `plan-notif-${pn.id}`,
+        isPlanUpdate: true,
+        planNotification: pn,
+        title: `Plans v${pn.plan_config?.version || 1} Published`,
+        text: `New subscription plans have been published. Click to view full details and features.`,
+        time: new Date(pn.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+        unread: !pn.is_read
+      }))
+    : [];
+
+  const notifications = [...planNotificationItems, ...baseNotifications];
   const unreadCount = notifications.filter(n => n.unread).length;
 
   const user = authStore.user || {
@@ -370,16 +399,56 @@ export default function DashboardLayout({ role }) {
                 </div>
                 <div style={{ maxHeight: 360, overflowY: 'auto' }}>
                   {notifications.map(n => (
-                    <div key={n.id} style={{
-                      padding: '12px 16px', borderBottom: '1px solid var(--surface-2)',
-                      background: n.unread ? 'var(--brand-50)' : 'transparent',
-                      cursor: 'pointer', transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'}
-                    onMouseLeave={e => e.currentTarget.style.background = n.unread ? 'var(--brand-50)' : 'transparent'}
+                    <div
+                      key={n.id}
+                      onClick={() => {
+                        if (n.isPlanUpdate) {
+                          setShowNotifications(false);
+                          setSelectedPlanNotif(n.planNotification);
+                          if (!n.planNotification.is_read) {
+                            markPlanNotifRead.mutate(n.planNotification.id);
+                          }
+                        }
+                      }}
+                      style={{
+                        padding: '12px 16px',
+                        borderBottom: '1px solid var(--surface-2)',
+                        background: n.isPlanUpdate && n.unread
+                          ? 'linear-gradient(90deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.04))'
+                          : n.unread
+                          ? 'var(--brand-50)'
+                          : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        borderLeft: n.isPlanUpdate ? '3px solid #6366f1' : 'none'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'}
+                      onMouseLeave={e => e.currentTarget.style.background = n.isPlanUpdate && n.unread ? 'linear-gradient(90deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.04))' : n.unread ? 'var(--brand-50)' : 'transparent'}
                     >
-                      <p style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', margin: '0 0 4px 0', lineHeight: 1.4, fontWeight: n.unread ? 600 : 400 }}>{n.text}</p>
-                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{n.time}</span>
+                      {n.isPlanUpdate && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', background: '#e0e7ff', color: '#4338ca', padding: '1px 6px', borderRadius: 4 }}>
+                            ⚡ Plan Update
+                          </span>
+                          {n.unread && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366f1' }} />}
+                        </div>
+                      )}
+                      <p style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', margin: '0 0 4px 0', lineHeight: 1.4, fontWeight: n.unread ? 700 : 400 }}>
+                        {n.title || n.text}
+                      </p>
+                      {n.title && (
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 4px 0', lineHeight: 1.3 }}>
+                          {n.text}
+                        </p>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{n.time}</span>
+                        {n.isPlanUpdate && (
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#4f46e5' }}>
+                            View Plans →
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
                   {notifications.length === 0 && (
@@ -450,6 +519,18 @@ export default function DashboardLayout({ role }) {
           </div>
         </div>
       </div>
+
+      {selectedPlanNotif && (
+        <PlanModal
+          notification={selectedPlanNotif}
+          onClose={() => setSelectedPlanNotif(null)}
+          onRead={() => {
+            if (!selectedPlanNotif.is_read) {
+              markPlanNotifRead.mutate(selectedPlanNotif.id);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
