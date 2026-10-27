@@ -198,7 +198,8 @@ export function useProctoring(options = {}) {
 
     // Connect to WebSocket
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        wsRef.current = new WebSocket(`ws://localhost:8000/api/proctoring/ws/vision/${examId}`);
+        const wsBase = import.meta.env.VITE_WS_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/^http/, 'ws') : 'ws://localhost:8000');
+        wsRef.current = new WebSocket(`${wsBase}/api/proctoring/ws/vision/${examId}`);
         
         wsRef.current.onmessage = (event) => {
             const data = JSON.parse(event.data);
