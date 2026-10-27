@@ -9,12 +9,20 @@ from models.course import Course
 from schemas.schemas import ProctoringViolationEvent
 import json
 import base64
-import numpy as np
-import cv2
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import redis.asyncio as aioredis
 from core.config import settings
+
+# Safe imports for vision/OpenCV dependencies
+try:
+    import numpy as np
+    import cv2
+    HAS_VISION_DEPS = True
+except ImportError:
+    np = None
+    cv2 = None
+    HAS_VISION_DEPS = False
 
 # Thread pool for running YOLO without blocking the async event loop
 _yolo_executor = ThreadPoolExecutor(max_workers=1)
@@ -24,20 +32,27 @@ yolo_model = None
 def get_yolo_model():
     global yolo_model
     if yolo_model is None:
-        import torch
-        from ultralytics import YOLO
-        yolo_model = YOLO("yolov8s.pt")
-        # Use FP16 half-precision if GPU available (2x faster, half the memory)
-        if torch.cuda.is_available():
-            yolo_model.model.half()
-            print("[Proctoring] YOLO running on GPU with FP16")
-        else:
-            print("[Proctoring] YOLO running on CPU")
-        # Warm up the model with a dummy frame to avoid first-frame latency spike
-        import numpy as np
-        dummy = np.zeros((416, 416, 3), dtype=np.uint8)
-        yolo_model.predict(dummy, imgsz=416, verbose=False)
-        print("[Proctoring] YOLO warmed up and ready")
+        try:
+            import torch
+            from ultralytics import YOLO
+            yolo_model = YOLO("yolov8s.pt")
+            # Use FP16 half-precision if GPU available (2x faster, half the memory)
+            if torch.cuda.is_available():
+                yolo_model.model.half()
+                print("[Proctoring] YOLO running on GPU with FP16")
+            else:
+                print("[Proctoring] YOLO running on CPU")
+            # Warm up the model with a dummy frame to avoid first-frame latency spike
+            if np is not None:
+                dummy = np.zeros((416, 416, 3), dtype=np.uint8)
+                yolo_model.predict(dummy, imgsz=416, verbose=False)
+                print("[Proctoring] YOLO warmed up and ready")
+        except ImportError:
+            print("[Proctoring] Vision models not installed; running in lightweight mode")
+            return None
+        except Exception as e:
+            print(f"[Proctoring] YOLO initialization skipped: {e}")
+            return None
     return yolo_model
 
 router = APIRouter(prefix="/api/proctoring", tags=["Proctoring"])
@@ -414,6 +429,11 @@ async def vision_proctor_ws(
                 missing_padding = len(data) % 4
                 if missing_padding:
                     data += "=" * (4 - missing_padding)
+
+                # If OpenCV/YOLO dependencies are not available on server, echo status ok
+                if not HAS_VISION_DEPS or model is None:
+                    await websocket.send_json({"status": "ok"})
+                    continue
 
                 # Decode base64 to numpy array for OpenCV
                 img_bytes = base64.b64decode(data)
