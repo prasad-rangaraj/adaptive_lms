@@ -6,7 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 import {
   TrendingUp, TrendingDown, Users, BookOpen, GraduationCap, ArrowRight,
   Sparkles, Bell, FileText, Settings, PlayCircle, MoreHorizontal,
-  ChevronRight, Command, LayoutDashboard, ShieldCheck, ClipboardList
+  ChevronRight, Command, LayoutDashboard, ShieldCheck, ClipboardList, LifeBuoy
 } from 'lucide-react';
 import Loader from '../../components/ui/Loader';
 
@@ -62,6 +62,9 @@ export default function AdminDashboard() {
         
         <div style={{ display: 'flex', gap: 12 }}>
           <button className="btn btn-ghost btn-icon"><Bell size={18} /></button>
+          <button className="btn btn-secondary" style={{ gap: 8 }} onClick={() => navigate('/admin/support')}>
+            <LifeBuoy size={16} /> Support Desk
+          </button>
           <button className="btn btn-primary" style={{ gap: 8 }} onClick={() => navigate('/admin/directory')}>
             <Users size={16} /> Invite Members
           </button>
@@ -88,7 +91,8 @@ export default function AdminDashboard() {
               {parts.map((p, i) => {
                 if (p.startsWith('**') && p.endsWith('**')) {
                   const content = p.replace(/\*\*/g, '');
-                  const color = content.toLowerCase().includes('down') || content.toLowerCase().includes('falling') || content.toLowerCase().includes('behind') ? '#e11d48' : 'var(--brand-700)';
+                  const isWarning = ['down', 'falling', 'behind', 'pending', 'approval', 'ticket', 'critical'].some(w => content.toLowerCase().includes(w));
+                  const color = isWarning ? '#e11d48' : 'var(--brand-700)';
                   return <strong key={i} style={{ color, fontWeight: 800 }}>{content}</strong>;
                 }
                 return p;
@@ -231,6 +235,7 @@ export default function AdminDashboard() {
               {[
                 { label: 'Manage Members', icon: Users, color: 'var(--brand-600)', path: '/admin/directory' },
                 { label: 'Curriculum Library', icon: BookOpen, color: 'var(--brand-600)', path: '/admin/content' },
+                { label: 'Support Desk (Raise Ticket)', icon: LifeBuoy, color: 'var(--brand-600)', path: '/admin/support' },
                 { label: 'View Audit Trail', icon: ClipboardList, color: 'var(--brand-600)', path: '/admin/security' },
                 { label: 'Organization Settings', icon: Settings, color: 'var(--text-muted)', path: '/admin/settings' },
               ].map((action, i) => (

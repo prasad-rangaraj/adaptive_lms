@@ -115,22 +115,19 @@ def get_teacher_office_hours(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Mocking for MVP since OfficeHourBooking model isn't built yet
+    from models.community import OfficeHourBooking
+    bookings = db.query(OfficeHourBooking).filter(
+        OfficeHourBooking.teacher_id == current_user.id
+    ).order_by(OfficeHourBooking.id.desc()).limit(15).all()
+    
     return [
         {
-            "id": 1,
-            "student": "Alex M.",
-            "topic": "Assignment 2 Help",
-            "time": "2026-10-10 14:00",
-            "status": "Scheduled"
-        },
-        {
-            "id": 2,
-            "student": "Sarah K.",
-            "topic": "Project Guidance",
-            "time": "2026-10-10 14:30",
-            "status": "Scheduled"
-        }
+            "id": b.id,
+            "student": b.student.full_name if b.student else "Student",
+            "topic": b.topic,
+            "time": f"{b.date} • {b.time}",
+            "status": b.status
+        } for b in bookings
     ]
 
 @router.get("/teacher/bounties")
@@ -158,17 +155,71 @@ def get_teacher_mentees(
     current_user: User = Depends(get_current_user)
 ):
     from models.community import Mentorship
+    from models.enrollment import Enrollment
+    from sqlalchemy import func
+
     mentorships = db.query(Mentorship).filter(Mentorship.mentor_id == current_user.id).all()
-    return [
-        {
+    results = []
+    for m in mentorships:
+        avg_prog = db.query(func.avg(Enrollment.progress_percentage)).filter(
+            Enrollment.student_id == m.mentee_id,
+            Enrollment.status == "active"
+        ).scalar()
+        prog_val = round(float(avg_prog), 1) if avg_prog is not None else 0
+
+        results.append({
             "id": m.id,
-            "name": m.mentee.full_name if m.mentee else "Unknown",
-            "goal": m.focus_area or "General Mentorship",
-            "progress": 50,
-            "nextMeeting": "Unscheduled",
-            "status": m.status.lower()
-        } for m in mentorships
-    ]
+            "mentee_id": m.mentee_id,
+            "name": m.mentee.full_name if m.mentee else "Student",
+            "email": m.mentee.email if m.mentee else "",
+            "avatar_url": m.mentee.avatar_url if m.mentee else None,
+            "goal": m.focus_area or "Software Engineering & Systems Architecture",
+            "progress": prog_val,
+            "nextMeeting": "Available for 1-on-1",
+            "status": m.status.lower() if m.status else "pending"
+        })
+    return results
+
+class AssignMenteeRequest(BaseModel):
+    student_id: int
+    focus_area: Optional[str] = "Academic & Career Mentorship"
+
+@router.post("/teacher/mentees/assign")
+def assign_mentee(
+    payload: AssignMenteeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from models.community import Mentorship
+    existing = db.query(Mentorship).filter(
+        Mentorship.mentor_id == current_user.id,
+        Mentorship.mentee_id == payload.student_id
+    ).first()
+    if existing:
+        existing.status = "active"
+        existing.focus_area = payload.focus_area or existing.focus_area
+    else:
+        m = Mentorship(
+            mentor_id=current_user.id,
+            mentee_id=payload.student_id,
+            focus_area=payload.focus_area or "Academic & Career Mentorship",
+            status="active"
+        )
+        db.add(m)
+    db.commit()
+    return {"status": "success"}
+
+@router.get("/teacher/available-students")
+def get_available_students(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from models.user import User as UserModel
+    students = db.query(UserModel).filter(
+        UserModel.tenant_id == current_user.tenant_id,
+        UserModel.role == "student"
+    ).all()
+    return [{"id": s.id, "name": s.full_name, "email": s.email} for s in students]
 
 @router.put("/teacher/mentees/{mentorship_id}/accept")
 def accept_mentorship(
@@ -234,8 +285,19 @@ def book_office_hour(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Mocking booking success for MVP since model doesn't exist yet
-    return {"status": "success"}
+    from models.community import OfficeHourBooking
+    booking = OfficeHourBooking(
+        teacher_id=payload.teacher_id,
+        student_id=current_user.id,
+        topic=payload.topic,
+        date=payload.date,
+        time=payload.time,
+        status="upcoming"
+    )
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+    return {"status": "success", "id": booking.id}
 
 @router.post("/mentorships/request")
 def request_mentorship(

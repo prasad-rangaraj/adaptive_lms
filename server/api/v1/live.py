@@ -4,7 +4,7 @@ from db.database import get_db
 from core.config import settings
 from core.security import get_current_user, require_role
 from models.user import User
-from models.live_session import LiveSession
+from models.live_session import LiveSession, SessionParticipant
 from schemas.schemas import LiveSessionCreateRequest, LiveSessionResponse
 from livekit.api import AccessToken, VideoGrants
 from typing import List, Optional
@@ -194,6 +194,16 @@ async def join_session(
 
     can_publish = current_user.role in ("teacher", "tenant_admin", "super_admin")
     token = _mint_token(current_user, session.room_name, can_publish=can_publish)
+
+    # Record participant join (upsert — ignore if student already logged)
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+    stmt = pg_insert(SessionParticipant).values(
+        session_id=session_id,
+        user_id=current_user.id,
+    ).on_conflict_do_nothing(constraint="uq_session_participant")
+    db.execute(stmt)
+    db.commit()
+
     return {"token": token, "url": settings.LIVEKIT_URL, "room_name": session.room_name, "session_id": session.id}
 
 

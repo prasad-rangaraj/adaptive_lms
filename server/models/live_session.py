@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.database import Base
@@ -33,3 +33,20 @@ class LiveSession(Base):
     # Relationships
     teacher = relationship("User")
     course = relationship("Course")
+    participants = relationship("SessionParticipant", back_populates="session", cascade="all, delete-orphan")
+
+
+class SessionParticipant(Base):
+    """Records each user who actually joined a live session — used by Auto-Capture."""
+    __tablename__ = "session_participants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("live_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    joined_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Each user only appears once per session (upsert via INSERT ... ON CONFLICT DO NOTHING)
+    __table_args__ = (UniqueConstraint("session_id", "user_id", name="uq_session_participant"),)
+
+    session = relationship("LiveSession", back_populates="participants")
+    user = relationship("User")

@@ -29,17 +29,7 @@ async def get_all_courses(
     return db.query(Course).order_by(Course.created_at.desc()).all()
 
 
-from models.audit_log import AuditLog
-from schemas.schemas import AuditLogResponse
 
-@router.get("/audit-logs", response_model=List[AuditLogResponse])
-async def get_audit_logs(
-    limit: int = 50,
-    db: Session = Depends(get_db),
-    _: User = Depends(require_role("super_admin")),
-):
-    """Super Admin only: Fetch the global audit logs."""
-    return db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all()
 
 
 @router.get("/billing")
@@ -159,12 +149,35 @@ async def get_system_health(
 
 @router.get("/audit-logs")
 async def get_audit_logs(
+    tenant_id: Optional[int] = None,
+    limit: int = 200,
     db: Session = Depends(get_db),
     _: User = Depends(require_role("super_admin")),
 ):
-    """Super Admin: Fetch system-wide security audit trail."""
+    """Super Admin: Fetch system-wide security audit trail with optional organization filtering."""
     from models.audit_log import AuditLog
-    logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(100).all()
+    from models.tenant import Tenant
+    from models.user import User as UserModel
+
+    # Map all tenants for fast org name lookups
+    tenants_list = db.query(Tenant).all()
+    tenant_map = {t.id: t.name for t in tenants_list}
+
+    query = db.query(AuditLog)
+    if tenant_id is not None:
+        if tenant_id == 0:  # 0 indicates platform root / unassociated logs
+            query = query.filter(AuditLog.tenant_id == None)
+        else:
+            query = query.filter(AuditLog.tenant_id == tenant_id)
+
+    logs = query.order_by(AuditLog.created_at.desc()).limit(limit).all()
+
+    user_ids = {log.user_id for log in logs if log.user_id}
+    user_map = {}
+    if user_ids:
+        users = db.query(UserModel).filter(UserModel.id.in_(user_ids)).all()
+        user_map = {u.id: {"name": u.full_name, "email": u.email} for u in users}
+
     return [
         {
             "id": log.id,
@@ -173,7 +186,10 @@ async def get_audit_logs(
             "details": log.details,
             "ip_address": log.ip_address,
             "user_id": log.user_id,
+            "user_name": user_map.get(log.user_id, {}).get("name") if log.user_id else None,
+            "user_email": user_map.get(log.user_id, {}).get("email") if log.user_id else None,
             "tenant_id": log.tenant_id,
+            "tenant_name": tenant_map.get(log.tenant_id, "Platform Root / Global") if log.tenant_id else "Platform Root / Global",
             "created_at": log.created_at.isoformat() + "Z" if log.created_at else None,
         }
         for log in logs
@@ -185,6 +201,13 @@ class TicketReplyRequest(BaseModel):
 
 class TicketStatusRequest(BaseModel):
     status: str
+
+class AdminTicketCreateRequest(BaseModel):
+    subject: str
+    category: Optional[str] = "General"
+    priority: Optional[str] = "medium"
+    description: str
+    tenant_id: Optional[int] = None
 
 class BroadcastCreateRequest(BaseModel):
     type: Optional[str] = "info"
@@ -221,6 +244,56 @@ async def get_support_tickets(
         }
         for t in tickets
     ]
+
+
+@router.post("/tickets", status_code=201)
+async def create_admin_ticket(
+    payload: AdminTicketCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("super_admin")),
+):
+    """Super Admin: Raise a support or maintenance ticket."""
+    from models.system import SupportTicket
+    from models.audit_log import AuditLog
+
+    ticket = SupportTicket(
+        tenant_id=payload.tenant_id,
+        subject=payload.subject.strip(),
+        category=payload.category or "General",
+        priority=payload.priority or "medium",
+        status="open",
+        raised_by=current_user.id,
+        description=payload.description.strip(),
+        replies_count=0
+    )
+    db.add(ticket)
+    db.flush()
+
+    audit = AuditLog(
+        tenant_id=payload.tenant_id,
+        user_id=current_user.id,
+        action="ticket_created",
+        resource="support_ticket",
+        details={"ticket_id": f"TKT-{ticket.id:03d}", "subject": ticket.subject, "priority": ticket.priority, "by": "super_admin"},
+        ip_address="127.0.0.1"
+    )
+    db.add(audit)
+    db.commit()
+    db.refresh(ticket)
+
+    return {
+        "id": f"TKT-{ticket.id:03d}",
+        "numeric_id": ticket.id,
+        "subject": ticket.subject,
+        "category": ticket.category or "General",
+        "priority": ticket.priority,
+        "status": ticket.status,
+        "description": ticket.description,
+        "orgId": ticket.tenant_id,
+        "createdAt": ticket.created_at.isoformat() + "Z" if ticket.created_at else None,
+        "replies": ticket.replies_count or 0,
+        "raised_by": current_user.full_name or "Super Admin"
+    }
 
 
 @router.post("/tickets/{ticket_id}/reply")

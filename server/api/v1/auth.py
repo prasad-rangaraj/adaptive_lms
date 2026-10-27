@@ -90,6 +90,7 @@ async def register_org(payload: OrgRegisterRequest, db: Session = Depends(get_db
         user_id=user.id,
         role=user.role,
         full_name=user.full_name,
+        avatar_url=user.avatar_url,
         tenant_id=user.tenant_id,
     )
 
@@ -115,6 +116,7 @@ async def login(
         user_id=user.id,
         role=user.role,
         full_name=user.full_name,
+        avatar_url=user.avatar_url,
         tenant_id=user.tenant_id,
     )
 
@@ -142,6 +144,7 @@ async def impersonate_user(
         user_id=target_user.id,
         role=target_user.role,
         full_name=target_user.full_name,
+        avatar_url=target_user.avatar_url,
         tenant_id=target_user.tenant_id,
     )
 
@@ -150,3 +153,58 @@ async def impersonate_user(
 async def get_me(current_user: User = Depends(get_current_user)):
     """Return the profile of the currently authenticated user."""
     return current_user
+
+
+from pydantic import BaseModel
+from typing import Optional
+
+class UpdateProfileRequest(BaseModel):
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.put("/me")
+async def update_me(
+    payload: UpdateProfileRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update profile details for the authenticated user (any role)."""
+    if payload.full_name is not None and payload.full_name.strip():
+        current_user.full_name = payload.full_name.strip()
+    if payload.avatar_url is not None:
+        current_user.avatar_url = payload.avatar_url.strip()
+
+    db.commit()
+    db.refresh(current_user)
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "role": current_user.role,
+        "avatar_url": current_user.avatar_url,
+        "tenant_id": current_user.tenant_id,
+        "is_active": current_user.is_active,
+    }
+
+
+@router.put("/change-password")
+async def change_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Change password for the authenticated user (any role)."""
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password does not match.")
+    if len(payload.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters.")
+
+    current_user.password_hash = get_password_hash(payload.new_password)
+    db.commit()
+    return {"message": "Password updated successfully."}
+

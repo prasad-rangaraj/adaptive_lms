@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { tenantsAPI, authAPI } from '../../services/api.service';
 import { useAuthStore } from '../../store/authStore';
 import {
   LayoutDashboard, BookOpen, Bot, Shield, Building2,
@@ -32,6 +34,9 @@ const navConfig = {
     { section: 'Future', items: [
       { to: '/student/career', icon: TrendingUp, label: 'Career Horizon' },
     ]},
+    { section: 'Account', items: [
+      { to: '/student/settings', icon: Settings, label: 'Settings' },
+    ]},
   ],
   teacher: [
     { section: 'Command Center', items: [
@@ -50,6 +55,9 @@ const navConfig = {
       { to: '/teacher/live', icon: Video, label: 'Live Sessions' },
       { to: '/teacher/mentorship', icon: HeartPulse, label: 'Mentorship Hub' },
       { to: '/teacher/chat', icon: MessageSquare, label: 'Messages' },
+    ]},
+    { section: 'Preferences', items: [
+      { to: '/teacher/settings', icon: Settings, label: 'Settings' },
     ]},
   ],
   admin: [
@@ -75,6 +83,7 @@ const navConfig = {
     { section: 'Administration', items: [
       { to: '/admin/security',      icon: Shield,          label: 'Security Hub' },
       { to: '/admin/settings',      icon: Settings,        label: 'Settings Hub' },
+      { to: '/admin/support',       icon: LifeBuoy,        label: 'Support Desk' },
     ]},
   ],
   super_admin: [
@@ -174,6 +183,29 @@ export default function DashboardLayout({ role }) {
     role: 'super_admin'
   };
 
+  const tenantId = user?.tenant_id;
+  const { data: tenantInfo } = useQuery({
+    queryKey: ['tenant-branding-active', tenantId],
+    queryFn: () => tenantsAPI.get(tenantId).then(r => r.data),
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 10,
+  });
+
+  // Sync latest user profile (avatar, name) from backend on mount
+  useEffect(() => {
+    if (authStore.isAuthenticated) {
+      authAPI.me().then(res => {
+        if (res.data) {
+          authStore.updateUser({
+            full_name: res.data.full_name,
+            avatar_url: res.data.avatar_url,
+            email: res.data.email,
+          });
+        }
+      }).catch(() => {});
+    }
+  }, [authStore.isAuthenticated]);
+
   const handleLogout = () => { authStore.logout(); navigate('/auth/login'); };
 
   return (
@@ -189,11 +221,18 @@ export default function DashboardLayout({ role }) {
               background: rc.gradient,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: rc.glow, flexShrink: 0,
+              overflow: 'hidden'
             }}>
-              <GraduationCap size={18} color="white" />
+              {tenantInfo?.logo_url ? (
+                <img src={tenantInfo.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <GraduationCap size={18} color="white" />
+              )}
             </div>
-            <div>
-              <p style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.9375rem', letterSpacing: '-0.025em', lineHeight: 1 }}>Lumina</p>
+            <div style={{ overflow: 'hidden' }}>
+              <p style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.9375rem', letterSpacing: '-0.025em', lineHeight: 1, maxWidth: 135, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tenantInfo?.name || 'Lumina'}>
+                {tenantInfo?.name || 'Lumina'}
+              </p>
               <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: 2 }}>{rc.label} Portal</p>
             </div>
           </div>
@@ -228,8 +267,21 @@ export default function DashboardLayout({ role }) {
         <div style={{ padding: '1rem', borderTop: '1px solid var(--sidebar-border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.625rem 0.75rem', borderRadius: 10, background: 'var(--surface-2)', marginBottom: '0.625rem' }}>
             <div style={{ position: 'relative' }}>
-              <div className="avatar" style={{ width: 32, height: 32, fontSize: '0.875rem', background: rc.gradient, boxShadow: rc.glow }}>
-                {user?.full_name?.[0]?.toUpperCase()}
+              <div className="avatar" style={{ 
+                width: 34, height: 34, fontSize: '0.875rem', 
+                background: rc.gradient, boxShadow: rc.glow, 
+                overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' 
+              }}>
+                {user?.avatar_url ? (
+                  <img 
+                    src={user.avatar_url} 
+                    alt={user?.full_name} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                ) : (
+                  user?.full_name?.[0]?.toUpperCase() || 'U'
+                )}
               </div>
               <div style={{ position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: '#16a34a', border: '1.5px solid white' }} />
             </div>
@@ -341,9 +393,47 @@ export default function DashboardLayout({ role }) {
             )}
           </div>
 
-          <button className="btn btn-ghost btn-icon">
-            <Settings size={17} color="var(--text-muted)" />
-          </button>
+          {/* User Profile Pill in Navbar */}
+          <div 
+            onClick={() => {
+              const path = role === 'admin' ? '/admin/settings' : role === 'super_admin' ? '/super-admin/settings' : role === 'teacher' ? '/teacher/settings' : '/student/settings';
+              navigate(path);
+            }}
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', 
+              padding: '3px 10px 3px 4px', borderRadius: 999, border: '1px solid var(--surface-3)',
+              background: 'var(--surface-0)', transition: 'all 0.15s',
+              boxShadow: 'var(--shadow-xs)'
+            }}
+            title="Account & Profile Settings"
+            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand-400)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--surface-3)'}
+          >
+            <div style={{ 
+              width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', 
+              background: rc.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              color: 'white', fontWeight: 800, fontSize: '0.75rem', flexShrink: 0 
+            }}>
+              {user?.avatar_url ? (
+                <img 
+                  src={user.avatar_url} 
+                  alt={user?.full_name} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              ) : (
+                user?.full_name?.[0]?.toUpperCase() || 'U'
+              )}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.full_name || 'Profile'}
+              </span>
+              <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                {role?.replace('_', ' ')}
+              </span>
+            </div>
+          </div>
         </header>
 
         {/* Page Content */}

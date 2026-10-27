@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './store/authStore';
+import TenantThemeApplier from './components/common/TenantThemeApplier';
+
 
 // Layouts
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -28,6 +30,7 @@ import StudentCoursesHub from './pages/student/StudentCoursesHub';
 import CoursesHub from './pages/shared/CoursesHub';
 import StudentLiveArena from './pages/student/StudentLiveArena';
 import StudentOnboarding from './pages/student/StudentOnboarding';
+import StudentSettingsHub from './pages/student/StudentSettingsHub';
 
 // Teacher Pages
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
@@ -38,6 +41,7 @@ import TeacherAcademicDesk from './pages/teacher/TeacherAcademicDesk';
 import TeacherMentorshipHub from './pages/teacher/TeacherMentorshipHub';
 import TeacherExamForge from './pages/teacher/TeacherExamForge';
 import TeacherCommunicationHub from './pages/teacher/TeacherCommunicationHub';
+import TeacherSettingsHub from './pages/teacher/TeacherSettingsHub';
 
 
 // Admin Pages
@@ -53,6 +57,7 @@ import OrgSettingsHub from './pages/admin/OrgSettingsHub';
 import OrgAcademicMonitor from './pages/admin/OrgAcademicMonitor';
 import OrgAssessmentMonitor from './pages/admin/OrgAssessmentMonitor';
 import OrgLiveMonitor from './pages/admin/OrgLiveMonitor';
+import OrgSupportHub from './pages/admin/OrgSupportHub';
 
 // Super Admin Pages
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
@@ -84,6 +89,7 @@ function ProtectedRoute({ children, allowedRoles }) {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <TenantThemeApplier />
       <BrowserRouter>
         <Toaster
           position="top-right"
@@ -133,6 +139,7 @@ export default function App() {
             <Route path="career" element={<StudentCareerHub />} />
             <Route path="live/:courseId" element={<StudentLiveArena />} />
             <Route path="live" element={<StudentLiveArena />} /> {/* default for testing */}
+            <Route path="settings" element={<StudentSettingsHub />} />
           </Route>
           
           {/* Onboarding is outside the main dashboard layout but protected */}
@@ -159,6 +166,7 @@ export default function App() {
             <Route path="communication" element={<TeacherCommunicationHub />} />
             <Route path="chat" element={<ChatHub />} />
             <Route path="courses" element={<CoursesHub />} />
+            <Route path="settings" element={<TeacherSettingsHub />} />
           </Route>
 
           {/* Admin Routes (Tenant Admin) */}
@@ -180,6 +188,7 @@ export default function App() {
             <Route path="assessment" element={<OrgAssessmentMonitor />} />
             <Route path="live" element={<OrgLiveMonitor />} />
             <Route path="chat" element={<ChatHub />} />
+            <Route path="support" element={<OrgSupportHub />} />
           </Route>
 
           {/* Super Admin Routes */}

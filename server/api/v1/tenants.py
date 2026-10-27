@@ -303,23 +303,10 @@ async def get_dashboard_narrative(
     student_count = db.query(User).filter(User.tenant_id == tenant_id, User.role == "student").count()
     teacher_count = db.query(User).filter(User.tenant_id == tenant_id, User.role == "teacher").count()
     
-    from models.enrollment import Enrollment
     from models.course import Course
     from models.academic import LeaveRequest
+    from models.system import SupportTicket
     
-    # Calculate unique students falling behind (<30% progress)
-    falling_behind_students = (
-        db.query(Enrollment.student_id)
-        .join(Course, Enrollment.course_id == Course.id)
-        .filter(
-            Course.tenant_id == tenant_id,
-            Enrollment.status == "active",
-            Enrollment.progress_percentage < 30
-        )
-        .distinct()
-        .count()
-    )
-
     pending_courses = db.query(Course).filter(
         Course.tenant_id == tenant_id,
         Course.is_published == False
@@ -331,6 +318,11 @@ async def get_dashboard_narrative(
         .filter(User.tenant_id == tenant_id, LeaveRequest.status == "Pending")
         .count()
     )
+
+    open_tickets = db.query(SupportTicket).filter(
+        SupportTicket.tenant_id == tenant_id,
+        SupportTicket.status.in_(["open", "in_progress"])
+    ).count()
 
     from datetime import datetime
     hour = datetime.utcnow().hour
@@ -346,12 +338,12 @@ async def get_dashboard_narrative(
     t_label = f"**{teacher_count} teacher**" if teacher_count == 1 else f"**{teacher_count} teachers**"
 
     status_summary = []
-    if falling_behind_students > 0:
-        status_summary.append(f"**{falling_behind_students} student{' is' if falling_behind_students == 1 else 's are'} falling behind** (<30% progress)")
-    if pending_courses > 0:
-        status_summary.append(f"**{pending_courses} pending course approval{'s' if pending_courses > 1 else ''}**")
     if pending_leaves > 0:
         status_summary.append(f"**{pending_leaves} pending leave request{'s' if pending_leaves > 1 else ''}**")
+    if pending_courses > 0:
+        status_summary.append(f"**{pending_courses} pending course approval{'s' if pending_courses > 1 else ''}**")
+    if open_tickets > 0:
+        status_summary.append(f"**{open_tickets} active support ticket{'s' if open_tickets > 1 else ''}**")
 
     if status_summary:
         narrative = (
@@ -366,14 +358,6 @@ async def get_dashboard_narrative(
         )
 
     action_items = []
-    if pending_courses > 0:
-        action_items.append({
-            "id": "courses",
-            "title": f"Review {pending_courses} unpublished course{'s' if pending_courses > 1 else ''}",
-            "description": "Instructors are waiting for tenant publication.",
-            "link": "/admin/content",
-            "priority": "high",
-        })
     if pending_leaves > 0:
         action_items.append({
             "id": "leaves",
@@ -382,12 +366,20 @@ async def get_dashboard_narrative(
             "link": "/admin/academic",
             "priority": "medium",
         })
-    if falling_behind_students > 0:
+    if pending_courses > 0:
         action_items.append({
-            "id": "academic_pulse",
-            "title": f"Inspect {falling_behind_students} student{'s' if falling_behind_students == 1 else ''} with low progress",
-            "description": "Progress below 30% threshold in enrolled courses.",
-            "link": "/admin/academic",
+            "id": "courses",
+            "title": f"Review {pending_courses} unpublished course{'s' if pending_courses > 1 else ''}",
+            "description": "Instructors are waiting for tenant publication.",
+            "link": "/admin/content",
+            "priority": "high",
+        })
+    if open_tickets > 0:
+        action_items.append({
+            "id": "tickets",
+            "title": f"Track {open_tickets} active support ticket{'s' if open_tickets > 1 else ''}",
+            "description": "Tickets opened with platform support.",
+            "link": "/admin/support",
             "priority": "medium",
         })
     if not action_items:
@@ -1092,5 +1084,138 @@ async def delete_tenant_api_key(
     tenant.features_json = json.dumps(features)
     db.commit()
     return {"message": "API key revoked"}
+
+
+# ── Support Tickets for Tenant Organizations ─────────────────────────────────
+from pydantic import BaseModel
+
+class TenantTicketCreateRequest(BaseModel):
+    subject: str
+    category: Optional[str] = "General"
+    priority: Optional[str] = "medium"
+    description: str
+
+class TenantTicketReplyRequest(BaseModel):
+    message: str
+
+
+@router.get("/{tenant_id}/tickets")
+async def get_tenant_tickets(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin", "super_admin")),
+):
+    """Retrieve all support tickets for a specific tenant organization."""
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from models.system import SupportTicket
+    tickets = db.query(SupportTicket).filter(SupportTicket.tenant_id == tenant_id).order_by(SupportTicket.created_at.desc()).all()
+    return [
+        {
+            "id": f"TKT-{t.id:03d}",
+            "numeric_id": t.id,
+            "subject": t.subject,
+            "category": t.category or "General",
+            "priority": t.priority,
+            "status": t.status,
+            "description": t.description or "No description provided.",
+            "org": t.tenant.name if t.tenant else "Organization",
+            "orgId": t.tenant_id,
+            "createdAt": t.created_at.isoformat() + "Z" if t.created_at else None,
+            "replies": t.replies_count or 0,
+            "raised_by": t.raised_by_user.full_name if t.raised_by_user else "Organization Admin"
+        }
+        for t in tickets
+    ]
+
+
+@router.post("/{tenant_id}/tickets", status_code=201)
+async def create_tenant_ticket(
+    tenant_id: int,
+    payload: TenantTicketCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin", "super_admin")),
+):
+    """Org Admin: Raise a new support ticket to Super Admin."""
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from models.system import SupportTicket
+    from models.audit_log import AuditLog
+
+    ticket = SupportTicket(
+        tenant_id=tenant_id,
+        subject=payload.subject.strip(),
+        category=payload.category or "General",
+        priority=payload.priority or "medium",
+        status="open",
+        raised_by=current_user.id,
+        description=payload.description.strip(),
+        replies_count=0
+    )
+    db.add(ticket)
+    db.flush()
+
+    audit = AuditLog(
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        action="ticket_created",
+        resource="support_ticket",
+        details={"ticket_id": f"TKT-{ticket.id:03d}", "subject": ticket.subject, "priority": ticket.priority},
+        ip_address="127.0.0.1"
+    )
+    db.add(audit)
+    db.commit()
+    db.refresh(ticket)
+
+    return {
+        "id": f"TKT-{ticket.id:03d}",
+        "numeric_id": ticket.id,
+        "subject": ticket.subject,
+        "category": ticket.category or "General",
+        "priority": ticket.priority,
+        "status": ticket.status,
+        "description": ticket.description,
+        "orgId": ticket.tenant_id,
+        "createdAt": ticket.created_at.isoformat() + "Z" if ticket.created_at else None,
+        "replies": ticket.replies_count or 0,
+        "raised_by": current_user.full_name or "Organization Admin"
+    }
+
+
+@router.post("/{tenant_id}/tickets/{ticket_id}/reply")
+async def reply_tenant_ticket(
+    tenant_id: int,
+    ticket_id: str,
+    payload: TenantTicketReplyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("tenant_admin", "super_admin")),
+):
+    """Org Admin: Reply to their support ticket thread."""
+    if current_user.role == "tenant_admin" and current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from models.system import SupportTicket
+    clean_id = str(ticket_id).replace("TKT-", "").replace("TK-", "")
+    try:
+        t_id = int(clean_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid ticket ID")
+
+    ticket = db.query(SupportTicket).filter(SupportTicket.id == t_id, SupportTicket.tenant_id == tenant_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    ticket.replies_count = (ticket.replies_count or 0) + 1
+    db.commit()
+    db.refresh(ticket)
+    return {
+        "message": "Response dispatched to platform operations desk",
+        "ticket_id": f"TKT-{ticket.id:03d}",
+        "replies": ticket.replies_count,
+        "status": ticket.status
+    }
+
 
 

@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { tenantsAPI } from '../../services/api.service';
+import { tenantsAPI, authAPI } from '../../services/api.service';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import { 
   Settings, Palette, Globe, Upload, Check, AlertCircle, Building2,
   Search, Plus, Webhook, Video, MessageSquare, CreditCard, Puzzle, Link2,
   Download, ExternalLink, Zap, CheckCircle2, FileText, X, Copy, Shield,
-  RefreshCw, Trash2, Key, Sliders, Smartphone, CheckSquare
+  RefreshCw, Trash2, Key, Sliders, Smartphone, CheckSquare, LifeBuoy, User
 } from 'lucide-react';
 import Loader from '../../components/ui/Loader';
+import { applyTenantTheme, cacheTenantTheme, PRESET_THEMES, resetTenantTheme } from '../../utils/themeUtils';
 
 // ── General Profile / Branding ───────────────────────────────────────────────
 function LivePreview({ name, primary, secondary, logoUrl }) {
@@ -114,13 +116,17 @@ function GeneralTab({ tenantId }) {
     mutationFn: (data) => tenantsAPI.update(tenantId, data),
     onSuccess: (res) => {
       qc.invalidateQueries(['tenant', tenantId]);
-      toast.success('Organization settings & branding saved successfully!');
+      qc.invalidateQueries(['tenant-branding-active', tenantId]);
       if (res.data?.primary_color) {
-        document.documentElement.style.setProperty('--brand-600', res.data.primary_color);
+        applyTenantTheme(res.data.primary_color, res.data.secondary_color);
+        cacheTenantTheme(tenantId, {
+          primary_color: res.data.primary_color,
+          secondary_color: res.data.secondary_color,
+          logo_url: res.data.logo_url,
+          name: res.data.name,
+        });
       }
-      if (res.data?.secondary_color) {
-        document.documentElement.style.setProperty('--brand-500', res.data.secondary_color);
-      }
+      toast.success('Organization branding & settings saved globally across your institution!');
     },
     onError: (err) => toast.error(err.response?.data?.detail || 'Failed to save settings'),
   });
@@ -162,7 +168,18 @@ function GeneralTab({ tenantId }) {
   };
 
   if (isLoading) return <Loader text="Loading settings..." />;
-  const set = (field) => (val) => setForm(f => ({ ...f, [field]: val }));
+  const set = (field) => (val) => {
+    setForm(f => {
+      const next = { ...f, [field]: val };
+      if (field === 'primary_color' || field === 'secondary_color') {
+        applyTenantTheme(
+          field === 'primary_color' ? val : next.primary_color,
+          field === 'secondary_color' ? val : next.secondary_color
+        );
+      }
+      return next;
+    });
+  };
 
   return (
     <div style={{ display: 'flex', gap: '2.5rem', alignItems: 'flex-start' }}>
@@ -231,12 +248,67 @@ function GeneralTab({ tenantId }) {
 
           {/* Theming & Appearance */}
           <div>
-            <h3 style={{ fontSize: '1.0625rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 1.25rem' }}>
-              <Palette size={20} color="var(--brand-600)" /> Theming &amp; Appearance
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: 10 }}>
+              <div>
+                <h3 style={{ fontSize: '1.0625rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 10, margin: 0 }}>
+                  <Palette size={20} color="var(--brand-600)" /> Theming &amp; White-Label Branding
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                  Changes are applied in real-time live preview across all navigation items, buttons, and badges.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setForm(f => ({ ...f, primary_color: '#0e7490', secondary_color: '#0891b2' }));
+                  resetTenantTheme();
+                  toast.success('Reset to platform default cyan theme');
+                }}
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: '0.75rem', fontWeight: 700, gap: 6, color: 'var(--text-muted)' }}
+              >
+                <RefreshCw size={13} /> Reset Defaults
+              </button>
+            </div>
+
+            {/* Curated Presets Ribbon */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>
+                Curated Institution Palettes:
+              </span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {PRESET_THEMES.map(preset => {
+                  const isSelected = form.primary_color.toLowerCase() === preset.primary.toLowerCase();
+                  return (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => {
+                        setForm(f => ({ ...f, primary_color: preset.primary, secondary_color: preset.secondary }));
+                        applyTenantTheme(preset.primary, preset.secondary);
+                        toast.success(`Selected ${preset.name} palette`);
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px',
+                        borderRadius: 12, border: `1.5px solid ${isSelected ? preset.primary : 'var(--glass-border)'}`,
+                        background: isSelected ? preset.previewBg : 'var(--surface-0)',
+                        cursor: 'pointer', transition: 'all 0.15s',
+                        boxShadow: isSelected ? `0 2px 8px ${preset.primary}25` : 'none'
+                      }}
+                    >
+                      <div style={{ width: 14, height: 14, borderRadius: '50%', background: `linear-gradient(135deg, ${preset.primary}, ${preset.secondary})`, border: '1px solid rgba(0,0,0,0.1)' }} />
+                      <span style={{ fontSize: '0.75rem', fontWeight: isSelected ? 800 : 600, color: isSelected ? preset.primary : 'var(--text-primary)' }}>
+                        {preset.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 260 }}>
-                <p style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)', marginBottom: 8 }}>Brand Logo</p>
+                <p style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)', marginBottom: 8 }}>Institution Brand Logo</p>
                 <div 
                   onClick={() => fileInputRef.current?.click()}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '2rem', borderRadius: 16, border: '2px dashed var(--surface-3)', background: 'var(--surface-0)', cursor: 'pointer', transition: 'border-color 0.2s' }}
@@ -265,9 +337,25 @@ function GeneralTab({ tenantId }) {
               </div>
 
               <div style={{ flex: 1, minWidth: 300, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <p style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)', margin: 0 }}>Color Palette</p>
+                <p style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)', margin: 0 }}>Custom Hex Palette</p>
                 <ColorRow label="Primary Brand Color" value={form.primary_color} onChange={set('primary_color')} />
                 <ColorRow label="Accent Highlights Color" value={form.secondary_color} onChange={set('secondary_color')} />
+
+                {/* Live Sandbox Preview */}
+                <div style={{ padding: '1rem', background: 'var(--surface-0)', borderRadius: 14, border: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div>
+                    <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Live Sandbox Test:</span>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-600)', background: 'var(--brand-50)', padding: '3px 8px', borderRadius: 6, border: '1px solid var(--brand-200)' }}>
+                        Active Badge
+                      </span>
+                      <button type="button" className="btn btn-primary btn-sm" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
+                        Primary Action
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--brand-600)', boxShadow: 'var(--shadow-brand)' }} />
+                </div>
               </div>
             </div>
           </div>
@@ -956,8 +1044,100 @@ Thank you for powering your academic operations with Lumina.`;
   );
 }
 
+// ── Admin Profile & Password Tab ─────────────────────────────────────────────
+function AdminProfileTab() {
+  const { user, updateUser } = useAuthStore();
+  const [fullName, setFullName] = useState(user?.full_name || '');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    try {
+      const res = await authAPI.updateProfile({ full_name: fullName.trim() });
+      updateUser({ full_name: res.data.full_name });
+      toast.success('Admin profile updated!');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to update profile');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await authAPI.changePassword({ current_password: currentPassword, new_password: newPassword });
+      toast.success('Admin password updated successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to update password');
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '2rem' }}>
+      <form onSubmit={handleSaveProfile} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Administrator Profile</h3>
+        <div>
+          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Full Name</label>
+          <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} className="input-field" style={{ width: '100%' }} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Admin Email</label>
+          <input type="email" disabled value={user?.email || ''} className="input-field" style={{ width: '100%', background: 'var(--surface-2)', cursor: 'not-allowed' }} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Role & Permissions</label>
+          <input type="text" disabled value="Organization Administrator (Tenant Admin)" className="input-field" style={{ width: '100%', background: 'var(--surface-2)', cursor: 'not-allowed' }} />
+        </div>
+        <button type="submit" disabled={savingProfile} className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: 8 }}>
+          {savingProfile ? 'Saving...' : 'Save Profile'}
+        </button>
+      </form>
+
+      <form onSubmit={handleChangePassword} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Change Password</h3>
+        <div>
+          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Current Password</label>
+          <input type="password" required value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="input-field" style={{ width: '100%' }} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>New Password</label>
+          <input type="password" required value={newPassword} onChange={e => setNewPassword(e.target.value)} className="input-field" style={{ width: '100%' }} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Confirm New Password</label>
+          <input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="input-field" style={{ width: '100%' }} />
+        </div>
+        <button type="submit" disabled={savingPassword} className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: 8 }}>
+          {savingPassword ? 'Updating...' : 'Update Password'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 // ── Main Settings Hub ─────────────────────────────────────────────────────────
 export default function OrgSettingsHub() {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const tenantId = user?.tenant_id || 1;
   const [activeTab, setActiveTab] = useState('general');
@@ -966,6 +1146,8 @@ export default function OrgSettingsHub() {
     { id: 'general', label: 'General & Branding', icon: Settings },
     { id: 'integrations', label: 'Integrations & Webhooks', icon: Puzzle },
     { id: 'billing', label: 'Billing & Plan', icon: CreditCard },
+    { id: 'profile', label: 'Admin Account & Security', icon: User },
+    { id: 'support', label: 'Support Desk (Raise Ticket)', icon: LifeBuoy, isLink: true },
   ];
 
   return (
@@ -976,7 +1158,13 @@ export default function OrgSettingsHub() {
           {tabs.map(t => (
             <button 
               key={t.id}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => {
+                if (t.isLink) {
+                  navigate('/admin/support');
+                } else {
+                  setActiveTab(t.id);
+                }
+              }}
               style={{ 
                 display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', borderRadius: 12, border: 'none', cursor: 'pointer',
                 fontWeight: 800, fontSize: '0.875rem', transition: 'all 0.2s',
@@ -993,6 +1181,7 @@ export default function OrgSettingsHub() {
       {activeTab === 'general' && <GeneralTab tenantId={tenantId} />}
       {activeTab === 'integrations' && <IntegrationsTab tenantId={tenantId} />}
       {activeTab === 'billing' && <BillingTab tenantId={tenantId} />}
+      {activeTab === 'profile' && <AdminProfileTab />}
     </div>
   );
 }

@@ -53,6 +53,7 @@ class TokenResponse(BaseModel):
     user_id: int
     role: str
     full_name: str
+    avatar_url: Optional[str] = None
     tenant_id: Optional[int]
 
 

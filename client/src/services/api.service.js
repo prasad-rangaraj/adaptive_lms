@@ -40,6 +40,8 @@ export const authAPI = {
   register: (data) => api.post('/api/auth/register', data),
   registerOrg: (data) => api.post('/api/auth/register-org', data),
   me: () => api.get('/api/auth/me'),
+  updateProfile: (data) => api.put('/api/auth/me', data),
+  changePassword: (data) => api.put('/api/auth/change-password', data),
   impersonate: (userId) => api.post(`/api/auth/impersonate/${userId}`),
 };
 
@@ -57,7 +59,7 @@ export const adminAPI = {
   listGlobalCourses: () => api.get('/api/admin/courses/global'),
 
   // Audit & Logs
-  listAuditLogs: () => api.get('/api/admin/audit-logs'),
+  listAuditLogs: (params) => api.get('/api/admin/audit-logs', { params }),
 
   // Billing & Stats
   getBillingStats: () => api.get('/api/admin/billing'),
@@ -68,6 +70,7 @@ export const adminAPI = {
 
   // Support
   getSupportTickets: () => api.get('/api/admin/tickets'),
+  createTicket: (data) => api.post('/api/admin/tickets', data),
   replyToTicket: (ticketId, message) => api.post(`/api/admin/tickets/${ticketId}/reply`, { message }),
   updateTicketStatus: (ticketId, status) => api.patch(`/api/admin/tickets/${ticketId}/status`, { status }),
 
@@ -125,6 +128,11 @@ export const tenantsAPI = {
   getApiKeys: (tenantId) => api.get(`/api/tenants/${tenantId}/api-keys`),
   createApiKey: (tenantId, payload) => api.post(`/api/tenants/${tenantId}/api-keys`, payload),
   deleteApiKey: (tenantId, keyId) => api.delete(`/api/tenants/${tenantId}/api-keys/${keyId}`),
+
+  // Support Tickets
+  getTickets: (tenantId) => api.get(`/api/tenants/${tenantId}/tickets`),
+  createTicket: (tenantId, data) => api.post(`/api/tenants/${tenantId}/tickets`, data),
+  replyTicket: (tenantId, ticketId, message) => api.post(`/api/tenants/${tenantId}/tickets/${ticketId}/reply`, { message }),
 };
 
 export const orgAIAPI = {
@@ -271,8 +279,13 @@ export const academicAPI = {
   getAssignments: () => api.get('/api/academic/assignments'),
   getPYQs: () => api.get('/api/academic/pyqs'),
   getMarks: () => api.get('/api/academic/marks'),
+  getTeacherActiveSession: () => api.get('/api/academic/teacher/active-session'),
   getTeacherAttendance: () => api.get('/api/academic/teacher/attendance'),
   updateTeacherAttendance: (payload) => api.post('/api/academic/teacher/attendance', payload),
+  runAutoCapture: (courseId) =>
+    api.post('/api/academic/teacher/attendance/auto-capture', null, {
+      params: courseId && courseId !== 'all' ? { course_id: courseId } : {},
+    }),
   getTeacherLeaveRequests: () => api.get('/api/academic/teacher/leave-requests'),
   updateLeaveRequest: (id, payload) => api.put(`/api/academic/teacher/leave-requests/${id}`, payload),
   getTeacherQuestions: () => api.get('/api/academic/teacher/questions'),
@@ -321,6 +334,8 @@ export const communityAPI = {
   getTeacherBounties: () => api.get('/api/community/teacher/bounties'),
   getTeacherMentees: () => api.get('/api/community/teacher/mentees'),
   acceptMentorship: (id) => api.put(`/api/community/teacher/mentees/${id}/accept`),
+  assignMentee: (data) => api.post('/api/community/teacher/mentees/assign', data),
+  getAvailableStudents: () => api.get('/api/community/teacher/available-students'),
   
   sendMessage: (data) => api.post('/api/community/messages', data),
   getMessageRecipients: () => api.get('/api/community/message-recipients'),

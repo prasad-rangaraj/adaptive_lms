@@ -115,7 +115,11 @@ function InvoicesLedgerTab() {
       plan: p,
       amount: rate,
       status: t.is_active ? 'paid' : 'past_due',
-      date: t.created_at ? new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: '01', year: 'numeric' }) : 'Oct 01, 2026'
+      date: (() => {
+        if (!t.created_at) return 'Oct 01, 2026';
+        const d = new Date(t.created_at);
+        return !isNaN(d.getTime()) ? d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Oct 01, 2026';
+      })()
     };
   });
 

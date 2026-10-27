@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminAPI } from '../../services/api.service';
 import Loader from '../../components/ui/Loader';
@@ -63,6 +64,27 @@ function TicketInboxTab() {
       toast.success(res.data.message || 'Status updated');
     },
     onError: () => toast.error('Failed to update status')
+  });
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newSubject, setNewSubject] = useState('');
+  const [newCategory, setNewCategory] = useState('General Technical Support');
+  const [newPriority, setNewPriority] = useState('medium');
+  const [newDescription, setNewDescription] = useState('');
+
+  const createMutation = useMutation({
+    mutationFn: (data) => adminAPI.createTicket(data),
+    onSuccess: (res) => {
+      qc.invalidateQueries(['supportTickets']);
+      setShowCreateModal(false);
+      setNewSubject('');
+      setNewDescription('');
+      toast.success(`Ticket ${res.data.id} created.`);
+    },
+    onError: (err) => {
+      const msg = err.response?.data?.detail || 'Failed to create ticket';
+      toast.error(msg);
+    }
   });
 
   const filtered = tickets.filter(t => {
@@ -141,19 +163,39 @@ function TicketInboxTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
+      {/* Segmented Status Toggle Dock */}
+      <div style={{ display: 'inline-flex', background: 'var(--surface-0)', padding: 5, borderRadius: 16, border: '1.5px solid var(--glass-border)', gap: 4, flexWrap: 'wrap', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
         {[
-          { key: 'all',        label: 'All Tickets',  count: tickets.length },
-          { key: 'open',       label: 'Open',         count: counts.open || 0,        color: '#dc2626', bg: '#fef2f2' },
-          { key: 'in_progress',label: 'In Progress',  count: counts.in_progress || 0, color: '#d97706', bg: '#fffbeb' },
-          { key: 'resolved',   label: 'Resolved',     count: counts.resolved || 0,    color: '#16a34a', bg: '#f0fdf4' },
-        ].map(({ key, label, count, color, bg }) => {
+          { key: 'all',        label: 'All Tickets',  count: tickets.length, color: 'var(--brand-600)' },
+          { key: 'open',       label: 'Open',         count: counts.open || 0,        color: '#dc2626' },
+          { key: 'in_progress',label: 'In Progress',  count: counts.in_progress || 0, color: '#d97706' },
+          { key: 'resolved',   label: 'Resolved',     count: counts.resolved || 0,    color: '#16a34a' },
+        ].map(({ key, label, count, color }) => {
           const active = statusFilter === key;
-          const c = color || 'var(--brand-500)';
-          const b = bg || 'var(--brand-50)';
           return (
-            <button key={key} onClick={() => setStatusFilter(key)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 999, border: `2px solid ${active ? c : 'var(--glass-border)'}`, background: active ? b : 'transparent', color: active ? c : 'var(--text-muted)', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>
-              {label} <span style={{ background: active ? c : 'var(--surface-3)', color: active ? 'white' : 'var(--text-secondary)', borderRadius: 999, padding: '1px 7px', fontSize: '0.6875rem', fontWeight: 700 }}>{count}</span>
+            <button 
+              key={key} 
+              onClick={() => setStatusFilter(key)} 
+              style={{ 
+                display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 11, 
+                border: active ? `1.5px solid ${color}` : '1.5px solid transparent', 
+                background: active ? `${color}12` : 'transparent', 
+                color: active ? color : 'var(--text-secondary)', 
+                fontSize: '0.8125rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                boxShadow: active ? `0 2px 8px ${color}20` : 'none'
+              }}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--surface-1)'; }}
+              onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+            >
+              <span>{label}</span>
+              <span style={{ 
+                background: active ? color : 'var(--surface-2)', 
+                color: active ? 'white' : 'var(--text-muted)', 
+                borderRadius: 999, padding: '2px 8px', fontSize: '0.6875rem', fontWeight: 800,
+                transition: 'all 0.2s'
+              }}>
+                {count}
+              </span>
             </button>
           );
         })}
@@ -165,7 +207,12 @@ function TicketInboxTab() {
             <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
             <input type="text" placeholder="Search tickets..." value={search} onChange={e => setSearch(e.target.value)} className="input-field" style={{ paddingLeft: '2.25rem', width: '100%', height: 36, fontSize: '0.875rem' }} />
           </div>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, background: 'var(--surface-0)', padding: '4px 10px', borderRadius: 999, border: '1px solid var(--glass-border)', flexShrink: 0 }}>{filtered.length} tickets</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, background: 'var(--surface-0)', padding: '4px 10px', borderRadius: 999, border: '1px solid var(--glass-border)', flexShrink: 0 }}>{filtered.length} tickets</span>
+            <button onClick={() => setShowCreateModal(true)} className="btn btn-primary btn-sm" style={{ gap: 6, fontWeight: 700 }}>
+              <Plus size={14} /> New Ticket
+            </button>
+          </div>
         </div>
 
         {!filtered.length ? (
@@ -173,9 +220,9 @@ function TicketInboxTab() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {filtered.map((ticket, i) => {
-              const priority = PRIORITY_META[ticket.priority];
-              const status = STATUS_META[ticket.status];
-              const PIcon = priority.icon;
+              const priority = PRIORITY_META[ticket.priority] || PRIORITY_META.medium;
+              const status = STATUS_META[ticket.status] || STATUS_META.open;
+              const PIcon = priority.icon || Circle;
               return (
                 <div key={ticket.id} onClick={() => setSelected(ticket)} style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', padding: '1.25rem 1.5rem', cursor: 'pointer', borderBottom: i < filtered.length - 1 ? '1px solid var(--glass-border)' : 'none', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <div style={{ width: 36, height: 36, borderRadius: 10, background: priority.bg, border: `1px solid ${priority.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><PIcon size={16} color={priority.color} /></div>
@@ -201,6 +248,122 @@ function TicketInboxTab() {
           </div>
         )}
       </div>
+
+      {/* Super Admin Ticket Creation Modal */}
+      {showCreateModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem'
+        }}>
+          <div className="glass-card animate-scale-in" style={{
+            width: '100%', maxWidth: 580, background: 'var(--surface-0)',
+            borderRadius: 20, border: '1px solid var(--glass-border)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden'
+          }}>
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface-1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--brand-100)', color: 'var(--brand-700)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Plus size={18} />
+                </div>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  Create Platform Service Ticket
+                </h3>
+              </div>
+              <button onClick={() => setShowCreateModal(false)} className="btn btn-ghost btn-icon btn-sm" style={{ color: 'var(--text-muted)' }}>
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={e => {
+              e.preventDefault();
+              if (!newSubject.trim() || !newDescription.trim()) return;
+              createMutation.mutate({
+                subject: newSubject.trim(),
+                category: newCategory,
+                priority: newPriority,
+                description: newDescription.trim()
+              });
+            }} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                  Subject *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Scheduled Maintenance for DB Cluster"
+                  value={newSubject}
+                  onChange={e => setNewSubject(e.target.value)}
+                  className="input-field"
+                  style={{ width: '100%', fontSize: '0.875rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                    Category
+                  </label>
+                  <select
+                    value={newCategory}
+                    onChange={e => setNewCategory(e.target.value)}
+                    className="input-field"
+                    style={{ width: '100%', fontSize: '0.875rem' }}
+                  >
+                    <option value="General Technical Support">General Technical Support</option>
+                    <option value="Authentication & SSO">Authentication & SSO</option>
+                    <option value="Infrastructure & Latency">Infrastructure & Latency</option>
+                    <option value="AI Features & Engine Tuning">AI Features & Engine Tuning</option>
+                    <option value="Billing & Monetization">Billing & Monetization</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                    Priority
+                  </label>
+                  <select
+                    value={newPriority}
+                    onChange={e => setNewPriority(e.target.value)}
+                    className="input-field"
+                    style={{ width: '100%', fontSize: '0.875rem' }}
+                  >
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                  Description *
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Explain the technical issue or operational task..."
+                  value={newDescription}
+                  onChange={e => setNewDescription(e.target.value)}
+                  className="input-field"
+                  style={{ width: '100%', resize: 'vertical', fontSize: '0.875rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setShowCreateModal(false)} className="btn btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" disabled={createMutation.isPending} className="btn btn-primary" style={{ gap: 6 }}>
+                  {createMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  {createMutation.isPending ? 'Creating...' : 'Create Ticket'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -317,19 +480,49 @@ export default function GlobalServiceHub() {
           <h1 style={{ fontSize: '1.875rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.1 }}>Service & Helpdesk Hub</h1>
         </div>
         
-        <div style={{ display: 'flex', background: 'var(--surface-1)', padding: 6, borderRadius: 16, border: '1px solid var(--glass-border)', gap: 4, overflowX: 'auto' }}>
+        {/* Segmented Service Command Dock */}
+        <div className="hide-scrollbar" style={{
+          display: 'flex', background: 'var(--surface-0)', padding: 6,
+          borderRadius: 20, border: '1.5px solid var(--glass-border)', gap: 6,
+          overflowX: 'auto', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', flexWrap: 'nowrap'
+        }}>
           {[
             { id: 'inbox', label: 'Ticket Inbox', icon: MessageSquare },
             { id: 'sla', label: 'SLA Monitor', icon: Activity },
             { id: 'knowledge', label: 'Knowledge Base', icon: LayoutGrid },
             { id: 'feedback', label: 'Feature Requests', icon: Lightbulb },
-          ].map(t => (
-            <button 
-              key={t.id} onClick={() => setActiveTab(t.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.875rem', transition: 'all 0.2s', whiteSpace: 'nowrap', background: activeTab === t.id ? 'white' : 'transparent', color: activeTab === t.id ? 'var(--brand-600)' : 'var(--text-muted)', boxShadow: activeTab === t.id ? '0 2px 8px rgba(0,0,0,0.06)' : 'none' }}>
-              <t.icon size={16} /> {t.label}
-            </button>
-          ))}
+          ].map(t => {
+            const isActive = activeTab === t.id;
+            return (
+              <button 
+                key={t.id} 
+                onClick={() => setActiveTab(t.id)}
+                style={{ 
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', borderRadius: 14, 
+                  border: isActive ? '1px solid var(--brand-300)' : '1px solid transparent', 
+                  cursor: 'pointer', fontWeight: 800, fontSize: '0.875rem', transition: 'all 0.2s', whiteSpace: 'nowrap', 
+                  background: isActive ? 'linear-gradient(135deg, white, var(--brand-50))' : 'transparent', 
+                  color: isActive ? 'var(--brand-700)' : 'var(--text-secondary)', 
+                  boxShadow: isActive ? '0 4px 14px var(--brand-500)20, inset 0 1px 1px white' : 'none' 
+                }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--surface-1)'; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{
+                  width: 24, height: 24, borderRadius: 8,
+                  background: isActive ? 'var(--brand-100)' : 'var(--surface-2)',
+                  color: isActive ? 'var(--brand-600)' : 'var(--text-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <t.icon size={14} />
+                </div>
+                <span>{t.label}</span>
+                {isActive && (
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand-600)', boxShadow: '0 0 8px var(--brand-600)' }} />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 

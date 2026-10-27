@@ -19,8 +19,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await authAPI.login(email, password);
-      const { access_token, user_id, role, full_name, tenant_id } = res.data;
-      login({ id: user_id, role, full_name, email, tenant_id }, access_token);
+      const { access_token, user_id, role, full_name, tenant_id, avatar_url } = res.data;
+      login({ id: user_id, role, full_name, email, tenant_id, avatar_url }, access_token);
       toast.success(`Welcome back, ${full_name}! 👋`);
       if (role === 'student') navigate('/student/dashboard');
       else if (role === 'teacher') navigate('/teacher/dashboard');
